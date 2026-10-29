@@ -1,43 +1,59 @@
-# TimeLapse
-A time lapse app for Sony Alpha cameras using the [OpenMemories: Framework](https://github.com/ma1co/OpenMemories-Framework).
+# TimeLapse+
 
-I have only a a6300 to test it, if you have another camera I would be happy to receive bug reports.
+An in-camera time-lapse (intervalometer) app for Sony cameras that run PlayMemories Camera Apps, built on the [OpenMemories: Framework](https://github.com/ma1co/OpenMemories-Framework).
 
-## Installation ##
-Use [Sony-PMCA-RE](https://github.com/ma1co/Sony-PMCA-RE) or install through [sony-pmca.appspot.com](https://sony-pmca.appspot.com/apps).
+This is a maintained continuation of [jonasjuffinger/TimeLapse](https://github.com/jonasjuffinger/TimeLapse) (dormant since 2020), consolidating the holy-grail exposure ramping from [Frosbe/SonyHolyGrailTimelapse](https://github.com/Frosbe/SonyHolyGrailTimelapse) and targeting the bodies upstream never tested:
 
-Thanks to [ma1co](https://github.com/ma1co) for creating this amazing framework and [obs1dium](https://github.com/obs1dium), I used FocusBracket as a code base.
+| Camera | PMCA API | Status |
+|---|---|---|
+| ILCE-6500 (a6500) | 2.17 | primary target |
+| NEX-5T | 1.1 | primary target |
+| ILCE-6300 (a6300) | 2.15 | upstream's test body |
+| other PMCA cameras | — | may work; reports welcome |
 
-## Usage ##
-The app is easy to use. It doesn't have any controls for shutter speed, aperture, ISO, picture quality etc. Adjust all this settings before starting the app, it will use them. If you don't want the camera to focus before each shot, set the camera to manual mode.
+Sony closed the PlayMemories store in 2025, so its own Time-lapse app can no longer be downloaded. This app is free and MIT-licensed.
 
-Then start the app set the shoot interval and the amount of pictures it should take. Below the seek bars you can see how long it will take to shoot all the photos and how long the video will be. The fps setting only changes the calculation of the video length, the app doesn't produce a video.
+> **Status:** under active rework — see [docs/plan.md](docs/plan.md). The usage notes below describe the upstream 1.4.0 behavior and will change.
 
-Finally click the start button and wait.
+## Installation
 
-You can stop by clicking the MENU button on the camera.
+Install the APK from the [releases](https://github.com/nathanrcast/pmca-timelapse/releases) page with [PMCA-RE RELOADED](https://github.com/masterflai/pmca-re-reloaded) (`pmca-console install --apk <file>`), or the original [Sony-PMCA-RE](https://github.com/ma1co/Sony-PMCA-RE).
 
-## SS (Silent Shutter) ##
-The silent shutter option is functionless on cameras without silent shutter mode.
+The package id (`io.github.nathanrcast.timelapse`) differs from upstream's, so both can be installed side by side.
 
-## MF (Manual Focus) ##
-This sets focus mode to manual. Be sure to have focused before starting the app!
+## Usage
 
-## AEL (Auto Exposure Lock) ##
-This locks the exposure to the exposure of the first shot.
+The app has no controls for shutter speed, aperture, ISO or picture quality — set those on the camera before starting the app and it uses them. Set the camera to manual focus if you don't want it to refocus before each shot.
 
-## BRC3 ##
-The app supports exposure bracketing. Set the mode to three-image exposure bracketing outside of the app and check BRC3 checkbox in the app. The app will always take three pictures. Keep in mind that the interval time must be large enough to take all three pictures.
+Start the app, set the interval and the number of pictures. The screen shows how long the shoot takes and how long the resulting clip will be at the chosen fps (the app doesn't produce a video). Press start; press MENU to stop.
 
-## DOFF (Display Off) ##
-Turn the display off between each shot. This doesn't change the battery consumption but it can be healthy for the display when taking very long time lapses.
+- **SS (Silent Shutter)** — no effect on cameras without a silent shutter mode.
+- **MF (Manual Focus)** — sets focus to manual. Focus before starting.
+- **AEL (Auto Exposure Lock)** — locks exposure to that of the first shot.
+- **BRC3** — set three-image exposure bracketing on the camera, then tick BRC3. The interval must be long enough for all three frames.
+- **DOFF (Display Off)** — turns the display off between shots.
+- **Burst mode** — at the lowest interval the camera shoots as fast as the card can write, for the duration set by the second slider.
 
-## Burst mode ##
-When selecting the lowest interval the camera is in burst mode. In this mode it takes pictures as fast as it can write to the SD card for the duration set by the second slider.
+### Known issues (upstream 1.4.0)
 
-## Known Issues ##
+- Silent shutter must be off on some cameras.
+- If single-shot drive mode fails, try continuous.
+- Turn long-exposure noise reduction off when the interval is less than twice the shutter speed — otherwise every other frame is skipped.
 
-If the app crashes the camera, please try the following camera settings. They were reported to work with the RX100 M4.
- - The silent shutter needs to be disabled or unchecked in the app, on some cameras
- - If it doesn't work in single shoot mode, please try continuous shooting. It worked for some people.
- - Long exposure noise reduction should be turned off if the interval is less than double the shutter speed.
+## Building
+
+See [AGENTS.md](AGENTS.md) § Commands. The build is being modernized (ticket T01); until then it needs the legacy Android Gradle Plugin 3.5 toolchain.
+
+## Credits
+
+- [ma1co](https://github.com/ma1co) — OpenMemories framework, Sony-PMCA-RE, OpenMemories-Tweak
+- [obs1dium](https://github.com/obs1dium) — FocusBracket, the original code base
+- [jonasjuffinger](https://github.com/jonasjuffinger) — TimeLapse
+- [Frosbe](https://github.com/Frosbe) — holy-grail ramping
+- [masterflai](https://github.com/masterflai) — PMCA-RE RELOADED
+
+Not affiliated with or endorsed by Sony. Installing third-party apps on your camera is at your own risk.
+
+## License
+
+MIT — see [LICENSE.txt](LICENSE.txt).

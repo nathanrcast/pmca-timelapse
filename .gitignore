@@ -3,4 +3,11 @@
 /build
 /local.properties
 /*.iml
-/keystore.jks
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties
+/app/release/
+CLAUDE.local.md
+__pycache__/

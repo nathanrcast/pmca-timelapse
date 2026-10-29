@@ -4,7 +4,7 @@ android {
     compileSdkVersion 10
 
     defaultConfig {
-        applicationId "com.jonasjuffinger.timelapse"
+        applicationId "io.github.nathanrcast.timelapse"
         minSdkVersion 10
         targetSdkVersion 10
         versionCode 7
@@ -29,7 +29,7 @@ android {
 
 android.applicationVariants.all { variant ->
     variant.outputs.all { output ->
-        outputFileName =  "TimeLapse-${output.baseName}-${variant.versionName}.apk"
+        outputFileName =  "TimeLapsePlus-${output.baseName}-${variant.versionName}.apk"
     }
 }
 
