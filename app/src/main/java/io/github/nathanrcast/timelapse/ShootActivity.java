@@ -33,7 +33,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ShootActivity extends BaseActivity implements SurfaceHolder.Callback, CameraEx.ShutterListener, CameraEx.ShutterSpeedChangeListener
+public class ShootActivity extends BaseActivity implements SurfaceHolder.Callback, CameraEx.ShutterListener
 {
     private Settings settings;
 
@@ -322,37 +322,40 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         setAutoPowerOffMode(false);
 
-        // Exposure metering
-        cameraEx.setProgramLineRangeOverListener(new CameraEx.ProgramLineRangeOverListener()
-        {
-            @Override
-            public void onAERange(boolean b, boolean b1, boolean b2, CameraEx cameraEx)
+        // HG-only Sony calls: older bodies may lack them, so HG off must not touch them.
+        if (settings.holyGrail) {
+            // Exposure metering
+            cameraEx.setProgramLineRangeOverListener(new CameraEx.ProgramLineRangeOverListener()
             {
-                //log(String.format("onARRange b %b b1 %b b2 %b\n", Boolean.valueOf(b), Boolean.valueOf(b1), Boolean.valueOf(b2)));
-            }
-
-            @Override
-            public void onEVRange(int ev, CameraEx cameraEx)
-            {
-                exposureLevel = (float)ev / 3.0f;
-                if (settings.useCurrentExposure){
-                    targetExposureLevel = exposureLevel;
-                    settings.useCurrentExposure = false;
-                    updateScreen();
+                @Override
+                public void onAERange(boolean b, boolean b1, boolean b2, CameraEx cameraEx)
+                {
+                    //log(String.format("onARRange b %b b1 %b b2 %b\n", Boolean.valueOf(b), Boolean.valueOf(b1), Boolean.valueOf(b2)));
                 }
-                tvExposureLevel.setText(String.format("%.2f", exposureLevel));
-                //log(String.format("onEVRange i %d %f\n", ev, (float)ev / 3.0f));
-            }
 
-            @Override
-            public void onMeteringRange(boolean b, CameraEx cameraEx)
-            {
-                //log(String.format("onMeteringRange b %b\n", Boolean.valueOf(b)));
-            }
-        });
+                @Override
+                public void onEVRange(int ev, CameraEx cameraEx)
+                {
+                    exposureLevel = (float)ev / 3.0f;
+                    if (settings.useCurrentExposure){
+                        targetExposureLevel = exposureLevel;
+                        settings.useCurrentExposure = false;
+                        updateScreen();
+                    }
+                    tvExposureLevel.setText(String.format("%.2f", exposureLevel));
+                    //log(String.format("onEVRange i %d %f\n", ev, (float)ev / 3.0f));
+                }
 
-        updateShutterSpeed();
-        updateISOLevel();
+                @Override
+                public void onMeteringRange(boolean b, CameraEx cameraEx)
+                {
+                    //log(String.format("onMeteringRange b %b\n", Boolean.valueOf(b)));
+                }
+            });
+
+            updateShutterSpeed();
+            updateISOLevel();
+        }
         updateScreen();
     }
 
@@ -472,17 +475,22 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         catch (IOException e) {}
     }
 
-    @Override
-    public void onShutterSpeedChange(CameraEx.ShutterSpeedInfo shutterSpeedInfo, CameraEx cameraEx)
+    // Never registered (the fork never called setShutterSpeedChangeListener). It lives in its own
+    // class so ShootActivity doesn't depend on this interface when it loads on older bodies.
+    private static class HolyGrailShutterSpeedListener implements CameraEx.ShutterSpeedChangeListener
     {
-        int numerator = shutterSpeedInfo.currentShutterSpeed_n;
-        int denominator = shutterSpeedInfo.currentShutterSpeed_d;
-        //find the shutterspeed in the list (list of int[][])
-        int shutterSpeedIndex = 0;
-        for(int i = 0; i < SHUTTER_SPEEDS.length; i++){
-            if(SHUTTER_SPEEDS[i][0] == numerator && SHUTTER_SPEEDS[i][1] == denominator){
-                shutterSpeedIndex = i;
-                break;
+        @Override
+        public void onShutterSpeedChange(CameraEx.ShutterSpeedInfo shutterSpeedInfo, CameraEx cameraEx)
+        {
+            int numerator = shutterSpeedInfo.currentShutterSpeed_n;
+            int denominator = shutterSpeedInfo.currentShutterSpeed_d;
+            //find the shutterspeed in the list (list of int[][])
+            int shutterSpeedIndex = 0;
+            for(int i = 0; i < SHUTTER_SPEEDS.length; i++){
+                if(SHUTTER_SPEEDS[i][0] == numerator && SHUTTER_SPEEDS[i][1] == denominator){
+                    shutterSpeedIndex = i;
+                    break;
+                }
             }
         }
     }
