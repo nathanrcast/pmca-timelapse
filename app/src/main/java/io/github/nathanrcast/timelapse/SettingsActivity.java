@@ -23,6 +23,7 @@ import com.github.ma1co.pmcademo.app.BaseActivity;
 import com.sony.scalar.hardware.CameraEx;
 
 import io.github.nathanrcast.timelapse.core.Settings;
+import io.github.nathanrcast.timelapse.core.ShotPlan;
 import io.github.nathanrcast.timelapse.core.SliderMapping;
 import io.github.nathanrcast.timelapse.core.Util;
 
@@ -586,7 +587,8 @@ public class SettingsActivity extends BaseActivity
     };
 
     void updateTimes() {
-        if(settings.shotCount == Integer.MAX_VALUE)
+        ShotPlan plan = ShotPlan.of(settings);
+        if(plan.isInfinite())
         {
             tvDurationValue.setText("inf");
             tvDurationUnit.setText("");
@@ -595,18 +597,9 @@ public class SettingsActivity extends BaseActivity
             return;
         }
 
-        int duration = 0;
-        int videoTime = 0;
-        if(settings.interval == 0) {
-            duration = settings.shotCount;
-            videoTime = -1;
-        }
-        else {
-            duration = (int) Math.round(settings.interval * settings.shotCount);
-            videoTime = settings.shotCount / fps;
-        }
+        long videoTime = plan.clipSeconds(fps);
 
-        tvDurationValue.setText(Util.formatTime(duration));
+        tvDurationValue.setText(Util.formatTime(plan.durationSeconds()));
         tvDurationUnit.setText("");
 
         if(videoTime == -1) {
