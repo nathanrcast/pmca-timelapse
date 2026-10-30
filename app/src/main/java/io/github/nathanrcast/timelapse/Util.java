@@ -131,4 +131,14 @@ public class Util {
             0.9f,
             1.0f,
     };
+
+    public static String formatTime(long seconds)
+    {
+        if (seconds < 0) return "";
+        if (seconds < 60) return seconds + "s";
+        long h = seconds / 3600;
+        long m = (seconds / 60) % 60;
+        if (h > 0) return h + "h " + m + "m";
+        return m + "m " + (seconds % 60) + "s";
+    }
 }
