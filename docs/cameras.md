@@ -24,14 +24,14 @@ A CAPS file has these sections:
 
 ## How the app decides what a body can do (T07)
 
-`camera/SafeCamera` probes once per app session, the first time the settings screen opens:
+`camera/SafeCamera` decides in four steps:
 
-1. **Methods.** Every Sony method the app calls (`core.camera.SonyMethod`; each one is also in a CAPS file's *Used methods* section) is looked up by reflection. A method is absent if its class, a parameter type or the method itself can't be resolved. Nothing absent is ever called.
-2. **Values.** The camera is opened, each supported-value query (`core.camera.Query`) present on the firmware is called on a `ParametersModifier`, and the camera is released. A query that is absent or throws stays *unknown*. If the camera can't be opened, every value is unknown and the shoot screen probes again when it opens the camera.
+1. **Methods, once per process.** Every Sony method the app calls (`core.camera.SonyMethod`; each one is also in a CAPS file's *Used methods* section) is looked up by reflection. A method is absent if its class, a parameter type or the method itself can't be resolved. Nothing absent is ever called.
+2. **Values, at every run start.** Each supported-value query (`core.camera.Query`) present on the firmware is called on a `ParametersModifier`. A query that is absent or throws stays *unknown*. The values can depend on the body's current mode, so they are read again each time the shoot screen opens the camera, and the run is masked against those values. The settings screen also reads them once, on a background thread, to decide what to show. If it can't open the camera, it tries once more on its next resume, and shows every option until then.
 3. **Rules.** Each feature (`core.camera.Feature`) needs all of its methods. Where the firmware reports a value list, the value the app sets must be in it; an unknown list doesn't veto. The two `isSupported*` answers must be known and `true`.
 4. **Profile.** `camera/ModelProfile` then switches features off for behaviour reflection can't see, keyed on `DeviceInfo.getModel()`. A profile can't switch a feature on.
 
-An option the body lacks is hidden on the settings screen and forced off for the run. If a *core* method (open, release, `getNormalCamera`, `createParametersModifier`, `setShutterListener`, `burstableTakePicture`, `cancelTakePicture`) is missing, the shoot screen shows *Camera unavailable* instead of opening the camera. Each launch writes the result to `TIMELPS/LOG.TXT` as `Capabilities:` lines (model and profile, absent methods, features on/off, every value), and each failing camera call is logged once per run as `SafeCamera: UNSUPPORTED …` or `SafeCamera: FAILED …`.
+An option the body lacks is hidden on the settings screen, but its saved value is kept, so a probe that failed once doesn't lose the user's choice. The run's copy of the settings is masked instead (`core.camera.RunOptions`, the single gate), and the masked options are logged. If a *core* method (open, release, `getNormalCamera`, `createParametersModifier`, `setShutterListener`, `burstableTakePicture`, `cancelTakePicture`) is missing, the shoot screen shows *Camera unavailable* instead of opening the camera. Each probe and each run start writes the result to `TIMELPS/LOG.TXT` as `Capabilities:` lines (model and profile, absent methods, features on/off, every value), and each failing camera call is logged once per run as `SafeCamera: UNSUPPORTED …` or `SafeCamera: FAILED …`.
 
 | Option | Feature | Needs these methods | and these values (when reported) |
 |---|---|---|---|
@@ -40,9 +40,9 @@ An option the body lacks is hidden on the settings screen and forced off for the
 | BRC3 | `BRACKET_3` | `setDriveMode`, `setBracketMode`, `setExposureBracketMode`, `setExposureBracketPeriod`, `setNumOfBracketPicture` | drive modes have `bracket`, bracket modes `exposure`, exposure-bracket modes `single`, bracket counts `3` |
 | Holy grail | `HOLY_GRAIL` | `setProgramLineRangeOverListener`, `getShutterSpeed`, `getISOSensitivity`, `setISOSensitivity`, `incrementShutterSpeed`, `decrementShutterSpeed`, `createEmptyParameters` | — |
 | MF | `TOGGLE_FOCUS`, else `FOCUS_MODE_MANUAL` | `setToggleFocusMode`, `isSupportedToggleFocusMode`; the fallback needs none (Android `setFocusMode`) | `isSupportedToggleFocusMode()` is `true`; for the fallback, `getSupportedFocusModes` has `manual` |
-| Burst (interval 0) | `BURST` | `setDriveMode`, `getSupportedBurstDriveSpeeds`, `setBurstDriveSpeed`, `setBurstDriveButtonReleaseBehave` | drive modes have `burst`, burst speeds not empty; otherwise single drive |
+| Burst (interval 0) | `BURST` | `setDriveMode`, `getSupportedBurstDriveSpeeds`, `setBurstDriveSpeed`, `setBurstDriveButtonReleaseBehave` | drive modes have `burst`, burst speeds not empty; otherwise the settings screen shows the burst position as *n/a* and the run uses the shortest interval (1 s) |
 
-MF prefers the AF/MF toggle. The stubs have no getter for the toggle state, so the app reads the focus mode first: if the body is already in manual focus it leaves the toggle alone, otherwise it engages the toggle and releases it when the run ends. If the toggle call throws, it falls back to `setFocusMode("manual")` and restores the previous focus mode afterwards. `isSupportedLongExposureNR` and `getSupportedISOSensitivities` are read and logged for T12 and T14 but gate nothing yet. There is no shutter-speed list API in the stubs; the holy-grail ramp uses `Util.SHUTTER_SPEEDS`.
+MF prefers the AF/MF toggle. The stubs have no getter for the toggle state, so the app reads the focus mode first: if the body is already in manual focus it leaves the toggle alone, otherwise it engages the toggle and releases it when the run ends. While the app holds the toggle, a flag in its preferences says so; a run that never ended cleanly (crash, reboot) leaves the flag set, and the next run start releases the toggle before anything else. The toggle is engaged only after the run's parameters applied. If the toggle call throws, it falls back to `setFocusMode("manual")` and restores the previous focus mode afterwards. `isSupportedLongExposureNR` and `getSupportedISOSensitivities` are read and logged for T12 and T14 but gate nothing yet. There is no shutter-speed list API in the stubs; the holy-grail ramp uses `Util.SHUTTER_SPEEDS`.
 
 ## ILCE-6500
 
@@ -62,7 +62,7 @@ PMCA API 1.1. **CAPS file: pending** (T08); replace the expectations below with 
 
 Expected (unverified):
 
-- Profile: SS off (upstream reports no silent shutter on the NEX-5R/5T, [`up#5`](https://github.com/jonasjuffinger/TimeLapse/issues/5)); quirk `DIAL_UNRELIABLE`, for T10.
+- Profile `NEX`, which applies to every model starting with `NEX-`. It turns SS off: no NEX body has a silent shutter, and upstream reports it missing on the NEX-5R/5T ([`up#5`](https://github.com/jonasjuffinger/TimeLapse/issues/5)). It also sets the quirk `DIAL_UNRELIABLE` for T10. The quirk only means input must also work with the arrow keys, so it's safe for the whole family.
 - SS hidden even if the probe finds the methods.
 - AEL, BRC3, holy grail, toggle focus and burst: the probe decides. Any of them may be missing on API 1.1. If they are, the option is hidden, and MF falls back to the focus mode.
 
