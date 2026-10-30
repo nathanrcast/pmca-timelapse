@@ -141,6 +141,16 @@ public class CapsFormatTest {
     }
 
     @Test
+    public void controlCharactersAreEscaped() {
+        assertEquals("plain", CapsFormat.escape("plain"));
+        assertEquals("a\\r\\nb\\tc\\u0001d\\u007f", CapsFormat.escape("a\r\nb\tc\u0001d\u007f"));
+        assertEquals("\"x\\ry\"", CapsFormat.value("x\ry"));
+        assertEquals("java.lang.IllegalStateException: bad\\r\\nline",
+                CapsFormat.failure(new IllegalStateException("bad\r\nline")));
+        assertEquals(Arrays.asList("a=1", "b=x\\ry"), CapsFormat.sortedLines("b=x\ry;a=1"));
+    }
+
+    @Test
     public void constantsListPrimitivesAndStrings() {
         assertEquals(Arrays.asList("DRIVE_MODE_BURST = \"burst\"", "MAX = 30"), CapsFormat.constants(FakeModifier.class));
     }

@@ -6,7 +6,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -35,7 +34,7 @@ final class CapsFormat {
         if (v == null)
             return "null";
         if (v instanceof String)
-            return "\"" + ((String) v).replace("\n", "\\n") + "\"";
+            return "\"" + escape((String) v) + "\"";
         if (v instanceof Number || v instanceof Boolean || v instanceof Character)
             return v.toString();
         if (v instanceof Enum)
@@ -70,7 +69,7 @@ final class CapsFormat {
             return "(" + fieldValue(first, v, depth) + ", " + fieldValue(second, v, depth) + ")";
         if (!overridesToString(c))
             return fields(v, depth);
-        return v.toString().replace("\n", "\\n");
+        return escape(v.toString());
     }
 
     private static Field publicField(Class<?> c, String name) {
@@ -124,10 +123,33 @@ final class CapsFormat {
         String msg = t.getMessage();
         if (msg == null)
             return t.getClass().getName();
-        msg = msg.replace("\n", " ");
         if (msg.length() > MAX_MESSAGE)
             msg = msg.substring(0, MAX_MESSAGE) + "...";
-        return t.getClass().getName() + ": " + msg;
+        return t.getClass().getName() + ": " + escape(msg);
+    }
+
+    // Keeps one entry per line: each control character becomes a backslash escape (n, r, t or uXXXX).
+    static String escape(String s) {
+        StringBuilder sb = null;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 0x20 && c != 0x7f) {
+                if (sb != null)
+                    sb.append(c);
+                continue;
+            }
+            if (sb == null)
+                sb = new StringBuilder(s.length() + 8).append(s, 0, i);
+            if (c == '\n')
+                sb.append("\\n");
+            else if (c == '\r')
+                sb.append("\\r");
+            else if (c == '\t')
+                sb.append("\\t");
+            else
+                sb.append(String.format(Locale.US, "\\u%04x", (int) c));
+        }
+        return sb == null ? s : sb.toString();
     }
 
     static String typeName(Class<?> c) {
@@ -330,7 +352,9 @@ final class CapsFormat {
     }
 
     static List<String> sortedLines(String flattened) {
-        List<String> lines = new ArrayList<String>(Arrays.asList(flattened.split(";")));
+        List<String> lines = new ArrayList<String>();
+        for (String l : flattened.split(";"))
+            lines.add(escape(l));
         Collections.sort(lines);
         return lines;
     }
