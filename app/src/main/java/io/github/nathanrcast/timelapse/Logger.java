@@ -13,7 +13,8 @@ public class Logger
         return new File(Environment.getExternalStorageDirectory(), "TIMELPS/LOG.TXT");
     }
 
-    protected static void log(String msg) {
+    // synchronized: CapsDumpActivity logs from its worker thread as well as the UI thread.
+    protected static synchronized void log(String msg) {
         try {
             getFile().getParentFile().mkdirs();
             BufferedWriter writer = new BufferedWriter(new FileWriter(getFile(), true));
