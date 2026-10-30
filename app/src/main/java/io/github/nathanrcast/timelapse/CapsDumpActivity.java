@@ -462,7 +462,7 @@ public class CapsDumpActivity extends BaseActivity {
         }
     }
 
-    // Opens and releases CameraEx the way ShootActivity does, and only reads values: no setParameters, no set* on the modifier.
+    // Opens and releases CameraEx the way ShootActivity does, and only reads values: no set*, no setParameters.
     private void dumpValues(Out out) {
         CameraEx cameraEx;
         try {
@@ -518,19 +518,6 @@ public class CapsDumpActivity extends BaseActivity {
                     out.line("getSupportedParameters = " + CapsFormat.value(supported));
             } catch (Throwable t) {
                 out.fail("getSupportedParameters", t);
-            }
-
-            out.section("Values CameraEx$AutoPictureReviewControl (attached as in ShootActivity)");
-            try {
-                CameraEx.AutoPictureReviewControl review = new CameraEx.AutoPictureReviewControl();
-                cameraEx.setAutoPictureReviewControl(review);
-                try {
-                    out.lines(CapsFormat.probeGetters(review));
-                } finally {
-                    cameraEx.setAutoPictureReviewControl(null);
-                }
-            } catch (Throwable t) {
-                out.fail("AutoPictureReviewControl", t);
             }
         } finally {
             try {
