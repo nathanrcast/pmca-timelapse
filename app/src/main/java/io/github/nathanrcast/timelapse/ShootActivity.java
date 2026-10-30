@@ -23,6 +23,7 @@ import io.github.nathanrcast.timelapse.camera.SafeCamera;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 
+import io.github.nathanrcast.timelapse.core.AwakeGuard;
 import io.github.nathanrcast.timelapse.core.BracketTiming;
 import io.github.nathanrcast.timelapse.core.Clock;
 import io.github.nathanrcast.timelapse.core.ExposureRamp;
@@ -101,6 +102,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private boolean isoUnknownLogged;
 
     private Display display;
+    // Auto power-off is suppressed from onResume to teardown(), the only place it is re-enabled.
+    private final AwakeGuard awake = new AwakeGuard();
 
     // One timer, re-armed for each deadline the scheduler hands out.
     private final Handler handler = new Handler();
@@ -112,13 +115,14 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             Scheduler.Decision decision = scheduler.onTimer();
             trackBracket(decision);
             if (decision.action == Scheduler.Action.FIRE) {
-                takeFrame(decision);
-                if (burstShooting) {
+                fire(decision);
+                if (burstShooting && !tornDown) {
                     handler.removeCallbacks(burstPollRunnable);
                     handler.postDelayed(burstPollRunnable, BURST_POLL_MS);
                 }
+            } else {
+                logDecision(decision);
             }
-            logDecision(decision);
             if (scheduler.isDone())
                 finishRun();
             else
@@ -154,6 +158,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         public void run() {
             if (tornDown)
                 return;
+            if (awake.reassertDue(clock.nowMs()))
+                setAutoPowerOffMode(false);
             if (!panelOff) {
                 if (cardSpace != null)
                     cardSpace.request();
@@ -243,7 +249,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         super.onResume();
         tornDown = false;
         stopping = false;
-        display = new Display(getDisplayManager());
+        display = new Display(getDisplayManager(), this);
+        if (awake.acquire(clock.nowMs()))
+            setAutoPowerOffMode(false);
 
         Result<SafeCamera> opened = SafeCamera.open(this, this);
         if (!opened.isOk()) {
@@ -281,7 +289,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             handler.postDelayed(wakeOffRunnable, KEY_WAKE_MS);
         }
 
-        setAutoPowerOffMode(false);
+        if (settings.displayOff)
+            display.arm();
 
         if (cardSpace == null)
             cardSpace = new CardSpace(runStartWallMs);
@@ -450,8 +459,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         handler.removeCallbacksAndMessages(null);
         if (display != null) {
             try {
-                display.on();
                 display.turnAutoOff(Display.NO_AUTO_OFF);
+                if (display.on())
+                    display.disarm();
+                display.release();
             } catch (RuntimeException e) {
                 log("display: " + e);
             }
@@ -480,7 +491,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (safeCamera != null)
             safeCamera.close();
 
-        setAutoPowerOffMode(true);
+        if (awake.release())
+            setAutoPowerOffMode(true);
     }
 
     private void stopPreview() {
@@ -512,21 +524,20 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         catch (IOException e) {}
     }
 
-    private void shoot(Scheduler.Decision decision) {
+    private boolean shoot(Scheduler.Decision decision) {
         // One ramp per slot, before its first frame: later bracket frames keep the exposure of the set.
         if (controller != null && settings.holyGrail && decision.frame == 0)
             holyGrailSlot(decision.slot);
 
-        safeCamera.takePicture();
+        Result<Void> taken = safeCamera.takePicture();
+        if (!taken.isOk()) {
+            log("takePicture failed: " + taken);
+            return false;
+        }
 
         shotCount++;
-
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                updateScreen();
-            }
-        });
+        updateScreen();
+        return true;
     }
 
     private void holyGrailSlot(long slot) {
@@ -588,14 +599,32 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         Scheduler.Decision decision = scheduler.onFrameCaptured();
         trackBracket(decision);
         if (decision.action == Scheduler.Action.FIRE) {
-            takeFrame(decision);
-        } else if (decision.action == Scheduler.Action.SLOT_DONE) {
+            fire(decision);
+            return;
+        }
+        if (decision.action == Scheduler.Action.SLOT_DONE) {
             if (scheduler.isDone())
                 finishRun();
             else
                 showReview();
         }
         logDecision(decision);
+    }
+
+    // Takes the frame and logs its FIRE row; if the camera refuses it at once, closes the slot as LOST right away
+    // instead of at the capture timeout.
+    private void fire(Scheduler.Decision decision) {
+        boolean taken = takeFrame(decision);
+        logDecision(decision);
+        if (taken)
+            return;
+        Scheduler.Decision failed = scheduler.captureFailed();
+        trackBracket(failed);
+        logDecision(failed);
+        if (scheduler.isDone())
+            finishRun();
+        else
+            armTimer();
     }
 
     // Every non-WAIT decision becomes a LOG.CSV row; LOG.TXT keeps only a lost frame, which is an error.
@@ -645,11 +674,12 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             handler.postAtTime(tickRunnable, wake);
     }
 
-    private void takeFrame(Scheduler.Decision decision) {
+    private boolean takeFrame(Scheduler.Decision decision) {
         stopReview(true);
-        shoot(decision);
+        boolean taken = shoot(decision);
         if (!burstShooting)
             panelOn();
+        return taken;
     }
 
     // Shows the last capture until the next deadline, for at most the review setting (default off: no review, and

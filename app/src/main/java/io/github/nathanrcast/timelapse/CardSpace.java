@@ -20,6 +20,9 @@ import io.github.nathanrcast.timelapse.core.HudModel;
 final class CardSpace {
     private static final long MIN_GAP_MS = 15000;
     private static final int NEWEST_FILES = 60;
+    // The folder listing grows with the card (thousands of names on a big SDXC); the size average needs it far
+    // less often than free space does.
+    private static final long AVG_GAP_MS = 120000;
 
     private volatile long freeBytes = HudModel.UNKNOWN;
     private volatile long avgBytes = HudModel.UNKNOWN;
@@ -28,6 +31,7 @@ final class CardSpace {
     private final HandlerThread thread;
     private final Handler handler;
     private long lastMs;
+    private long lastAvgMs;
     private volatile boolean queued;
     private boolean stopped;
 
@@ -82,9 +86,13 @@ final class CardSpace {
             } catch (RuntimeException e) {
                 freeBytes = HudModel.UNKNOWN;
             }
-            double avg = averageFrameBytes(newestFolder(new File(root, "DCIM")));
-            if (avg > 0)
-                avgBytes = (long) avg;
+            long now = System.currentTimeMillis();
+            if (avgBytes == HudModel.UNKNOWN || now - lastAvgMs >= AVG_GAP_MS) {
+                lastAvgMs = now;
+                double avg = averageFrameBytes(newestFolder(new File(root, "DCIM")));
+                if (avg > 0)
+                    avgBytes = (long) avg;
+            }
         } catch (Throwable t) {
             Logger.error("CardSpace: " + t);
         } finally {

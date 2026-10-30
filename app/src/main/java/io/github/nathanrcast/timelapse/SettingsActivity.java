@@ -98,6 +98,7 @@ public class SettingsActivity extends BaseActivity
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
+        Display.restoreIfLeftOff(this);
         setContentView(R.layout.activity_settings);
         if (!(Thread.getDefaultUncaughtExceptionHandler() instanceof CustomExceptionHandler))
             Thread.setDefaultUncaughtExceptionHandler(new CustomExceptionHandler());
