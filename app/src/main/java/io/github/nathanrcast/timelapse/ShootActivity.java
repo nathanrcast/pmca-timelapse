@@ -24,6 +24,8 @@ import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 
 import io.github.nathanrcast.timelapse.core.Clock;
+import io.github.nathanrcast.timelapse.core.Progress;
+import io.github.nathanrcast.timelapse.core.Scheduler;
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
 import io.github.nathanrcast.timelapse.core.Util;
@@ -33,13 +35,13 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class ShootActivity extends BaseActivity implements SurfaceHolder.Callback, SafeCamera.ShutterCallback
 {
     private Settings settings;
     private ShotPlan plan;
-    private final Clock clock = Clocks.WALL;
+    private Scheduler scheduler;
+    private final Clock clock = Clocks.UPTIME;
 
     private int shotCount;
 
@@ -64,14 +66,13 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private SurfaceHolder cameraSurfaceHolder;
     private SafeCamera safeCamera;
     private Camera camera;
-    private int pictureReviewTime;
+
+    private static final long REVIEW_MS = 2000;
+    private static final long BURST_POLL_MS = 500;
 
     private boolean burstShooting;
-    private boolean stopPicturePreview;
-    private boolean takingPicture;
-
-    private long shootTime;
-    private long shootStartTime;
+    private boolean reviewShowing;
+    private boolean finishing;
 
     private float exposureLevel = 0;
     private int ISOLevelIndex = 0;
@@ -81,48 +82,47 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private Display display;
 
-    private Handler shootRunnableHandler = new Handler();
-    private final Runnable shootRunnable = new Runnable()
-    {
+    // One timer, re-armed for each deadline the scheduler hands out.
+    private final Handler handler = new Handler();
+    private final Runnable tickRunnable = new Runnable() {
         @Override
-        public void run()
-        {
-            if(stopPicturePreview) {
-                stopPicturePreview = false;
-                camera.stopPreview();
-                reviewSurfaceView.setVisibility(View.GONE);
-                if(settings.displayOff)
-                    display.off();
-            }
-
-            if(burstShooting) {
-                shoot();
-            }
-            else if(shotCount < plan.totalFrames()) {
-                long remainingTime = Math.round(shootTime + settings.interval * 1000 - clock.nowMs());
-                if(brck.get()>0){
-                    remainingTime = -1;
-                }
-
-                log("  Remaining Time: " + Long.toString(remainingTime));
-
-                if (remainingTime <= 150) { // 300ms is vaguely the time this postDelayed is to slow
-                    brck.getAndDecrement();
-                    shoot();
-                    display.on();
-                } else {
-                    shootRunnableHandler.postDelayed(this, remainingTime-150);
+        public void run() {
+            Scheduler.Decision decision = scheduler.onTimer();
+            if (decision.action == Scheduler.Action.FIRE) {
+                takeFrame();
+                if (burstShooting) {
+                    handler.removeCallbacks(burstPollRunnable);
+                    handler.postDelayed(burstPollRunnable, BURST_POLL_MS);
                 }
             }
-            else {
-                display.on();
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        onBackPressed();
-                    }
-                });
-            }
+            logDecision(decision);
+            if (scheduler.isDone())
+                finishRun();
+            else
+                armTimer();
+        }
+    };
+
+    // onShutter's scheduler work, moved onto the main looper so every Scheduler call runs there.
+    private final Runnable shutterRunnable = new Runnable() {
+        @Override
+        public void run() {
+            frameCaptured();
+        }
+    };
+
+    private final Runnable stopReviewRunnable = new Runnable() {
+        @Override
+        public void run() {
+            stopReview(true);
+        }
+    };
+
+    private final Runnable finishRunnable = new Runnable() {
+        @Override
+        public void run() {
+            display.on();
+            onBackPressed();
         }
     };
 
@@ -131,16 +131,19 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         public void run() {
             if (delaySecondsRemaining() > 0) {
                 updateScreen();
-                shootRunnableHandler.postDelayed(this, 1000);
+                handler.postDelayed(this, 1000);
             }
         }
     };
 
-    private Handler manualShutterCallbackCallRunnableHandler = new Handler();
-    private final Runnable manualShutterCallbackCallRunnable = new Runnable() {
+    // Burst drive doesn't call onShutter per frame: while the burst runs, refresh the screen and
+    // feed the scheduler a stand-in onShutter. The burst's end comes from its own timer.
+    private final Runnable burstPollRunnable = new Runnable() {
         @Override
         public void run() {
-            onShutter(0);
+            updateScreen();
+            frameCaptured();
+            handler.postDelayed(this, BURST_POLL_MS);
         }
     };
 
@@ -158,7 +161,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         plan = ShotPlan.of(settings);
 
         shotCount = 0;
-        takingPicture = false;
         burstShooting = plan.isBurst();
 
         tvCount = (TextView) findViewById(R.id.tvCount);
@@ -229,20 +231,21 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         cameraSurfaceHolder.addCallback(this);
         safeCamera.configure(run);
 
-        pictureReviewTime = 2;
-        //log(Integer.toString(pictureReviewTime));
-
-
-        shotCount = 0;
-        shootRunnableHandler.postDelayed(shootRunnable, plan.delayMs());
-        shootStartTime = clock.nowMs() + plan.delayMs();
+        // Built after applyCapabilities, from the masked plan (BRC3 or burst may be off on this body).
+        // A resumed run keeps its slots: the scheduler shifts every remaining deadline by the pause.
+        if (scheduler == null) {
+            scheduler = new Scheduler(plan, clock, Scheduler.StopOn.CAPTURED);
+            scheduler.start();
+        } else {
+            scheduler.resume();
+        }
+        if (scheduler.isDone())
+            finishRun();
+        else
+            armTimer();
 
         if (settings.delay > 0) {
-            shootRunnableHandler.post(delayCountdownRunnable);
-        }
-
-        if(burstShooting) {
-            manualShutterCallbackCallRunnableHandler.postDelayed(manualShutterCallbackCallRunnable, 500);
+            handler.post(delayCountdownRunnable);
         }
 
         if(settings.displayOff) {
@@ -322,16 +325,17 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private long delaySecondsRemaining() {
-        return plan.delaySecondsRemaining(shootStartTime, clock.nowMs(), shotCount);
+        return Progress.delaySecondsRemaining(scheduler, clock.nowMs());
     }
 
     private void updateScreen(){
-        long delaySeconds = delaySecondsRemaining();
+        long now = clock.nowMs();
+        long delaySeconds = Progress.delaySecondsRemaining(scheduler, now);
         if (delaySeconds > 0)
             tvCount.setText("Delay: " + Util.formatTime(delaySeconds));
         else
-            tvCount.setText(Integer.toString(shotCount)+"/"+Long.toString(plan.totalFrames()));
-        tvRemaining.setText(getRemainingTime());
+            tvCount.setText(Progress.count(scheduler, now));
+        tvRemaining.setText(Progress.remaining(scheduler, now));
         tvBattery.setText(getBatteryPercentage());
 
         //Holy Grail
@@ -379,9 +383,11 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         log("on pause");
 
-        shootRunnableHandler.removeCallbacks(shootRunnable);
-        shootRunnableHandler.removeCallbacks(delayCountdownRunnable);
-        manualShutterCallbackCallRunnableHandler.removeCallbacks(manualShutterCallbackCallRunnable);
+        handler.removeCallbacksAndMessages(null);
+        if (scheduler != null)
+            scheduler.pause();
+        stopReview(false);
+        finishing = false;
 
         if(cameraSurfaceHolder == null)
             log("cameraSurfaceHolder == null");
@@ -415,15 +421,11 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private void shoot() {
-        if(takingPicture)
-            return;
-
         if (settings.holyGrail){
             log("holyGrail shot " + shotCount + ", exposureLevel: " + exposureLevel + ", target:" + targetExposureLevel);
             holyGrailPrePhotoEvent();
         }
 
-        shootTime = clock.nowMs();
         safeCamera.takePicture();
 
         shotCount++;
@@ -516,78 +518,83 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     }
 
-    private AtomicInteger brck = new AtomicInteger(0);
-
-
-    // When burst shooting this method is not called automatically
-    // Therefore we called it every second manually
+    // The camera calls this when a frame is captured, possibly off the main looper.
     @Override
     public void onShutter(int status) {
-
-        if(brck.get()<0){
-            brck = new AtomicInteger(0);
-            if(plan.framesPerInterval()>1) {
-                brck = new AtomicInteger(2);
-            }
-        }
-
-        if(burstShooting) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    updateScreen();
-                }
-            });
-
-            // just keep shooting until we have all shots
-            if (clock.nowMs() >= plan.endMs(shootStartTime)) {
-                safeCamera.cancelTakePicture();
-                stopPicturePreview = true;
-                display.on();
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        onBackPressed();
-                    }
-                });
-            }
-            else {
-                manualShutterCallbackCallRunnableHandler.postDelayed(manualShutterCallbackCallRunnable, 500);
-            }
-        }
-        else {
+        if(!burstShooting) {
             safeCamera.cancelTakePicture();
 
             //camera.startPreview();
+        }
+        handler.post(shutterRunnable);
+    }
 
-            if (shotCount < plan.totalFrames()) {
+    private void frameCaptured() {
+        Scheduler.Decision decision = scheduler.onFrameCaptured();
+        if (decision.action == Scheduler.Action.FIRE) {
+            takeFrame();
+        } else if (decision.action == Scheduler.Action.SLOT_DONE) {
+            if (scheduler.isDone())
+                finishRun();
+            else
+                showReview();
+        }
+        logDecision(decision);
+    }
 
-                // remaining time to the next shot
-                double remainingTime = shootTime + settings.interval * 1000 - clock.nowMs();
-                if (brck.get() > 0) {
-                    remainingTime = -1;
-                }
+    private void logDecision(Scheduler.Decision decision) {
+        if (decision.action != Scheduler.Action.WAIT)
+            log(decision.toString());
+    }
 
-                log("Remaining Time: " + remainingTime);
+    private void armTimer() {
+        handler.removeCallbacks(tickRunnable);
+        long wake = scheduler.nextWakeMs();
+        if (wake != Scheduler.NEVER)
+            handler.postAtTime(tickRunnable, wake);
+    }
 
-                // if the remaining time is negative immediately take the next picture
-                if (remainingTime < 0) {
-                    stopPicturePreview = false;
-                    shootRunnableHandler.post(shootRunnable);
-                }
-                // show the preview picture for some time
-                else {
-                    long previewPictureShowTime = Math.round(Math.min(remainingTime, pictureReviewTime * 1000));
-                    //log("  Stop preview in: " + previewPictureShowTime);
-                    reviewSurfaceView.setVisibility(View.VISIBLE);
-                    stopPicturePreview = true;
-                    shootRunnableHandler.postDelayed(shootRunnable, previewPictureShowTime);
-                }
-            } else {
-                //stopPicturePreview = true;
-                shootRunnableHandler.postDelayed(shootRunnable, pictureReviewTime * 1000);
-            }
+    private void takeFrame() {
+        stopReview(true);
+        shoot();
+        if (!burstShooting)
+            display.on();
+    }
+
+    // Shows the last capture until the next deadline, for at most REVIEW_MS.
+    private void showReview() {
+        long until = scheduler.reviewUntilMs(REVIEW_MS);
+        if (until < 0)
+            return;
+        reviewSurfaceView.setVisibility(View.VISIBLE);
+        reviewShowing = true;
+        handler.postAtTime(stopReviewRunnable, until);
+    }
+
+    // displayOff: apply DOFF afterwards; not on pause, where the display must stay on.
+    private void stopReview(boolean displayOff) {
+        handler.removeCallbacks(stopReviewRunnable);
+        if (!reviewShowing)
+            return;
+        reviewShowing = false;
+        if (camera != null)
+            camera.stopPreview();
+        reviewSurfaceView.setVisibility(View.GONE);
+        if (displayOff && settings.displayOff)
+            display.off();
+    }
+
+    private void finishRun() {
+        if (finishing)
+            return;
+        finishing = true;
+        handler.removeCallbacks(tickRunnable);
+        handler.removeCallbacks(burstPollRunnable);
+        if (burstShooting) {
+            safeCamera.cancelTakePicture();
+            handler.post(finishRunnable);
+        } else {
+            handler.postDelayed(finishRunnable, REVIEW_MS);
         }
     }
 
@@ -611,10 +618,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             s = "c ";
 
         return s + (int)(level / (float)scale * 100) + "%";
-    }
-
-    private String getRemainingTime() {
-        return Util.formatTime(plan.secondsRemaining(shootStartTime, clock.nowMs(), shotCount));
     }
 
     @Override
