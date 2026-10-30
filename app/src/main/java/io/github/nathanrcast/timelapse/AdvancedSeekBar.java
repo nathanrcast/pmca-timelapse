@@ -32,16 +32,18 @@ public class AdvancedSeekBar extends SeekBar {
         if(!isFocused())
             return;
 
-        long time = System.currentTimeMillis();
-        boolean hold = event != null && event.getRepeatCount() > 0;
-
-        if (!hold) {
-            lastHoldActionTime = time;
+        if (event == null || event.getRepeatCount() == 0) {
+            lastHoldActionTime = System.currentTimeMillis();
             setProgress(getProgress() + value);
             return;
         }
 
-        // Held key: jump to the next multiple of 10, at most 3 times a second
+        jump(value);
+    }
+
+    // Held key: jump to the next multiple of 10, at most 3 times a second
+    private void jump(int value) {
+        long time = System.currentTimeMillis();
         if (time - lastHoldActionTime < 300)
             return;
         lastHoldActionTime = time;
@@ -57,11 +59,12 @@ public class AdvancedSeekBar extends SeekBar {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            dialChanged(1, event);
-            return true;
-        } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-            dialChanged(-1, event);
+        boolean right = keyCode == KeyEvent.KEYCODE_DPAD_RIGHT;
+        if ((right || keyCode == KeyEvent.KEYCODE_DPAD_LEFT) && event.getRepeatCount() > 0) {
+            int p = getProgress();
+            if ((right && p >= getMax()) || (!right && p <= 0))
+                return false;
+            jump(right ? 1 : -1);
             return true;
         }
         return super.onKeyDown(keyCode, event);
