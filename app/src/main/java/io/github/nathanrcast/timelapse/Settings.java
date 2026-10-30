@@ -66,7 +66,7 @@ class Settings {
         fps = 0;
         brs = true;
         mf = true;
-        holyGrail = true;
+        holyGrail = false;
         useCurrentExposure = true;
         targetExposure = 0; //0
         maxShutterSpeedIndex = 0;
@@ -131,7 +131,7 @@ class Settings {
                 intent.getBooleanExtra(EXTRA_AEL, false),
                 intent.getBooleanExtra(EXTRA_BRS, false),
                 intent.getBooleanExtra(EXTRA_MF, true),
-                intent.getBooleanExtra(EXTRA_HOLYGRAIL, true),
+                intent.getBooleanExtra(EXTRA_HOLYGRAIL, false),
                 intent.getBooleanExtra(EXTRA_USECURRENTEXPOSURE, true),
                 intent.getIntExtra(EXTRA_TARGETEXPOSURE, 0),
                 intent.getIntExtra(EXTRA_MAXSHUTTERSPEEDINDEX, 0),

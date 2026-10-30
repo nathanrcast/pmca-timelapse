@@ -121,6 +121,7 @@ public class SettingsActivity extends BaseActivity
         cbHolyGrail = (CheckBox) findViewById(R.id.cbHolyGrail);
         cbHolyGrail.setChecked(settings.holyGrail);
         cbHolyGrail.setOnCheckedChangeListener(cbHolyGrailOnCheckListener);
+        cbHolyGrailOnCheckListener.onCheckedChanged(cbHolyGrail, settings.holyGrail);
 
         laTargetExposure = (RelativeLayout) findViewById(R.id.laTargetExposure);
 
