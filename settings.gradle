@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = 'TimeLapsePlus'
 include ':app'
+include ':core'
