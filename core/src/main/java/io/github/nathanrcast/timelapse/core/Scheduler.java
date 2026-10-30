@@ -220,12 +220,16 @@ public final class Scheduler {
     /**
      * The camera refused the frame just fired (takePicture failed at once), so no onShutter will come: closes
      * the slot now as a {@link SkipReason#LOST} skip instead of waiting out the capture timeout. Ignored, as WAIT,
-     * when no frame is in flight and in burst mode, where the timer ends the burst and a retry here would spin.
+     * when no frame is in flight. A refused burst is the run's only slot: it ends the run, is never counted as
+     * captured and never re-fires.
      */
     public Decision captureFailed() {
-        if (!capturing || plan.isBurst())
+        if (!capturing)
             return Decision.WAIT;
-        return closeCapture(clock.nowMs(), SkipReason.LOST);
+        Decision decision = closeCapture(clock.nowMs(), SkipReason.LOST);
+        if (plan.isBurst())
+            done = true;
+        return decision;
     }
 
     /**

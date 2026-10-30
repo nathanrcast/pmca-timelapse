@@ -446,6 +446,18 @@ public class SchedulerTest {
     }
 
     @Test
+    public void startedAtIsWhenStartRanAndNeverShifts() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(10, 3, 0, 1), clock, CAPTURED);
+        s.start();
+        clock.advance(500);
+        s.pause();
+        clock.advance(500);
+        s.resume();
+        assertEquals(START, s.startedAtMs());
+    }
+
+    @Test
     public void aRefusedFrameClosesTheSlotAtOnceAsLost() {
         FakeClock clock = new FakeClock(START);
         Scheduler s = new Scheduler(new ShotPlan(10, 3, 0, 1), clock, CAPTURED);
@@ -491,19 +503,34 @@ public class SchedulerTest {
     }
 
     @Test
-    public void captureFailedWithNothingInFlightOrInABurstIsIgnored() {
+    public void captureFailedWithNothingInFlightIsIgnored() {
         FakeClock clock = new FakeClock(START);
         Scheduler s = new Scheduler(new ShotPlan(10, 3, 0, 1), clock, CAPTURED);
         s.start();
         assertSame(Scheduler.Decision.WAIT, s.captureFailed());
         assertEquals(0, s.skipped());
+    }
 
-        Scheduler burst = new Scheduler(new ShotPlan(0, 5, 0, 1), clock, CAPTURED);
-        burst.start();
-        assertEquals(FIRE, burst.onTimer().action);
-        assertEquals(WAIT, burst.captureFailed().action);
-        assertTrue(burst.isCapturing());
-        assertEquals(0, burst.skipped());
+    @Test
+    public void aRefusedBurstEndsTheRunWithoutACaptureOrARefire() {
+        for (Scheduler.StopOn stopOn : Scheduler.StopOn.values()) {
+            FakeClock clock = new FakeClock(START);
+            Scheduler burst = new Scheduler(new ShotPlan(0, 5, 0, 1), clock, stopOn);
+            burst.start();
+            assertEquals(FIRE, burst.onTimer().action);
+            clock.advance(20);
+            Decision d = burst.captureFailed();
+            assertEquals(SKIP, d.action);
+            assertEquals(LOST, d.skipReason);
+            assertTrue(burst.isDone());
+            assertFalse(burst.isCapturing());
+            assertEquals(0, burst.captured());
+            assertEquals(1, burst.skipped(LOST));
+            assertEquals(NEVER, burst.nextWakeMs());
+            clock.advance(60000);
+            assertEquals(WAIT, burst.onTimer().action);
+            assertEquals(0, burst.captured());
+        }
     }
 
     @Test
