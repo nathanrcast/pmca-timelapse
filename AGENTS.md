@@ -4,7 +4,7 @@ TimeLapse+: an in-camera intervalometer for Sony PlayMemories (PMCA) cameras, ha
 
 ## Commands
 
-Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17–21 (Gradle 8.7 cannot run on 22+, and a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. CI: `.github/workflows/ci.yml` job `build`. Signing and publishing: `scripts/release.sh <version> [--local] [--dry-run]` (needs a gitignored `keystore.properties`, see `keystore.properties.example`).
+Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17–21 (Gradle 8.7 cannot run on 22+, and a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. CI: `.github/workflows/ci.yml` job `build`. Signing and publishing: `scripts/release.sh <version> [--local] [--dry-run]` (needs a gitignored `keystore.properties`, see `keystore.properties.example`; `scripts/make-keystore.sh` creates both). Maintainer release steps: `docs/release.md`.
 
 ```
 JAVA_HOME=<JDK 17–21> ./gradlew clean :core:check :app:assembleDebug :app:assembleRelease :app:lint :app:testDebugUnitTest   # full build = pre-push gate

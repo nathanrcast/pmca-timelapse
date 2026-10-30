@@ -1,0 +1,10 @@
+---
+package: io.github.nathanrcast.timelapse
+name: TimeLapse+
+author: nathanrcast
+desc: In-camera intervalometer and timelapse for PlayMemories cameras (a6500, NEX-5T)
+homepage: https://github.com/nathanrcast/pmca-timelapse
+release:
+  type: github
+  user: nathanrcast
+  repo: pmca-timelapse

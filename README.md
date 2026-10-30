@@ -19,6 +19,14 @@ Sony closed the PlayMemories store in 2025, so its own Time-lapse app can no lon
 
 Install the APK from the [releases](https://github.com/nathanrcast/pmca-timelapse/releases) page with [PMCA-RE RELOADED](https://github.com/masterflai/pmca-re-reloaded) (`pmca-console install --apk <file>`), or the original [Sony-PMCA-RE](https://github.com/ma1co/Sony-PMCA-RE).
 
+Or add this repo as a PMCA-RE RELOADED source and install from it (`pmca-source.yaml` in the repo root):
+
+```
+pmca-console sources add nathanrcast/pmca-timelapse
+pmca-console apps
+pmca-console install --app io.github.nathanrcast.timelapse --source nathanrcast/pmca-timelapse
+```
+
 The package id (`io.github.nathanrcast.timelapse`) differs from upstream's, so both can be installed side by side.
 
 ## Usage
@@ -106,6 +114,8 @@ Nothing here has been verified on a camera. Expectations come from the Sony API 
 ## Building
 
 Needs a JDK 17–21 and the Android SDK with platform 34 (`sdk.dir` in `local.properties`). `./gradlew :app:assembleDebug` writes `app/build/outputs/apk/debug/app-debug.apk`. Full commands: [AGENTS.md](AGENTS.md) § Commands.
+
+Maintainers: signing and publishing a release is in [docs/release.md](docs/release.md). Changes per version: [CHANGELOG.md](CHANGELOG.md).
 
 ## Credits
 
