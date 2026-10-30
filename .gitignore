@@ -12,3 +12,4 @@ keystore.properties
 CLAUDE.local.md
 __pycache__/
 *.apk.sha256
+soak-meminfo.log

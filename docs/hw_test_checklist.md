@@ -33,3 +33,10 @@ Run this at the end of every wave on **both** bodies, using the build from merge
 - a6500: 8 h @ 10 s, DOFF on, dummy battery.
 - NEX-5T: 4 h @ 10 s, DOFF on.
 - Pass: analyzer reports max drift < 100 ms, 0 unexplained skips, and the camera responds afterwards with no black screen.
+
+Memory, over Tweak Wi-Fi ADB (adb on `$ADB` or PATH; the camera needs Tweak's ADB on and the host on the same LAN):
+
+1. Start the run on the camera, then on the host: `tools/soak_meminfo.sh <camera-ip> 30`. It runs `adb connect` and `dumpsys meminfo io.github.nathanrcast.timelapse` every 30 min and appends timestamped output to `soak-meminfo.log` (`--dry-run` prints the commands; Ctrl-C stops it; `SOAK_LOG` moves the file).
+2. After the run: `python3 -I tools/meminfo_trend.py soak-meminfo.log`. It prints native and dalvik heap growth with kB/h and exits 1 if a heap never shrank and grew by more than `--threshold-kb` (default 2048), 2 if the log has too few samples. Attach the output and a log excerpt to the T15 issue.
+3. Power-off: after the run, the camera must not have powered off by itself. With DOFF on, press any button after the run: the panel must come back.
+4. DOFF recovery: during a DOFF run, kill the app (`adb shell am force-stop io.github.nathanrcast.timelapse`) and relaunch it; the panel must come back on at the settings screen.
