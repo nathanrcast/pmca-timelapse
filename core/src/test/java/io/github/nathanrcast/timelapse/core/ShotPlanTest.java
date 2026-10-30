@@ -156,14 +156,33 @@ public class ShotPlanTest {
         assertEquals(-2, plan.secondsRemaining(start, clock.nowMs(), 1));
     }
 
-    // Every interval x shots x fps position the settings screen offers gives the same duration and
-    // clip length as the pre-T05 inline math in SettingsActivity.updateTimes.
+    @Test
+    public void ofAfterLoadUsesTheStoredSliderPositions() {
+        MapSettingsStore store = new MapSettingsStore();
+        store.values.put("interval", 75);
+        store.values.put("shotCount", 35);
+        store.values.put("delay", 16);
+        store.values.put("brs", true);
+        Settings settings = new Settings();
+        settings.load(store);
+
+        ShotPlan plan = ShotPlan.of(settings);
+        assertEquals(12000, plan.durationSeconds());
+        assertEquals(4, plan.clipSeconds(24));
+        assertEquals(300, plan.totalFrames());
+        assertEquals(3600000, plan.delayMs());
+        assertEquals(12000 + 3600, plan.secondsRemaining(1000 + plan.delayMs(), 1000, 0));
+    }
+
+    // Every interval x shots x fps position the settings screen offers (through the shipped
+    // SliderMapping) gives the same duration and clip length as the pre-T05 inline math in
+    // SettingsActivity.updateTimes.
     @Test
     public void settingsScreenMathMatchesTheOldInlineCode() {
-        for (int rawInterval = 0; rawInterval <= Settings.RAW_INTERVAL_MAX; rawInterval++) {
-            double interval = legacyInterval(rawInterval);
-            for (int rawShots = 0; rawShots <= Settings.RAW_SHOT_COUNT_MAX; rawShots++) {
-                int shots = legacyShotCount(rawShots);
+        for (int rawInterval = 0; rawInterval <= SliderMapping.INTERVAL_MAX; rawInterval++) {
+            double interval = SliderMapping.progressToInterval(rawInterval);
+            for (int rawShots = 0; rawShots <= SliderMapping.SHOTS_MAX; rawShots++) {
+                int shots = SliderMapping.progressToShotCount(rawShots);
                 for (boolean brs : new boolean[]{false, true}) {
                     ShotPlan plan = new ShotPlan(interval, shots, 0, brs ? 3 : 1);
                     assertEquals(shots == Integer.MAX_VALUE, plan.isInfinite());
@@ -188,9 +207,9 @@ public class ShotPlanTest {
         int[] delays = {0, 1, 5, 60, 1440};
         long[] offsets = {-200000, -60001, -1000, -999, -1, 0, 1, 999, 1000, 4321, 90000, 86400000};
         for (int ri : rawIntervals) {
-            double interval = legacyInterval(ri);
+            double interval = SliderMapping.progressToInterval(ri);
             for (int rs : rawShots) {
-                int shots = legacyShotCount(rs);
+                int shots = SliderMapping.progressToShotCount(rs);
                 for (int delay : delays) {
                     for (boolean brs : new boolean[]{false, true}) {
                         int cnt = brs ? 3 : 1;
@@ -217,31 +236,7 @@ public class ShotPlanTest {
         }
     }
 
-    // Copied from SettingsActivity's interval slider listener.
-    private static double legacyInterval(int i) {
-        i++;
-        if (i == 1) return 0;
-        else if (i < 41) return i * 0.5;
-        else if (i < 60) return (i - 40) + 20;
-        else if (i < 76) return (i - 60) * 5 + 40;
-        else if (i < 93) return (i - 76) * 30 + 120;
-        else return (i - 93) * 60 + 660;
-    }
-
-    // Copied from SettingsActivity's shots slider listener.
-    private static int legacyShotCount(int i) {
-        i++;
-        int shotCount = 0;
-        if (i <= 20) shotCount = i;
-        else if (i <= 36) shotCount = (i - 20) * 5 + 20;
-        else if (i <= 81) shotCount = (i - 36) * 20 + 100;
-        else if (i <= 100) shotCount = (i - 81) * 50 + 1000;
-        else if (i <= 130) shotCount = (i - 100) * 100 + 2000;
-        if (i == 131) shotCount = Integer.MAX_VALUE;
-        return shotCount;
-    }
-
-    // Copied from ShootActivity.delaySecondsRemaining.
+    // Frozen copy of the removed pre-T05 ShootActivity.delaySecondsRemaining.
     private static long legacyDelaySeconds(int shotCount, long shootStartTime, long now) {
         if (shotCount != 0 || shootStartTime <= 0)
             return 0;
@@ -249,7 +244,7 @@ public class ShotPlanTest {
         return ms > 0 ? (ms + 999) / 1000 : 0;
     }
 
-    // Copied from ShootActivity.getRemainingTime.
+    // Frozen copy of the removed pre-T05 ShootActivity.getRemainingTime.
     private static long legacyRemaining(double interval, int settingsShotCount, int cnt, int shotCount,
                                         long shootStartTime, long now) {
         if (interval == 0)

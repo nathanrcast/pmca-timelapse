@@ -4,14 +4,10 @@ package io.github.nathanrcast.timelapse.core;
  * Created by jonas on 2/18/17.
  */
 
-// The shoot options. Only the raw slider positions are persisted; SettingsActivity derives
-// interval, shotCount and delay from them. The keys and encodings are what existing installs hold.
+// The shoot options. Interval, shots and delay persist only their raw slider positions, and
+// interval/shotCount/delay are derived from them. The keys and encodings are what existing installs hold.
 public final class Settings {
     public static final int SHOTS_INFINITE = Integer.MAX_VALUE;
-
-    public static final int RAW_INTERVAL_MAX = 119;
-    public static final int RAW_SHOT_COUNT_MAX = 130;
-    public static final int RAW_DELAY_MAX = 39;
 
     static final String KEY_INTERVAL = "interval";
     static final String KEY_SHOT_COUNT = "shotCount";
@@ -125,14 +121,21 @@ public final class Settings {
         holyGrailAllowExposureUp = store.getBoolean(KEY_HOLY_GRAIL_ALLOW_EXPOSURE_UP, holyGrailAllowExposureUp);
         holyGrailAllowExposureDown = store.getBoolean(KEY_HOLY_GRAIL_ALLOW_EXPOSURE_DOWN, holyGrailAllowExposureDown);
         clamp();
+        deriveFromRaw();
+    }
+
+    public void deriveFromRaw() {
+        interval = SliderMapping.progressToInterval(rawInterval);
+        shotCount = SliderMapping.progressToShotCount(rawShotCount);
+        delay = SliderMapping.progressToDelay(rawDelay);
     }
 
     // Pulls persisted values into the ranges the sliders and step tables can show. Every value
     // the settings screen writes is already in range, so this only changes corrupt stores.
     public void clamp() {
-        rawInterval = SliderMapping.clamp(rawInterval, 0, RAW_INTERVAL_MAX);
-        rawShotCount = SliderMapping.clamp(rawShotCount, 0, RAW_SHOT_COUNT_MAX);
-        rawDelay = SliderMapping.clamp(rawDelay, 0, RAW_DELAY_MAX);
+        rawInterval = SliderMapping.clamp(rawInterval, 0, SliderMapping.INTERVAL_MAX);
+        rawShotCount = SliderMapping.clamp(rawShotCount, 0, SliderMapping.SHOTS_MAX);
+        rawDelay = SliderMapping.clamp(rawDelay, 0, SliderMapping.DELAY_MAX);
         int halfTarget = SliderMapping.TARGET_EXPOSURE_MAX / 2;
         targetExposure = SliderMapping.clamp(targetExposure, -halfTarget, halfTarget);
         maxShutterSpeedIndex = SliderMapping.clamp(maxShutterSpeedIndex, 0, Util.SHUTTER_SPEEDS.length - 1);

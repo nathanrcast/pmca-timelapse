@@ -94,9 +94,9 @@ public class SettingsTest {
     @Test
     public void loadRestoresWhatSaveWrote() {
         Settings saved = new Settings();
-        saved.rawInterval = Settings.RAW_INTERVAL_MAX;
-        saved.rawShotCount = Settings.RAW_SHOT_COUNT_MAX;
-        saved.rawDelay = Settings.RAW_DELAY_MAX;
+        saved.rawInterval = SliderMapping.INTERVAL_MAX;
+        saved.rawShotCount = SliderMapping.SHOTS_MAX;
+        saved.rawDelay = SliderMapping.DELAY_MAX;
         saved.fps = 6;
         saved.brs = false;
         saved.holyGrail = true;
@@ -132,17 +132,17 @@ public class SettingsTest {
     @Test
     public void clampLeavesEveryValueTheScreenCanWrite() {
         Settings s = new Settings();
-        for (int raw = 0; raw <= Settings.RAW_INTERVAL_MAX; raw++) {
+        for (int raw = 0; raw <= SliderMapping.INTERVAL_MAX; raw++) {
             s.rawInterval = raw;
             s.clamp();
             assertEquals(raw, s.rawInterval);
         }
-        for (int raw = 0; raw <= Settings.RAW_SHOT_COUNT_MAX; raw++) {
+        for (int raw = 0; raw <= SliderMapping.SHOTS_MAX; raw++) {
             s.rawShotCount = raw;
             s.clamp();
             assertEquals(raw, s.rawShotCount);
         }
-        for (int raw = 0; raw <= Settings.RAW_DELAY_MAX; raw++) {
+        for (int raw = 0; raw <= SliderMapping.DELAY_MAX; raw++) {
             s.rawDelay = raw;
             s.clamp();
             assertEquals(raw, s.rawDelay);
@@ -191,14 +191,38 @@ public class SettingsTest {
 
         Settings s = new Settings();
         s.load(store);
-        assertEquals(Settings.RAW_INTERVAL_MAX, s.rawInterval);
+        assertEquals(SliderMapping.INTERVAL_MAX, s.rawInterval);
         assertEquals(0, s.rawShotCount);
-        assertEquals(Settings.RAW_DELAY_MAX, s.rawDelay);
+        assertEquals(SliderMapping.DELAY_MAX, s.rawDelay);
         assertEquals(-30, s.targetExposure);
         assertEquals(Util.SHUTTER_SPEEDS.length - 1, s.maxShutterSpeedIndex);
         assertEquals(0, s.maxISOIndex);
         assertEquals(1, s.cooldown);
         assertEquals(SliderMapping.COUNT_MAX + 1, s.averageExposureAmount);
         assertEquals(Util.DEADBAND_VALUES.length - 1, s.deadbandIndex);
+        assertEquals(2280.0, s.interval, 0);
+        assertEquals(1, s.shotCount);
+        assertEquals(1440, s.delay);
+    }
+
+    @Test
+    public void loadDerivesIntervalShotsAndDelayFromTheSliderPositions() {
+        MapSettingsStore store = new MapSettingsStore();
+        store.values.put("interval", 0);
+        store.values.put("shotCount", SliderMapping.SHOTS_MAX);
+        store.values.put("delay", 6);
+        Settings s = new Settings();
+        s.load(store);
+        assertEquals(0.0, s.interval, 0);
+        assertEquals(Settings.SHOTS_INFINITE, s.shotCount);
+        assertEquals(10, s.delay);
+
+        s.rawInterval = 92;
+        s.rawShotCount = 36;
+        s.rawDelay = 39;
+        s.deriveFromRaw();
+        assertEquals(660.0, s.interval, 0);
+        assertEquals(120, s.shotCount);
+        assertEquals(1440, s.delay);
     }
 }

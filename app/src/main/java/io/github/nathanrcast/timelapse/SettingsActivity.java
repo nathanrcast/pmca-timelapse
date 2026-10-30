@@ -207,17 +207,17 @@ public class SettingsActivity extends BaseActivity
         cbMF   = (CheckBox) findViewById(R.id.cbMF);
         cbDOFF = (CheckBox) findViewById(R.id.cbDOFF);
 
-        sbInterval.setMax(Settings.RAW_INTERVAL_MAX);
+        sbInterval.setMax(SliderMapping.INTERVAL_MAX);
         sbInterval.setOnSeekBarChangeListener(sbIntervalOnSeekBarChangeListener);
         sbInterval.setProgress(settings.rawInterval);
         sbIntervalOnSeekBarChangeListener.onProgressChanged(sbInterval, settings.rawInterval, false);
 
-        sbShots.setMax(Settings.RAW_SHOT_COUNT_MAX);
+        sbShots.setMax(SliderMapping.SHOTS_MAX);
         sbShots.setOnSeekBarChangeListener(sbShotsOnSeekBarChangeListener);
         sbShots.setProgress(settings.rawShotCount);
         sbShotsOnSeekBarChangeListener.onProgressChanged(sbShots, settings.rawShotCount, false);
 
-        sbDelay.setMax(Settings.RAW_DELAY_MAX);
+        sbDelay.setMax(SliderMapping.DELAY_MAX);
         sbDelay.setOnSeekBarChangeListener(sbDelayOnSeekBarChangeListener);
         sbDelay.setProgress(settings.rawDelay);
         sbDelayOnSeekBarChangeListener.onProgressChanged(sbDelay, settings.rawDelay, false);
@@ -375,46 +375,10 @@ public class SettingsActivity extends BaseActivity
             = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            String intervalTextValue = "";
-            String intervalUnit = "";
-
             settings.rawInterval = i;
-
-            i++;
-
-            if (i == 1) {
-                settings.interval = 0;
-                intervalTextValue = "burst";
-                intervalUnit = "";
-            }
-            else if(i < 41) {
-                settings.interval = i * 0.5;
-                intervalTextValue = Double.toString(settings.interval);
-                intervalUnit = "s";
-
-            }
-            else if(i < 60) {
-                settings.interval = (i-40) + 20;
-                intervalTextValue = Double.toString(settings.interval);
-                intervalUnit = "s";
-            }
-            else if(i < 76) {
-                settings.interval = (i-60) * 5 + 40;
-                intervalTextValue = Double.toString(settings.interval);
-                intervalUnit = "s";
-            }
-            else if(i < 93) {
-                settings.interval = (i-76) * 30 + 120;
-                intervalTextValue = Double.toString((i-76) * 0.5 + 2);
-                intervalUnit = "min";
-            }
-            else {
-                settings.interval = (i-93) * 60 + 660;
-                intervalTextValue = Integer.toString(i-93+11);
-                intervalUnit = "min";
-            }
-            tvIntervalValue.setText(intervalTextValue);
-            tvIntervalUnit.setText(intervalUnit);
+            settings.interval = SliderMapping.progressToInterval(i);
+            tvIntervalValue.setText(SliderMapping.intervalText(settings.interval));
+            tvIntervalUnit.setText(SliderMapping.intervalUnit(settings.interval));
 
             if(settings.interval == 0)
                 lblShots.setText("Dur. (s)");
@@ -432,35 +396,9 @@ public class SettingsActivity extends BaseActivity
     sbShotsOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            String shotsText;
-
             settings.rawShotCount = i;
-
-            i++;
-
-            if(i <= 20)
-                settings.shotCount = i;
-
-            else if(i <= 36)
-                settings.shotCount = (i-20) * 5 + 20;
-
-            else if(i <= 81)
-                settings.shotCount = (i-36) * 20 + 100;
-
-            else if(i <= 100)
-                settings.shotCount = (i-81) * 50 + 1000;
-
-            else if(i <= 130)
-                settings.shotCount = (i-100) * 100 + 2000;
-
-            shotsText = Integer.toString(settings.shotCount);
-
-            if(i == 131) {
-                settings.shotCount = Settings.SHOTS_INFINITE;
-                shotsText = "inf";
-            }
-
-            tvShotsValue.setText(shotsText);
+            settings.shotCount = SliderMapping.progressToShotCount(i);
+            tvShotsValue.setText(SliderMapping.shotCountText(settings.shotCount));
             updateTimes();
         }
 
@@ -472,29 +410,10 @@ public class SettingsActivity extends BaseActivity
     sbDelayOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            String delayTextValue = "";
-            String delayUnit = "";
-
             settings.rawDelay = i;
-
-            if(i < 6) {
-                settings.delay = i;
-                delayTextValue = Double.toString(settings.delay);
-                delayUnit = "min";
-
-            }
-            else if(i < 16) {
-                settings.delay = (i-5)*5 + 5;
-                delayTextValue = Double.toString(settings.delay);
-                delayUnit = "min";
-            }
-            else {
-                settings.delay = (i-15) * 60;
-                delayTextValue = Double.toString(i-15);
-                delayUnit = "h";
-            }
-            tvDelayValue.setText(delayTextValue);
-            tvDelayUnit.setText(delayUnit);
+            settings.delay = SliderMapping.progressToDelay(i);
+            tvDelayValue.setText(SliderMapping.delayText(settings.delay));
+            tvDelayUnit.setText(SliderMapping.delayUnit(settings.delay));
 
             updateTimes();
         }
