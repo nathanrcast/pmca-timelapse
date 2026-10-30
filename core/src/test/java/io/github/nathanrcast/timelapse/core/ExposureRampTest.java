@@ -46,8 +46,7 @@ public class ExposureRampTest {
     public void sunsetLengthensShutterFirst() {
         Action a = ramp.decide(dark());
         assertEquals(Kind.SHUTTER_LONGER, a.kind);
-        assertEquals(1, a.steps);
-        assertTrue(a.reason, a.reason.contains("shutter"));
+                assertTrue(a.reason, a.reason.contains("shutter"));
     }
 
     @Test
@@ -56,8 +55,7 @@ public class ExposureRampTest {
         in.shutterIndex = SS_1_30;
         Action a = ramp.decide(in);
         assertEquals(Kind.ISO_UP, a.kind);
-        assertEquals(1, a.steps);
-    }
+            }
 
     @Test
     public void sunsetStopsAtMaxShutterAndIso() {
@@ -98,56 +96,6 @@ public class ExposureRampTest {
     }
 
     @Test
-    public void defaultStepCapIsOneStep() {
-        Input in = dark();
-        in.measuredEv = -5f;
-        assertEquals(1, ramp.decide(in).steps);
-    }
-
-    @Test
-    public void largerCapAllowsMoreStepsButNotPastTheError() {
-        Input in = dark();
-        in.measuredEv = -5f;
-        in.maxStepEv = 1f;
-        assertEquals(3, ramp.decide(in).steps);
-        in.measuredEv = -0.2f;
-        assertEquals(1, ramp.decide(in).steps);
-    }
-
-    @Test
-    public void capStopsAtShutterLimit() {
-        Input in = dark();
-        in.measuredEv = -5f;
-        in.maxStepEv = 3f;
-        in.shutterIndex = SS_1_30 - 2;
-        Action a = ramp.decide(in);
-        assertEquals(Kind.SHUTTER_LONGER, a.kind);
-        assertEquals(2, a.steps);
-    }
-
-    @Test
-    public void largerCapRaisesIsoAndLowersIsoInSteps() {
-        Input in = dark();
-        in.measuredEv = -5f;
-        in.maxStepEv = 1f;
-        in.shutterIndex = SS_1_30;
-        Action up = ramp.decide(in);
-        assertEquals(Kind.ISO_UP, up.kind);
-        assertEquals(3, up.steps);
-        Input down = bright();
-        down.measuredEv = 5f;
-        down.maxStepEv = 1f;
-        down.isoIndex = T.isoIndex(800);
-        Action d = ramp.decide(down);
-        assertEquals(Kind.ISO_DOWN, d.kind);
-        assertEquals(3, d.steps);
-        down.isoIndex = ISO_100;
-        down.shutterIndex = SS_1_30;
-        assertEquals(Kind.SHUTTER_SHORTER, ramp.decide(down).kind);
-        assertEquals(3, ramp.decide(down).steps);
-    }
-
-    @Test
     public void shutterClampedToHalfInterval() {
         Input in = dark();
         in.maxShutterIndex = T.shutterIndex(30, 1);
@@ -157,7 +105,7 @@ public class ExposureRampTest {
         assertEquals(Kind.ISO_UP, ramp.decide(in).kind);
         in.shutterIndex = T.shutterIndex(1, 2);
         assertEquals(Kind.SHUTTER_LONGER, ramp.decide(in).kind);
-        assertEquals(T.shutterIndex(1, 1), T.maxShutterIndex(T.shutterCount() - 1, 2));
+        assertEquals(T.shutterIndex(1, 1), T.maxShutterIndex(T.shutterCount() - 1, 2, 1, false));
     }
 
     @Test
@@ -176,14 +124,6 @@ public class ExposureRampTest {
         in.shutterIndex = 0;
         in.isoIndex = 0;
         assertEquals(Kind.NONE, ramp.decide(in).kind);
-    }
-
-    @Test
-    public void burstIntervalCannotLengthen() {
-        Input in = dark();
-        in.intervalSec = 0;
-        assertEquals(Kind.ISO_UP, ramp.decide(in).kind);
-        assertEquals(0, T.maxShutterIndex(SS_1_30, 0));
     }
 
     @Test
@@ -275,19 +215,22 @@ public class ExposureRampTest {
     @Test
     public void historyIsABoundedRing() {
         History h = new History(3);
-        assertEquals(0f, h.average(3), 0);
+        assertEquals(0f, h.average(), 0);
         h.add(1);
         h.add(2);
         assertEquals(2, h.size());
-        assertEquals(1.5f, h.average(5), 1e-6);
+        assertEquals(1.5f, h.average(), 1e-6);
         h.add(3);
         h.add(10);
         h.add(20);
         assertEquals(3, h.size());
-        assertEquals(20f, h.average(1), 1e-6);
-        assertEquals(15f, h.average(2), 1e-6);
-        assertEquals(11f, h.average(99), 1e-6);
-        assertEquals(0f, new History(0).average(1), 0);
+        assertEquals(11f, h.average(), 1e-6);
+        h.add(30);
+        assertEquals(20f, h.average(), 1e-6);
+        History one = new History(0);
+        one.add(4);
+        one.add(6);
+        assertEquals(6f, one.average(), 1e-6);
     }
 
     @Test
@@ -301,10 +244,69 @@ public class ExposureRampTest {
     }
 
     @Test
-    public void shutterLookupIsExactOrUnknown() {
+    public void shutterLookupIsNearestOrUnknown() {
         assertEquals(SS_1_60, T.shutterIndex(1, 60));
+        assertEquals(SS_1_60, T.shutterIndex(1, 61));
+        assertEquals(T.shutterIndex(1, 15), T.shutterIndex(6, 100));
         assertEquals(ExposureRamp.UNKNOWN, T.shutterIndex(65535, 1));
-        assertEquals(ExposureRamp.UNKNOWN, T.shutterIndex(1, 7));
+        assertEquals(ExposureRamp.UNKNOWN, T.shutterIndex(0, 1));
+        assertEquals(ExposureRamp.UNKNOWN, T.shutterIndex(1, 0));
+        assertEquals(ExposureRamp.UNKNOWN, T.shutterIndex(1, 100000));
+        assertEquals(ExposureRamp.UNKNOWN, T.shutterIndex(120, 1));
+    }
+
+    @Test
+    public void burstIsNotClampedByInterval() {
+        assertEquals(SS_1_30, T.maxShutterIndex(SS_1_30, 0, 1, false));
+        Input in = dark();
+        in.intervalSec = 0;
+        assertEquals(Kind.SHUTTER_LONGER, ramp.decide(in).kind);
+    }
+
+    @Test
+    public void bracketFramesAndLenrShrinkTheLimit() {
+        int all = T.shutterCount() - 1;
+        // single frame, 10 s: half the interval is 5 s
+        assertEquals(T.shutterIndex(5, 1), T.maxShutterIndex(all, 10, 1, false));
+        // three frames in 4 s: 3 x exposure + 1.5 s <= 3.2 s, so 0.5 s at most
+        assertEquals(T.shutterIndex(1, 2), T.maxShutterIndex(all, 4, 3, false));
+        // LENR doubles the exposure: 2 x e + 0.5 <= 8 s
+        assertEquals(T.shutterIndex(16, 5),
+                T.maxShutterIndex(all, 10, 1, true));
+        // nothing fits: index 0
+        assertEquals(0, T.maxShutterIndex(all, 0.3, 3, true));
+        // the cap still applies
+        assertEquals(SS_1_30, T.maxShutterIndex(SS_1_30, 1000, 1, false));
+        assertEquals(0, T.maxShutterIndex(-5, 1000, 1, false));
+    }
+
+    @Test
+    public void bracketedSlotStopsLengtheningAtTheLimit() {
+        Input in = dark();
+        in.maxShutterIndex = T.shutterIndex(30, 1);
+        in.intervalSec = 4;
+        in.framesPerInterval = 3;
+        in.shutterIndex = T.shutterIndex(1, 2);
+        assertEquals(Kind.ISO_UP, ramp.decide(in).kind);
+    }
+
+    @Test
+    public void shutterPastTheLimitIsPulledBackBeforeIso() {
+        Input in = dark();
+        in.maxShutterIndex = T.shutterIndex(30, 1);
+        in.intervalSec = 1;
+        in.shutterIndex = T.shutterIndex(1, 1);
+        Action a = ramp.decide(in);
+        assertEquals(Kind.SHUTTER_SHORTER, a.kind);
+        assertTrue(a.reason, a.reason.contains("past limit"));
+        in.shutterIndex = T.shutterIndex(1, 4);
+        assertEquals(Kind.ISO_UP, ramp.decide(in).kind);
+        Input b = bright();
+        b.maxShutterIndex = T.shutterIndex(30, 1);
+        b.intervalSec = 1;
+        b.shutterIndex = T.shutterIndex(1, 1);
+        b.isoIndex = T.isoIndex(800);
+        assertEquals(Kind.SHUTTER_SHORTER, ramp.decide(b).kind);
     }
 
     @Test

@@ -6,15 +6,16 @@ import java.util.Locale;
  * Holy-grail ramp decision: given the measured exposure level, the target and where shutter and ISO stand, picks
  * the next step. Pure; the caller owns the counters, the history and the camera. Run it once per scheduler slot.
  *
- * Brightening lengthens the shutter up to the limit (the setting, clamped so the exposure is at most half the
- * interval) and only then raises ISO. Darkening lowers ISO first, then shortens the shutter. A shutter or ISO
+ * Brightening lengthens the shutter up to the limit (the setting, clamped to what the slot can hold, see
+ * {@link Tables#maxShutterIndex}) and only then raises ISO. A shutter already past the limit is pulled back first.
+ * One table step per call. Darkening lowers ISO first, then shortens the shutter. A shutter or ISO
  * the caller could not place in the table is {@link #UNKNOWN}: shutter unknown means no brightening (the order
  * cannot be kept) and ISO unknown means shutter-only ramping.
  */
 public final class ExposureRamp {
     public static final int UNKNOWN = -1;
-    public static final float DEFAULT_MAX_STEP_EV = 1f / 3f;
-    private static final float STEP_TOLERANCE_EV = 0.05f;
+    private static final double WRITE_MARGIN_SEC = 0.5;
+    private static final double SLOT_FILL = 0.8;
     private static final float ISO_MATCH_EV = 1f / 6f;
     private static final int MIN_ISO_VALUE = 100;
 
@@ -70,12 +71,21 @@ public final class ExposureRamp {
             return (double) shutter[index][0] / shutter[index][1];
         }
 
-        /** Exact match, else {@link #UNKNOWN} (BULB, off-table). */
+        /** Nearest table entry within 1/6 EV, else {@link #UNKNOWN} (BULB, unreadable, far off-table). */
         public int shutterIndex(int n, int d) {
-            for (int i = 0; i < shutter.length; i++)
-                if (shutter[i][0] == n && shutter[i][1] == d)
-                    return i;
-            return UNKNOWN;
+            if (n <= 0 || d <= 0 || (n == 65535 && d == 1))
+                return UNKNOWN;
+            int best = UNKNOWN;
+            double bestEv = ISO_MATCH_EV;
+            double sec = (double) n / d;
+            for (int i = 0; i < shutter.length; i++) {
+                double ev = Math.abs(log2(sec / seconds(i)));
+                if (ev <= bestEv) {
+                    best = i;
+                    bestEv = ev;
+                }
+            }
+            return best;
         }
 
         /** Nearest table ISO within 1/6 EV, else {@link #UNKNOWN} (AUTO, no match). */
@@ -94,12 +104,25 @@ public final class ExposureRamp {
             return best;
         }
 
-        /** The longest table shutter index at or below {@code cap} whose exposure is at most half the interval. */
-        public int maxShutterIndex(int cap, double intervalSec) {
+        /**
+         * The longest table shutter index at or below {@code cap} that the slot can hold. Burst (interval 0) is not
+         * clamped by time. Otherwise the exposure is at most half the interval, and the slot's frames, each
+         * doubled by long-exposure NR if on, plus a write margin per frame fit in 80 % of the interval.
+         */
+        public int maxShutterIndex(int cap, double intervalSec, int framesPerInterval, boolean lenr) {
             int top = Math.max(0, Math.min(cap, shutter.length - 1));
-            while (top > 0 && seconds(top) > intervalSec / 2)
+            if (intervalSec <= 0)
+                return top;
+            int frames = Math.max(1, framesPerInterval);
+            while (top > 0 && !fits(top, intervalSec, frames, lenr))
                 top--;
             return top;
+        }
+
+        private boolean fits(int index, double intervalSec, int frames, boolean lenr) {
+            double exposure = seconds(index);
+            return exposure <= intervalSec / 2
+                    && frames * exposure * (lenr ? 2 : 1) + frames * WRITE_MARGIN_SEC <= SLOT_FILL * intervalSec;
         }
 
         public int minIsoIndex() {
@@ -107,14 +130,6 @@ public final class ExposureRamp {
                 if (iso[i] >= MIN_ISO_VALUE)
                     return i;
             return 0;
-        }
-
-        double shutterStepEv(int from, int to) {
-            return log2(seconds(to) / seconds(from));
-        }
-
-        double isoStepEv(int from, int to) {
-            return log2((double) iso[to] / iso[from]);
         }
     }
 
@@ -126,23 +141,22 @@ public final class ExposureRamp {
         /** The setting; the interval clamp is applied on top. */
         public int maxShutterIndex;
         public int maxIsoIndex;
+        /** 0 = burst: no clamp by time. */
         public double intervalSec;
+        public int framesPerInterval = 1;
+        public boolean lenr;
         public Mode mode = Mode.UP;
         public float deadbandEv;
         public int cooldownSlots;
         public int slotsSinceChange;
-        public float maxStepEv = DEFAULT_MAX_STEP_EV;
     }
 
     public static final class Action {
-
         public final Kind kind;
-        public final int steps;
         public final String reason;
 
-        Action(Kind kind, int steps, String reason) {
+        Action(Kind kind, String reason) {
             this.kind = kind;
-            this.steps = steps;
             this.reason = reason;
         }
 
@@ -152,7 +166,7 @@ public final class ExposureRamp {
 
         @Override
         public String toString() {
-            return kind + (steps > 0 ? " x" + steps : "") + " (" + reason + ")";
+            return kind + " (" + reason + ")";
         }
     }
 
@@ -177,15 +191,14 @@ public final class ExposureRamp {
             return size;
         }
 
-        /** Mean of the newest {@code count} samples (all of them if fewer); 0 when empty. */
-        public float average(int count) {
-            int n = Math.min(Math.max(count, 1), size);
-            if (n == 0)
+        /** Mean of the samples held (at most the capacity); 0 when empty. */
+        public float average() {
+            if (size == 0)
                 return 0;
             float sum = 0;
-            for (int i = 1; i <= n; i++)
-                sum += ring[(next - i + ring.length) % ring.length];
-            return sum / n;
+            for (int i = 0; i < size; i++)
+                sum += ring[i];
+            return sum / size;
         }
     }
 
@@ -217,84 +230,50 @@ public final class ExposureRamp {
             return none("within deadband");
         if (in.slotsSinceChange < in.cooldownSlots)
             return none("cooldown " + in.slotsSinceChange + "/" + in.cooldownSlots + " slots");
-        float cap = in.maxStepEv;
+        int limit = tables.maxShutterIndex(in.maxShutterIndex, in.intervalSec, in.framesPerInterval, in.lenr);
+        if (in.shutterIndex > limit && in.shutterIndex < tables.shutterCount())
+            return new Action(Kind.SHUTTER_SHORTER, "shutter " + shutter(in.shutterIndex) + " past limit "
+                    + shutter(limit) + ", pulling back");
         if (error < 0) {
             if (!in.mode.brightens())
                 return none("too dark, brightening off");
-            return brighten(in, excess, cap);
+            return brighten(in, excess, limit);
         }
         if (!in.mode.darkens())
             return none("too bright, darkening off");
-        return darken(in, excess, cap);
+        return darken(in, excess);
     }
 
-    private Action brighten(Input in, float excess, float cap) {
+    private Action brighten(Input in, float excess, int limit) {
         String why = "dark by " + ev(excess + in.deadbandEv);
         if (in.shutterIndex == UNKNOWN)
             return none(why + ", shutter unknown");
-        int limit = tables.maxShutterIndex(in.maxShutterIndex, in.intervalSec);
         if (in.shutterIndex >= tables.shutterCount())
             return none(why + ", shutter index out of table");
-        if (in.shutterIndex < limit) {
-            int steps = shutterSteps(in.shutterIndex, limit, 1, excess, cap);
-            return new Action(Kind.SHUTTER_LONGER, steps, why + ", shutter " + shutter(in.shutterIndex) + " -> "
-                    + shutter(in.shutterIndex + steps));
-        }
+        if (in.shutterIndex < limit)
+            return new Action(Kind.SHUTTER_LONGER, why + ", shutter " + shutter(in.shutterIndex) + " -> "
+                    + shutter(in.shutterIndex + 1));
         if (in.isoIndex == UNKNOWN)
             return none(why + ", shutter at max, ISO unknown");
         int isoMax = Math.max(0, Math.min(in.maxIsoIndex, tables.isoCount() - 1));
-        if (in.isoIndex < isoMax) {
-            int steps = isoSteps(in.isoIndex, isoMax, 1, excess, cap);
-            return new Action(Kind.ISO_UP, steps, why + ", shutter at max, ISO " + tables.isoAt(in.isoIndex) + " -> "
-                    + tables.isoAt(in.isoIndex + steps));
-        }
+        if (in.isoIndex < isoMax)
+            return new Action(Kind.ISO_UP, why + ", shutter at max, ISO " + tables.isoAt(in.isoIndex) + " -> "
+                    + tables.isoAt(in.isoIndex + 1));
         return none(why + ", at max shutter and ISO");
     }
 
-    private Action darken(Input in, float excess, float cap) {
+    private Action darken(Input in, float excess) {
         String why = "bright by " + ev(excess + in.deadbandEv);
         int isoMin = tables.minIsoIndex();
-        if (in.isoIndex != UNKNOWN && in.isoIndex < tables.isoCount() && in.isoIndex > isoMin) {
-            int steps = isoSteps(in.isoIndex, isoMin, -1, excess, cap);
-            return new Action(Kind.ISO_DOWN, steps, why + ", ISO " + tables.isoAt(in.isoIndex) + " -> "
-                    + tables.isoAt(in.isoIndex - steps));
-        }
+        if (in.isoIndex != UNKNOWN && in.isoIndex < tables.isoCount() && in.isoIndex > isoMin)
+            return new Action(Kind.ISO_DOWN, why + ", ISO " + tables.isoAt(in.isoIndex) + " -> "
+                    + tables.isoAt(in.isoIndex - 1));
         if (in.shutterIndex == UNKNOWN)
             return none(why + ", shutter unknown");
-        if (in.shutterIndex > 0 && in.shutterIndex < tables.shutterCount()) {
-            int steps = shutterSteps(in.shutterIndex, 0, -1, excess, cap);
-            return new Action(Kind.SHUTTER_SHORTER, steps, why + (in.isoIndex == UNKNOWN ? ", ISO unknown" : "")
-                    + ", shutter " + shutter(in.shutterIndex) + " -> " + shutter(in.shutterIndex - steps));
-        }
+        if (in.shutterIndex > 0 && in.shutterIndex < tables.shutterCount())
+            return new Action(Kind.SHUTTER_SHORTER, why + (in.isoIndex == UNKNOWN ? ", ISO unknown" : "")
+                    + ", shutter " + shutter(in.shutterIndex) + " -> " + shutter(in.shutterIndex - 1));
         return none(why + ", at min ISO and shutter");
-    }
-
-    // Steps of one table in one direction: the first always, more while the total stays within the per-slot cap
-    // and short of the error.
-    private int shutterSteps(int from, int limit, int dir, float excess, float cap) {
-        int steps = 1;
-        double total = Math.abs(tables.shutterStepEv(from, from + dir));
-        while (from + dir * steps != limit && total < excess) {
-            double next = Math.abs(tables.shutterStepEv(from + dir * steps, from + dir * (steps + 1)));
-            if (total + next > cap + STEP_TOLERANCE_EV)
-                break;
-            total += next;
-            steps++;
-        }
-        return steps;
-    }
-
-    private int isoSteps(int from, int limit, int dir, float excess, float cap) {
-        int steps = 1;
-        double total = Math.abs(tables.isoStepEv(from, from + dir));
-        while (from + dir * steps != limit && total < excess) {
-            double next = Math.abs(tables.isoStepEv(from + dir * steps, from + dir * (steps + 1)));
-            if (total + next > cap + STEP_TOLERANCE_EV)
-                break;
-            total += next;
-            steps++;
-        }
-        return steps;
     }
 
     private String shutter(int index) {
@@ -302,7 +281,7 @@ public final class ExposureRamp {
     }
 
     private static Action none(String reason) {
-        return new Action(Kind.NONE, 0, reason);
+        return new Action(Kind.NONE, reason);
     }
 
     private static String ev(float v) {
