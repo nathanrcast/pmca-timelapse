@@ -26,6 +26,15 @@ jobs:
         run: ./gradlew :core:check :app:testDebugUnitTest --stacktrace
       - name: Log analyzer tests
         run: python3 -I -m unittest discover -s tools -p 'test_*.py'
+      - name: Assemble a real MP4 from generated frames
+        run: |
+          sudo apt-get install -y ffmpeg
+          mkdir -p /tmp/frames
+          ffmpeg -loglevel error -f lavfi -i testsrc=size=320x240:rate=1 -frames:v 10 /tmp/frames/DSC%05d.JPG
+          tools/assemble.sh /tmp/frames --out /tmp/out.mp4
+          frames=$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 /tmp/out.mp4)
+          echo "frames in MP4: $frames"
+          test "$frames" -ge 10
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
