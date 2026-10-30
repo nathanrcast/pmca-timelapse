@@ -9,7 +9,7 @@ Make the exposure-ramping logic from T03 testable and model-aware.
 - Move the ramp decision into `core/.../ExposureRamp`. It takes the measured exposure, target, current SS/ISO, limits (max SS ≤ interval/2, ISO cap) and deadband, and returns the next SS/ISO. It is a pure function with no camera access.
 - Take shutter/ISO step tables from `Capabilities` (T07) per body. The NEX-5T and a6500 ranges differ.
 - Cover the Frosbe fork's own fix history: the "sunrise overexpose" and "ISO last change" issues. Add tests that reproduce them.
-- Limit the ramp to ≤ 1/3 EV per shot to avoid flicker. Make the limit configurable.
+- Limit the ramp to one table step (about 1/3 EV) per slot to avoid flicker. The step is fixed, not configurable: no two adjacent table steps fit in a 1/3 EV cap.
 
 ## Acceptance
 - [ ] Unit tests:
