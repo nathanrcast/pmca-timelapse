@@ -6,7 +6,7 @@
 Collect the facts T07 and T10 need from each body in a single maintainer session.
 
 ## Design
-A hidden `CapsDumpActivity`, reached by holding a key combination on the settings screen (pick one and document it, e.g. long-press DELETE). It writes `TIMELPS/CAPS-<model>.txt` containing:
+A `CapsDumpActivity`, reached from the **Camera info** button at the bottom of the settings screen. It's a button rather than a hidden key combination because the NEX-5T may have no DELETE key. Capture steps: `docs/cameras.md`. It writes `TIMELPS/CAPS-<model>.txt` containing:
 1. `DeviceInfo`: model, firmware version, PMCA API version, Android `Build.*`.
 2. A reflection probe of **every public method** on `CameraEx`, `CameraEx.ParametersModifier`, `CameraEx.ParametersModifier`'s supported-value getters and `CameraSequence` (if present): one line each, `present`/`absent`.
 3. For each supported-value getter that exists: the value list (shutter speeds, ISO, drive modes, focus modes, silent shutter, LENR / long-exposure NR, picture-review settings, bracket steps).
