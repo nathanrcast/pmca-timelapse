@@ -19,7 +19,7 @@ The maintainer runs one orchestrating agent session. It hands tickets to impleme
    - review findings are resolved or explicitly waived in a PR comment
    - for `hw:required` tickets, the maintainer has posted on-camera evidence (LOG/CAPS file or photo) on the PR
 
-   Merge with squash and delete the branch. Rebase any open sibling branches onto the new `main`.
+   Squash-merge and delete the branch, except PRs that import external history (T03, T04): those use a merge commit so upstream authorship and `git log --follow` survive. Rebase any open sibling branches onto the new `main`.
 6. **Close-out.** Update the ticket file's status line and `docs/plan.md` if the scope moved, in the same PR.
 
 ## Wave cadence
