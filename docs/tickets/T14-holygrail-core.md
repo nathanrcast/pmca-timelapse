@@ -18,3 +18,11 @@ Make the exposure-ramping logic from T03 testable and model-aware.
   - deadband (no change for small deltas)
   - limit clamping
 - [ ] **HW:** a sunset run on the a6500 gives a smooth exposure curve in the LOG.CSV `ss`/`iso` columns (pending maintainer).
+
+## Inherited from T03
+Holy-grail bugs that came in with the Frosbe fork merge (#23) and were not fixed there:
+- The manual target exposure is stored in 1/3-EV steps (`Settings.targetExposure`, −30…30, shown divided by 3 as EV). `ShootActivity` compares it directly with `exposureLevel`, which is in EV, so a manual target lands 3× too far from 0. "Use current exposure", the default, is unaffected.
+- The target slider (`laTargetExposure`) stays hidden on load when "Use current exposure" is saved off. Its visibility is only applied when the checkbox changes.
+- The default limits are `maxShutterSpeedIndex = 0` (1/8000) and `maxISOIndex = 0` (ISO 50), so with untouched settings the ramp can never brighten.
+- The ramp calls the Sony API directly: `decrementShutterSpeed`/`incrementShutterSpeed`, `setISOSensitivity`, `getShutterSpeed`, `getISOSensitivity` and `setProgramLineRangeOverListener`. These move behind T07's capability layer.
+- The exposure history (`exposureLevelList`) grows by one entry per HG shot for the whole run, but only the last `averageExposureAmount` entries are read.
