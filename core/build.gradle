@@ -28,7 +28,7 @@ tasks.named('jacocoTestCoverageVerification') {
     violationRules {
         rule {
             element = 'CLASS'
-            includes = ['io.github.nathanrcast.timelapse.core.ShotPlan']
+            includes = ['io.github.nathanrcast.timelapse.core.ShotPlan', 'io.github.nathanrcast.timelapse.core.Scheduler*']
             limit {
                 counter = 'LINE'
                 minimum = 0.90
