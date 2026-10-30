@@ -74,8 +74,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private Display display;
 
     private String savedFocusMode;
-    private boolean usedToggleFocus;
-    private boolean focusStateSaved;
 
     int getcnt(){
         if(settings.brs){
@@ -132,13 +130,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final Runnable delayCountdownRunnable = new Runnable() {
         @Override
         public void run() {
-            if (shotCount == 0 && shootStartTime > 0) {
-                long delaySeconds = (shootStartTime - System.currentTimeMillis()) / 1000;
-                if (delaySeconds >= 0) {
-                    tvCount.setText("Delay: " + formatTime(delaySeconds));
-                    tvRemaining.setText(getRemainingTime());
-                    shootRunnableHandler.postDelayed(this, 1000);
-                }
+            if (delaySecondsRemaining() > 0) {
+                updateScreen();
+                shootRunnableHandler.postDelayed(this, 1000);
             }
         }
     };
@@ -230,26 +224,16 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         final Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
 
-        if (settings.mf) {
-            try {
-                if (isToggleFocusSupported(cameraEx)) {
-                    setToggleFocus(cameraEx, true);
-                    usedToggleFocus = true;
-                    focusStateSaved = true;
-                } else {
-                    savedFocusMode = params.getFocusMode();
-                    params.setFocusMode(CameraEx.ParametersModifier.FOCUS_MODE_MANUAL);
-                    usedToggleFocus = false;
-                    focusStateSaved = true;
-                }
-            } catch (Exception e) {
-                focusStateSaved = false;
+        try {
+            if(settings.mf) {
+                savedFocusMode = params.getFocusMode();
+                params.setFocusMode(CameraEx.ParametersModifier.FOCUS_MODE_MANUAL);
             }
-        } else {
-            try {
+            else
                 params.setFocusMode("auto");
-            } catch (Exception ignored) {}
         }
+        catch(Exception ignored)
+        {}
 
         final CameraEx.ParametersModifier modifier = cameraEx.createParametersModifier(params);
 
@@ -389,8 +373,19 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("ISOLevelIndex: " + ISOLevelIndex);
     }
 
+    private long delaySecondsRemaining() {
+        if (shotCount != 0 || shootStartTime <= 0)
+            return 0;
+        long ms = shootStartTime - System.currentTimeMillis();
+        return ms > 0 ? (ms + 999) / 1000 : 0;
+    }
+
     private void updateScreen(){
-        tvCount.setText(Integer.toString(shotCount)+"/"+Long.toString((long) settings.shotCount * getcnt()));
+        long delaySeconds = delaySecondsRemaining();
+        if (delaySeconds > 0)
+            tvCount.setText("Delay: " + Util.formatTime(delaySeconds));
+        else
+            tvCount.setText(Integer.toString(shotCount)+"/"+Long.toString((long) settings.shotCount * getcnt()));
         tvRemaining.setText(getRemainingTime());
         tvBattery.setText(getBatteryPercentage());
 
@@ -440,19 +435,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         shootRunnableHandler.removeCallbacks(shootRunnable);
         shootRunnableHandler.removeCallbacks(delayCountdownRunnable);
 
-        // Restore the focus mode the camera had before MF was forced (reflection: not in the stubs, absent on older bodies)
-        if (focusStateSaved && cameraEx != null) {
+        // Restore the focus mode the camera had before MF was forced
+        if (savedFocusMode != null && cameraEx != null) {
             try {
-                if (usedToggleFocus && isToggleFocusSupported(cameraEx)) {
-                    setToggleFocus(cameraEx, false);
-                } else if (savedFocusMode != null) {
-                    Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
-                    params.setFocusMode(savedFocusMode);
-                    cameraEx.getNormalCamera().setParameters(params);
-                }
+                Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
+                params.setFocusMode(savedFocusMode);
+                cameraEx.getNormalCamera().setParameters(params);
             } catch (Exception ignored) {}
-            focusStateSaved = false;
         }
+        savedFocusMode = null;
 
         if(cameraSurfaceHolder == null)
             log("cameraSurfaceHolder == null");
@@ -693,27 +684,16 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         return s + (int)(level / (float)scale * 100) + "%";
     }
 
-    private String formatTime(long seconds) {
-        if (seconds < 0) return "";
-        if (seconds < 60) return seconds + "s";
-        long h = seconds / 3600;
-        long m = (seconds / 60) % 60;
-        if (h > 0) return h + "h " + m + "m";
-        return m + "m " + (seconds % 60) + "s";
-    }
-
     private String getRemainingTime() {
         long seconds;
         if(burstShooting)
             seconds = Math.round(((long) settings.shotCount * 1000 - System.currentTimeMillis() + shootStartTime) / 1000.0);
         else {
-            seconds = Math.round(((long) settings.shotCount * getcnt() - shotCount) * settings.interval);
-            if (shotCount == 0 && shootStartTime > 0) {
-                long delaySeconds = (shootStartTime - System.currentTimeMillis()) / 1000;
-                if (delaySeconds > 0) seconds += delaySeconds;
-            }
+            // bracketed frames are taken back to back within one interval
+            long intervalsLeft = settings.shotCount - shotCount / getcnt();
+            seconds = Math.round(intervalsLeft * settings.interval) + delaySecondsRemaining();
         }
-        return formatTime(seconds);
+        return Util.formatTime(seconds);
     }
 
     @Override
@@ -755,25 +735,5 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         else
             log("null");
         log("\n");
-    }
-
-
-
-    private static boolean isToggleFocusSupported(CameraEx cameraEx) {
-        try {
-            return (Boolean) cameraEx.getClass()
-                .getMethod("isSupportedToggleFocusMode")
-                .invoke(cameraEx);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private static void setToggleFocus(CameraEx cameraEx, boolean on) {
-        try {
-            cameraEx.getClass()
-                .getMethod("setToggleFocusMode", boolean.class)
-                .invoke(cameraEx, on);
-        } catch (Exception ignored) {}
     }
 }
