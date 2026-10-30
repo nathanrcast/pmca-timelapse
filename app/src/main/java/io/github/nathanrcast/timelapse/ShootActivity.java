@@ -10,10 +10,13 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
+import com.sony.scalar.sysutil.ScalarInput;
 
 import io.github.nathanrcast.timelapse.camera.Result;
 import io.github.nathanrcast.timelapse.camera.SafeCamera;
@@ -26,7 +29,7 @@ import io.github.nathanrcast.timelapse.core.LenrGuard;
 import io.github.nathanrcast.timelapse.core.StartMode;
 import io.github.nathanrcast.timelapse.core.StartTime;
 import io.github.nathanrcast.timelapse.core.ExposureRamp;
-import io.github.nathanrcast.timelapse.core.Progress;
+import io.github.nathanrcast.timelapse.core.HudModel;
 import io.github.nathanrcast.timelapse.core.RampController;
 import io.github.nathanrcast.timelapse.core.Scheduler;
 import io.github.nathanrcast.timelapse.core.Settings;
@@ -55,7 +58,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private ShotLog shotLog;
     private final SimpleDateFormat logTime = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
 
-    private TextView tvCount, tvBattery, tvRemaining, tvStatus;
+    private TextView tvCount, tvBattery, tvRemaining, tvStatus, tvHud;
+    private CardSpace cardSpace;
+    private long runStartWallMs;
     private BracketTiming bracketTiming;
     private String bracketWarning;
     // LENR guard: the state found at the first start (null: unknown) and the status-line note for this run.
@@ -86,12 +91,21 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private SafeCamera safeCamera;
     private Camera camera;
 
-    private static final long REVIEW_MS = 2000;
+    private static final long END_SCREEN_MS = 2000;
+    private static final long KEY_WAKE_MS = 5000;
+    private static final long HUD_MS = 1000;
     private static final long BURST_POLL_MS = 500;
 
     private boolean burstShooting;
     private boolean reviewShowing;
     private boolean finishing;
+    private boolean stopping;
+    private volatile boolean tornDown;
+    // The panel is off (DOFF): nothing is drawn until a key or the next shot turns it on.
+    private boolean panelOff;
+    // A key woke the panel; automatic DOFF waits until this uptime.
+    private long wakeUntilMs;
+    private boolean buttonKey;
 
     private float exposureLevel = 0;
     private boolean isoUnknownLogged;
@@ -103,6 +117,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final Runnable tickRunnable = new Runnable() {
         @Override
         public void run() {
+            if (tornDown)
+                return;
             Scheduler.Decision decision = scheduler.onTimer();
             trackBracket(decision);
             if (decision.action == Scheduler.Action.FIRE) {
@@ -138,18 +154,36 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final Runnable finishRunnable = new Runnable() {
         @Override
         public void run() {
-            display.on();
-            onBackPressed();
+            leaveEndScreen();
         }
     };
 
-    private final Runnable delayCountdownRunnable = new Runnable() {
+    // The one screen refresh (HUD, count, delay countdown, burst seconds). It idles while the panel is off.
+    private final Runnable refreshRunnable = new Runnable() {
         @Override
         public void run() {
-            if (delaySecondsRemaining() > 0) {
+            if (tornDown)
+                return;
+            if (!panelOff) {
+                if (cardSpace != null)
+                    cardSpace.request();
                 updateScreen();
-                handler.postDelayed(this, 1000);
             }
+            handler.postDelayed(this, HUD_MS);
+        }
+    };
+
+    // A key woke the display under DOFF; put it back to sleep.
+    private final Runnable wakeOffRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (finishing || tornDown || display == null || !settings.displayOff)
+                return;
+            long wait = wakeUntilMs - clock.nowMs();
+            if (wait > 0)
+                handler.postDelayed(this, wait);
+            else
+                panelOff();
         }
     };
 
@@ -158,7 +192,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final Runnable burstPollRunnable = new Runnable() {
         @Override
         public void run() {
-            updateScreen();
             frameCaptured();
             handler.postDelayed(this, BURST_POLL_MS);
         }
@@ -187,6 +220,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         tvBattery = (TextView) findViewById(R.id.tvBattery);
         tvRemaining = (TextView) findViewById(R.id.tvRemaining);
         tvStatus = (TextView) findViewById(R.id.tvStatus);
+        tvHud = (TextView) findViewById(R.id.tvHud);
 
         //Holy Grail
         tvExposureLevel = (TextView) findViewById(R.id.tvExposureLevel);
@@ -220,6 +254,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("onResume");
 
         super.onResume();
+        tornDown = false;
+        stopping = false;
         display = new Display(getDisplayManager());
 
         Result<SafeCamera> opened = SafeCamera.open(this, this);
@@ -244,6 +280,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (scheduler == null) {
             scheduler = new Scheduler(plan, clock, Scheduler.StopOn.CAPTURED);
             scheduler.start(clock.nowMs() + startDelayMs());
+            runStartWallMs = System.currentTimeMillis();
             shotLog = new ShotLog(this, Build.MODEL, Build.VERSION.INCREMENTAL, appVersion(), clock.nowMs(),
                     ShotLogCsv.settingsJson(settings), LenrGuard.headerValue(lenrAtStart));
         } else {
@@ -255,15 +292,18 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         else
             armTimer();
 
-        if (delaySecondsRemaining() > 0) {
-            handler.post(delayCountdownRunnable);
-        }
-
-        if(settings.displayOff) {
-            display.turnAutoOff(5000);
+        panelOff = false;
+        if (settings.displayOff) {
+            wakeUntilMs = clock.nowMs() + KEY_WAKE_MS;
+            handler.postDelayed(wakeOffRunnable, KEY_WAKE_MS);
         }
 
         setAutoPowerOffMode(false);
+
+        if (cardSpace == null)
+            cardSpace = new CardSpace(runStartWallMs);
+        handler.removeCallbacks(refreshRunnable);
+        handler.postDelayed(refreshRunnable, HUD_MS);
 
         // applyCapabilities turned HG off if this body lacks any of its methods.
         if (settings.holyGrail) {
@@ -427,19 +467,20 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     };
 
-    private long delaySecondsRemaining() {
-        return Progress.delaySecondsRemaining(scheduler, clock.nowMs());
-    }
 
     private void updateScreen(){
+        if (panelOff || tornDown)
+            return;
         long now = clock.nowMs();
-        long delaySeconds = Progress.delaySecondsRemaining(scheduler, now);
-        if (delaySeconds > 0)
-            tvCount.setText("Delay: " + Util.formatTime(delaySeconds));
-        else
-            tvCount.setText(Progress.count(scheduler, now));
-        tvRemaining.setText(Progress.remaining(scheduler, now));
-        tvBattery.setText(getBatteryPercentage());
+        Battery battery = Battery.read(this);
+        HudModel hud = HudModel.of(scheduler, now, battery.pct, battery.charging,
+                cardSpace == null ? HudModel.UNKNOWN : cardSpace.freeBytes(),
+                cardSpace == null ? HudModel.UNKNOWN : cardSpace.avgBytes());
+        tvCount.setText(hud.count);
+        tvRemaining.setText(hud.remaining);
+        tvBattery.setText(hud.battery);
+        tvHud.setText("Skipped: " + hud.skips + "   Next: " + hud.next + "\nElapsed: " + hud.elapsed
+                + "   Card: " + hud.cardLeft + " left");
 
         //Holy Grail
         if (controller != null) {
@@ -469,54 +510,88 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     @Override
     protected boolean onMenuKeyUp() {
-        onBackPressed();
+        if (finishing)
+            leaveEndScreen();
+        else
+            stopRun();
         return true;
+    }
+
+    // MENU: stop now, tear everything down, report, and return to the settings screen.
+    private void stopRun() {
+        if (stopping)
+            return;
+        stopping = true;
+        String summary = scheduler == null ? "Stopped" : "Stopped: " + HudModel.summary(scheduler, clock.nowMs());
+        log(summary);
+        teardown();
+        Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
+        finish();
     }
 
     @Override
     protected void onPause() {
-        if (display != null) {
-            display.on();
-            display.turnAutoOff(Display.NO_AUTO_OFF);
-        }
-
+        teardown();
         super.onPause();
-
         log("on pause");
+    }
+
+    // Reached from MENU, onPause (power switch, activity switch) and onDestroy; only the first call does anything
+    // until onResume re-arms it.
+    private void teardown() {
+        if (tornDown)
+            return;
+        tornDown = true;
 
         handler.removeCallbacksAndMessages(null);
-        if (scheduler != null) {
-            logDecision(scheduler.pause());
-            if (shotLog != null)
-                shotLog.flush();
+        if (display != null) {
+            try {
+                display.on();
+                display.turnAutoOff(Display.NO_AUTO_OFF);
+            } catch (RuntimeException e) {
+                log("display: " + e);
+            }
         }
+
+        if (scheduler != null) {
+            if (scheduler.isCapturing() && safeCamera != null)
+                safeCamera.cancelTakePicture();
+            logDecision(scheduler.pause());
+        }
+        if (shotLog != null)
+            shotLog.flush();
         stopReview(false);
         finishing = false;
 
-        if(cameraSurfaceHolder == null)
-            log("cameraSurfaceHolder == null");
-        else {
+        if (cameraSurfaceHolder != null)
             cameraSurfaceHolder.removeCallback(this);
-        }
 
-        if(camera == null)
-            log("camera == null");
-        else {
-            camera.stopPreview();
-            camera = null;
-        }
+        stopPreview();
+        camera = null;
 
-        if(safeCamera == null)
-            log("safeCamera == null");
-        else
+        if (cardSpace != null) {
+            cardSpace.stop();
+            cardSpace = null;
+        }
+        if (safeCamera != null)
             safeCamera.close();
 
         setAutoPowerOffMode(true);
     }
 
+    private void stopPreview() {
+        if (camera == null)
+            return;
+        try {
+            camera.stopPreview();
+        } catch (RuntimeException e) {
+            log("stopPreview: " + e);
+        }
+    }
 
     @Override
     protected void onDestroy() {
+        teardown();
         if (shotLog != null) {
             shotLog.close();
             shotLog = null;
@@ -593,6 +668,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     // The camera calls this when a frame is captured, possibly off the main looper.
     @Override
     public void onShutter(int status) {
+        if (tornDown)
+            return;
         if(!burstShooting) {
             safeCamera.cancelTakePicture();
 
@@ -602,6 +679,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private void frameCaptured() {
+        if (tornDown)
+            return;
         Scheduler.Decision decision = scheduler.onFrameCaptured();
         trackBracket(decision);
         if (decision.action == Scheduler.Action.FIRE) {
@@ -666,14 +745,19 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         stopReview(true);
         shoot(decision);
         if (!burstShooting)
-            display.on();
+            panelOn();
     }
 
-    // Shows the last capture until the next deadline, for at most REVIEW_MS.
+    // Shows the last capture until the next deadline, for at most the review setting (default off: no review, and
+    // DOFF applies straight away).
     private void showReview() {
-        long until = scheduler.reviewUntilMs(REVIEW_MS);
-        if (until < 0)
+        long reviewMs = settings.reviewSeconds * 1000L;
+        long until = reviewMs > 0 ? scheduler.reviewUntilMs(reviewMs) : -1;
+        if (until < 0) {
+            if (settings.displayOff && !burstShooting)
+                panelOff();
             return;
+        }
         reviewSurfaceView.setVisibility(View.VISIBLE);
         reviewShowing = true;
         handler.postAtTime(stopReviewRunnable, until);
@@ -685,44 +769,104 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (!reviewShowing)
             return;
         reviewShowing = false;
-        if (camera != null)
-            camera.stopPreview();
+        stopPreview();
         reviewSurfaceView.setVisibility(View.GONE);
         if (displayOff && settings.displayOff)
-            display.off();
+            panelOff();
     }
 
+    // The run is over: stop the preview, show a summary for END_SCREEN_MS or until a key, then return to settings.
     private void finishRun() {
         if (finishing)
             return;
         finishing = true;
         handler.removeCallbacks(tickRunnable);
         handler.removeCallbacks(burstPollRunnable);
-        if (burstShooting) {
+        handler.removeCallbacks(wakeOffRunnable);
+        handler.removeCallbacks(stopReviewRunnable);
+        if (burstShooting)
             safeCamera.cancelTakePicture();
-            handler.post(finishRunnable);
-        } else {
-            handler.postDelayed(finishRunnable, REVIEW_MS);
+        reviewShowing = false;
+        stopPreview();
+        reviewSurfaceView.setVisibility(View.GONE);
+        panelOn();
+        tvStatus.setText("Done: " + HudModel.summary(scheduler, clock.nowMs()) + ". Press any key.");
+        tvStatus.setVisibility(View.VISIBLE);
+        updateScreen();
+        handler.postDelayed(finishRunnable, END_SCREEN_MS);
+    }
+
+    private void leaveEndScreen() {
+        if (stopping)
+            return;
+        stopping = true;
+        teardown();
+        finish();
+    }
+
+    private void panelOn() {
+        panelOff = false;
+        display.on();
+    }
+
+    // Not while a key wake is still running.
+    private void panelOff() {
+        if (clock.nowMs() < wakeUntilMs)
+            return;
+        panelOff = true;
+        display.off();
+    }
+
+    private static boolean isButton(int scanCode) {
+        switch (scanCode) {
+            case ScalarInput.ISV_KEY_UP:
+            case ScalarInput.ISV_KEY_DOWN:
+            case ScalarInput.ISV_KEY_LEFT:
+            case ScalarInput.ISV_KEY_RIGHT:
+            case ScalarInput.ISV_KEY_ENTER:
+            case ScalarInput.ISV_KEY_FN:
+            case ScalarInput.ISV_KEY_AEL:
+            case ScalarInput.ISV_KEY_MENU:
+            case ScalarInput.ISV_KEY_SK1:
+            case ScalarInput.ISV_KEY_S1_1:
+            case ScalarInput.ISV_KEY_S1_2:
+            case ScalarInput.ISV_KEY_S2:
+            case ScalarInput.ISV_KEY_PLAY:
+            case ScalarInput.ISV_KEY_STASTOP:
+            case ScalarInput.ISV_KEY_CUSTOM1:
+            case ScalarInput.ISV_KEY_DELETE:
+            case ScalarInput.ISV_KEY_SK2:
+                return true;
+            default:
+                return false;
         }
     }
 
-    private String getBatteryPercentage()
-    {
-        Battery battery = Battery.read(this);
-        if (battery.pct < 0)
-            return "?";
-        return (battery.charging ? "c " : "") + battery.pct + "%";
+    // BaseActivity calls onAnyKeyDown() for dials, the mode dial and lens events too; only buttons count.
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        buttonKey = isButton(event.getScanCode());
+        return super.onKeyDown(keyCode, event);
     }
 
+    // A button wakes the display and never stops the run (MENU stops it, on key up). Under DOFF the display
+    // goes back to sleep after KEY_WAKE_MS. Once the end screen shows, a button leaves it.
     @Override
     protected void onAnyKeyDown() {
-        // During the start countdown nothing else would turn the screen off again.
-        if (settings.displayOff && delaySecondsRemaining() > 0)
-            display.on(true);
-        else
-            display.on();
+        if (!buttonKey || display == null || tornDown)
+            return;
+        panelOn();
+        updateScreen();
+        if (finishing) {
+            leaveEndScreen();
+            return;
+        }
+        if (settings.displayOff) {
+            wakeUntilMs = clock.nowMs() + KEY_WAKE_MS;
+            handler.removeCallbacks(wakeOffRunnable);
+            handler.postDelayed(wakeOffRunnable, KEY_WAKE_MS);
+        }
     }
-
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}

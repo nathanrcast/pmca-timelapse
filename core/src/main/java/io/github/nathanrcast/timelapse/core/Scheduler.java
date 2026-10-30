@@ -108,6 +108,8 @@ public final class Scheduler {
     private boolean paused;
     private boolean done;
     private long t0;
+    private long startedAtMs;
+    private long plannedT0Ms;
     private long pausedAtMs;
 
     private long nextSlot;
@@ -152,7 +154,9 @@ public final class Scheduler {
         if (started)
             throw new IllegalStateException("already started");
         started = true;
+        startedAtMs = clock.nowMs();
         t0 = t0Ms;
+        plannedT0Ms = t0Ms;
     }
 
     /** When the caller's timer should next call {@link #onTimer()}; {@link #NEVER} if no timer is needed. */
@@ -291,6 +295,26 @@ public final class Scheduler {
 
     public long captureTimeoutMs() {
         return captureTimeoutMs;
+    }
+
+    /** When the first slot was scheduled at start; unlike {@link #t0Ms()}, never shifted by a pause. */
+    public long plannedFirstSlotMs() {
+        return plannedT0Ms;
+    }
+
+    /** When {@link #start()} ran; unlike {@link #t0Ms()}, never shifted by a pause. */
+    public long startedAtMs() {
+        return startedAtMs;
+    }
+
+    /**
+     * When the next slot is due, for display. {@link #NEVER} when every slot is claimed, paused, done or a
+     * burst: unlike {@link #nextWakeMs()} it never includes the lost-capture timeout.
+     */
+    public long nextSlotDueMs() {
+        if (!started || paused || done || plan.isBurst() || allSlotsClaimed())
+            return NEVER;
+        return deadlineMs(nextSlot);
     }
 
     public long t0Ms() {

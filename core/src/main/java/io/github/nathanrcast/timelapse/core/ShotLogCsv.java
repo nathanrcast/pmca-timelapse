@@ -102,6 +102,7 @@ public final class ShotLogCsv {
         sb.append(",\"at\":\"").append(StartTime.format(s.atHour, s.atMinute)).append('"');
         sb.append(",\"disableLenr\":").append(s.disableLenr);
         sb.append(",\"displayOff\":").append(s.displayOff);
+        sb.append(",\"reviewSeconds\":").append(s.reviewSeconds);
         sb.append(",\"silentShutter\":").append(s.silentShutter);
         sb.append(",\"ael\":").append(s.ael);
         sb.append(",\"fps\":").append(s.fps);

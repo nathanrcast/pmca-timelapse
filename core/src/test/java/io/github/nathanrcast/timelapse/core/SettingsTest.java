@@ -20,6 +20,7 @@ public class SettingsTest {
         assertEquals(10, s.shotCount);
         assertEquals(10, StepTables.SHOTS.value(s.shotsIndex));
         assertFalse(s.displayOff);
+        assertEquals(0, s.reviewSeconds);
         assertTrue(s.silentShutter);
         assertTrue(s.ael);
         assertEquals(0, s.fps);
@@ -50,6 +51,7 @@ public class SettingsTest {
         s.brs = false;
         s.mf = false;
         s.displayOff = true;
+        s.reviewSeconds = 3;
         s.holyGrail = true;
         s.useCurrentExposure = false;
         s.targetExposure = -6;
@@ -78,6 +80,7 @@ public class SettingsTest {
         expected.put("brs", false);
         expected.put("mf", false);
         expected.put("displayOff", true);
+        expected.put("reviewSeconds", 3);
         expected.put("holyGrail", true);
         expected.put("useCurrentExposure", false);
         expected.put("targetExposure", -6);
@@ -90,6 +93,18 @@ public class SettingsTest {
         expected.put("holyGrailAllowExposureDown", true);
         assertEquals(expected, store.values);
         assertEquals(1, store.applies);
+    }
+
+    @Test
+    public void reviewSecondsClampsToZeroThroughFive() {
+        MapSettingsStore store = new MapSettingsStore();
+        store.edit().putInt("reviewSeconds", 99).apply();
+        Settings s = new Settings();
+        s.load(store);
+        assertEquals(5, s.reviewSeconds);
+        store.edit().putInt("reviewSeconds", -2).apply();
+        s.load(store);
+        assertEquals(0, s.reviewSeconds);
     }
 
     @Test

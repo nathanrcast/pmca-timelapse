@@ -7,7 +7,8 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:layout_above="@+id/lButtonBar">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -304,6 +305,29 @@
                     android:textSize="20sp" />
             </LinearLayout>
 
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="5dp">
+
+                <TextView
+                    android:id="@+id/lblReview"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_marginLeft="10dp"
+                    android:text="Last-shot review"
+                    android:textSize="20sp" />
+
+                <Spinner
+                    android:id="@+id/spnReview"
+                    style="@android:style/Widget.Spinner"
+                    android:layout_width="100dp"
+                    android:layout_height="40dp"
+                    android:layout_alignParentRight="true"
+                    android:layout_centerVertical="true"
+                    android:entries="@array/review" />
+            </RelativeLayout>
             <RelativeLayout
                 android:id="@+id/laDelay"
                 android:layout_width="match_parent"
@@ -710,45 +734,46 @@
                 </RelativeLayout>
 
             </LinearLayout>
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#FFFFFF"
-                android:gravity="bottom">
-
-                <Button
-                    android:id="@+id/bnClose"
-                    android:layout_width="100dp"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentLeft="true"
-                    android:layout_alignParentTop="true"
-                    android:layout_marginLeft="10dp"
-                    android:text="Close"
-                    android:textSize="20sp" />
-
-                <Button
-                    android:id="@+id/bnStart"
-                    android:layout_width="100dp"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentTop="true"
-                    android:layout_alignParentRight="true"
-                    android:layout_marginRight="10dp"
-                    android:text="Start"
-                    android:textSize="20sp" />
-
-                <Button
-                    android:id="@+id/bnCameraInfo"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentTop="true"
-                    android:layout_centerHorizontal="true"
-                    android:text="Camera info"
-                    android:textSize="16sp" />
-
-            </RelativeLayout>
-
         </LinearLayout>
     </ScrollView>
+
+    <RelativeLayout
+        android:id="@+id/lButtonBar"
+        android:layout_alignParentBottom="true"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFFFF"
+        android:gravity="bottom">
+
+        <Button
+            android:id="@+id/bnClose"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentTop="true"
+            android:layout_marginLeft="10dp"
+            android:text="Close"
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/bnStart"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentRight="true"
+            android:layout_marginRight="10dp"
+            android:text="Start"
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/bnCameraInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_centerHorizontal="true"
+            android:text="Camera info"
+            android:textSize="16sp" />
+
+    </RelativeLayout>
 
 </RelativeLayout>

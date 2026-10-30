@@ -15,6 +15,7 @@ final class SettingsIntent {
     private static final String EXTRA_ATMINUTE = "io.github.nathanrcast.timelapse.ATMINUTE";
     private static final String EXTRA_DISABLELENR = "io.github.nathanrcast.timelapse.DISABLELENR";
     private static final String EXTRA_DISPLAYOFF = "io.github.nathanrcast.timelapse.DISPLAYOFF";
+    private static final String EXTRA_REVIEWSECONDS = "io.github.nathanrcast.timelapse.REVIEWSECONDS";
     private static final String EXTRA_SILENTSHUTTER = "io.github.nathanrcast.timelapse.SILENTSHUTTER";
     private static final String EXTRA_AEL = "io.github.nathanrcast.timelapse.AEL";
     private static final String EXTRA_BRS = "io.github.nathanrcast.timelapse.BRS";
@@ -41,6 +42,7 @@ final class SettingsIntent {
         intent.putExtra(EXTRA_ATMINUTE, settings.atMinute);
         intent.putExtra(EXTRA_DISABLELENR, settings.disableLenr);
         intent.putExtra(EXTRA_DISPLAYOFF, settings.displayOff);
+        intent.putExtra(EXTRA_REVIEWSECONDS, settings.reviewSeconds);
         intent.putExtra(EXTRA_SILENTSHUTTER, settings.silentShutter);
         intent.putExtra(EXTRA_AEL, settings.ael);
         intent.putExtra(EXTRA_BRS, settings.brs);
@@ -67,6 +69,7 @@ final class SettingsIntent {
         settings.atMinute = intent.getIntExtra(EXTRA_ATMINUTE, 0);
         settings.disableLenr = intent.getBooleanExtra(EXTRA_DISABLELENR, true);
         settings.displayOff = intent.getBooleanExtra(EXTRA_DISPLAYOFF, false);
+        settings.reviewSeconds = intent.getIntExtra(EXTRA_REVIEWSECONDS, 0);
         settings.silentShutter = intent.getBooleanExtra(EXTRA_SILENTSHUTTER, true);
         settings.ael = intent.getBooleanExtra(EXTRA_AEL, false);
         settings.brs = intent.getBooleanExtra(EXTRA_BRS, false);

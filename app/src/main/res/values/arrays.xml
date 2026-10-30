@@ -13,4 +13,12 @@
         <item>Delay</item>
         <item>At time</item>
     </string-array>
+    <string-array name="review">
+        <item>Off</item>
+        <item>1 s</item>
+        <item>2 s</item>
+        <item>3 s</item>
+        <item>4 s</item>
+        <item>5 s</item>
+    </string-array>
 </resources>
