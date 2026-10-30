@@ -17,7 +17,8 @@ The maintainer runs one orchestrating agent session. It hands tickets to impleme
 5. **Merge gate.** A PR merges when:
    - CI is green
    - review findings are resolved or explicitly waived in a PR comment
-   - for `hw:required` tickets, the maintainer has posted on-camera evidence (LOG/CAPS file or photo) on the PR
+
+   **Hardware deferral:** while the maintainer can't run camera sessions, `hw:required` PRs merge once CI and review pass. The PR body uses `Refs #N` instead of `Closes #N`, so the issue stays open with its on-camera boxes. A comment on the issue says what is pending, and all deferred checks run in one consolidated camera session before the release (T18).
 
    Merge with squash and delete the branch. Rebase any open sibling branches onto the new `main`.
 6. **Close-out.** Update the ticket file's status line and `docs/plan.md` if the scope moved, in the same PR.
@@ -26,7 +27,7 @@ The maintainer runs one orchestrating agent session. It hands tickets to impleme
 
 - Up to 3 implementers run in parallel. PRs merge in dependency order.
 - A wave ends with one **camera session**: the maintainer installs the merged `main` build on both bodies and runs `docs/hw_test_checklist.md`. Results go onto the open `hw:required` issues and PRs.
-- The next wave starts once the previous wave's hardware boxes are ticked, or are explicitly deferred with a reason.
+- The next wave starts once the previous wave's PRs have merged. Hardware boxes are deferred per the hardware-deferral rule above.
 
 ## Branch protection (`main`)
 
