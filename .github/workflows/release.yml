@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Point Gradle at the preinstalled Android SDK
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+      - name: Check tag matches versionName
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          v="$(sed -n "s/^[[:space:]]*versionName[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" app/build.gradle | head -1)"
+          if [ "$v" != "${TAG#v}" ]; then
+            echo "versionName '$v' in app/build.gradle does not match tag $TAG" >&2
+            exit 1
+          fi
+      - name: Build unsigned release APK
+        run: ./gradlew :app:assembleRelease --stacktrace
+      - name: Publish draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Asset name pattern must match `unsigned` in scripts/release.sh.
+          out="TimeLapsePlus-${TAG#v}-unsigned.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$out"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "release $TAG is already published; refusing to modify it" >&2
+              exit 1
+            fi
+            gh release upload "$TAG" "$out" --clobber
+          else
+            gh release create "$TAG" "$out" --draft --title "$TAG" --generate-notes
+          fi

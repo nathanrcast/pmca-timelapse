@@ -11,3 +11,4 @@ keystore.properties
 /app/release/
 CLAUDE.local.md
 __pycache__/
+*.apk.sha256
