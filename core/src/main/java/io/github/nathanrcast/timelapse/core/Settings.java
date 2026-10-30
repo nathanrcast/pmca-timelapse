@@ -24,6 +24,8 @@ public final class Settings {
     static final String KEY_BRS = "brs";
     static final String KEY_MF = "mf";
     static final String KEY_DISPLAY_OFF = "displayOff";
+    static final String KEY_REVIEW_SECONDS = "reviewSeconds";
+    public static final int REVIEW_SECONDS_MAX = 5;
     static final String KEY_HOLY_GRAIL = "holyGrail";
     static final String KEY_USE_CURRENT_EXPOSURE = "useCurrentExposure";
     static final String KEY_TARGET_EXPOSURE = "targetExposure";
@@ -41,6 +43,7 @@ public final class Settings {
     // Positions in StepTables.INTERVAL_MS / SHOTS / DELAY_MIN; call deriveFromIndex() after changing one.
     public int intervalIndex, shotsIndex, delayIndex;
     public boolean displayOff;
+    public int reviewSeconds;   // last-shot review on the shoot screen, 0 (default) = none
     public boolean silentShutter;
     public boolean ael;
     public int fps;    // index
@@ -63,6 +66,7 @@ public final class Settings {
         delayIndex = 0;
         deriveFromIndex();
         displayOff = false;
+        reviewSeconds = 0;
         silentShutter = true;
         ael = true;
         fps = 0;
@@ -88,6 +92,7 @@ public final class Settings {
                 .putBoolean(KEY_BRS, brs)
                 .putBoolean(KEY_MF, mf)
                 .putBoolean(KEY_DISPLAY_OFF, displayOff)
+                .putInt(KEY_REVIEW_SECONDS, reviewSeconds)
                 .putBoolean(KEY_HOLY_GRAIL, holyGrail)
                 .putBoolean(KEY_USE_CURRENT_EXPOSURE, useCurrentExposure)
                 .putInt(KEY_TARGET_EXPOSURE, targetExposure)
@@ -110,6 +115,7 @@ public final class Settings {
         brs = store.getBoolean(KEY_BRS, brs);
         mf = store.getBoolean(KEY_MF, mf);
         displayOff = store.getBoolean(KEY_DISPLAY_OFF, displayOff);
+        reviewSeconds = store.getInt(KEY_REVIEW_SECONDS, reviewSeconds);
         holyGrail = store.getBoolean(KEY_HOLY_GRAIL, holyGrail);
         useCurrentExposure = store.getBoolean(KEY_USE_CURRENT_EXPOSURE, useCurrentExposure);
         targetExposure = store.getInt(KEY_TARGET_EXPOSURE, targetExposure);
@@ -180,6 +186,7 @@ public final class Settings {
     // delay indices come from nearestIndex() and are always in range.
     public void clamp() {
         int halfTarget = SliderMapping.TARGET_EXPOSURE_MAX / 2;
+        reviewSeconds = SliderMapping.clamp(reviewSeconds, 0, REVIEW_SECONDS_MAX);
         targetExposure = SliderMapping.clamp(targetExposure, -halfTarget, halfTarget);
         maxShutterSpeedIndex = SliderMapping.clamp(maxShutterSpeedIndex, 0, Util.SHUTTER_SPEEDS.length - 1);
         maxISOIndex = SliderMapping.clamp(maxISOIndex, 0, Util.ISO_VALUES.length - 1);
