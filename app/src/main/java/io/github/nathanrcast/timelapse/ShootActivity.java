@@ -26,6 +26,9 @@ import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 import io.github.nathanrcast.timelapse.core.AwakeGuard;
 import io.github.nathanrcast.timelapse.core.BracketTiming;
 import io.github.nathanrcast.timelapse.core.Clock;
+import io.github.nathanrcast.timelapse.core.LenrGuard;
+import io.github.nathanrcast.timelapse.core.StartMode;
+import io.github.nathanrcast.timelapse.core.StartTime;
 import io.github.nathanrcast.timelapse.core.ExposureRamp;
 import io.github.nathanrcast.timelapse.core.HudModel;
 import io.github.nathanrcast.timelapse.core.RampController;
@@ -38,6 +41,7 @@ import io.github.nathanrcast.timelapse.core.Util;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -60,6 +64,12 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private long runStartWallMs;
     private BracketTiming bracketTiming;
     private String bracketWarning;
+    // LENR guard: the state found at the first start (null: unknown) and the status-line note for this run.
+    private Boolean lenrAtStart;
+    private boolean lenrChecked;
+    private String lenrNote;
+    // LENR is on and stays on for the run: the holy-grail ramp then budgets a dark frame per exposure.
+    private boolean lenrStillOn;
 
     //Holy Grail
     private TextView tvExposureLevel;
@@ -204,6 +214,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         Intent intent = getIntent();
         settings = SettingsIntent.get(intent);
+        // The delay setting only counts in DELAY mode; AT works out its own wait when the run starts.
+        if (settings.startMode != StartMode.DELAY)
+            settings.delay = 0;
         plan = ShotPlan.of(settings);
 
         shotCount = 0;
@@ -261,22 +274,26 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             return;
         }
         safeCamera = opened.get();
+        // The run plan is final before configure: capabilities mask, then the LENR decision (which may raise the
+        // interval), then configure and the bracket timing, both from that plan.
         RunOptions run = applyCapabilities(safeCamera.capabilities());
+        int[] shutter = readShutter();
+        applyLenrGuard(run, shutterMs(shutter));
         cameraSurfaceHolder.addCallback(this);
         safeCamera.configure(run);
-
-        startBracketTiming();
+        startBracketTiming(shutter);
 
         // Built after applyCapabilities, from the masked plan (BRC3 or burst may be off on this body).
         // A resumed run keeps its slots: the scheduler shifts every remaining deadline by the pause.
         if (scheduler == null) {
             scheduler = new Scheduler(plan, clock, Scheduler.StopOn.CAPTURED);
-            scheduler.start();
+            scheduler.start(clock.nowMs() + startDelayMs());
             runStartWallMs = System.currentTimeMillis();
             shotLog = new ShotLog(this, Build.MODEL, Build.VERSION.INCREMENTAL, appVersion(), clock.nowMs(),
-                    ShotLogCsv.settingsJson(settings));
+                    ShotLogCsv.settingsJson(settings), LenrGuard.headerValue(lenrAtStart));
         } else {
-            scheduler.resume();
+            // A start fixed on the wall clock (AT) must not slip by the time spent paused.
+            scheduler.resume(settings.startMode == StartMode.AT);
         }
         if (scheduler.isDone())
             finishRun();
@@ -299,20 +316,94 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         // applyCapabilities turned HG off if this body lacks any of its methods.
         if (settings.holyGrail) {
-            if (controller == null) // T12 wires LENR
-                controller = new RampController(ramp, settings, plan.framesPerInterval(), false);
+            if (controller == null)
+                controller = new RampController(ramp, settings, plan.framesPerInterval(), lenrStillOn);
             safeCamera.setExposureListener(exposureCallback);
         }
         updateScreen();
     }
 
+    // How long after now the first slot is due: nothing, the delay setting, or the next hh:mm on the camera clock.
+    private long startDelayMs() {
+        switch (settings.startMode) {
+            case DELAY:
+                return plan.delayMs();
+            case AT:
+                Calendar c = Clocks.wallCalendar();
+                long wait = StartTime.msUntilNext(StartTime.msOfDay(c.get(Calendar.HOUR_OF_DAY),
+                        c.get(Calendar.MINUTE), c.get(Calendar.SECOND), c.get(Calendar.MILLISECOND)),
+                        settings.atHour, settings.atMinute);
+                log("start at " + StartTime.format(settings.atHour, settings.atMinute) + " in " + wait / 1000 + " s");
+                return wait;
+            default:
+                return 0;
+        }
+    }
+
+    // The shutter time in ms, read once per resume for the LENR guard and the bracket timing; -1 if unreadable.
+    private static long shutterMs(int[] sp) {
+        return sp == null ? -1 : Util.shutterMs(sp[0], sp[1]);
+    }
+
+    // Long-exposure NR makes the camera shoot a dark frame after every frame of 1 s or more, which loses slots when
+    // the interval is shorter than the frames, dark frames and writes take (LenrGuard.minIntervalMs). If the body
+    // can switch it off (and "Disable LENR during runs" is on) it is off for the run and SafeCamera restores it on
+    // close; else the status line warns and the interval is raised to the minimum. The camera is re-opened on every
+    // resume, so this runs each time: on the first start the plan is raised before the scheduler exists, later the
+    // running scheduler is raised. Only the header's LENR state is taken once.
+    private void applyLenrGuard(RunOptions run, long shutterMs) {
+        Boolean lenr = safeCamera.longExposureNr();
+        if (!lenrChecked) {
+            lenrChecked = true;
+            lenrAtStart = lenr;
+            log("LENR " + LenrGuard.headerValue(lenr));
+        }
+        // The holy-grail ramp may reach its max shutter, so that decides whether LENR matters; but the ramp clamps
+        // itself to the interval (lenr budgeted), so the interval is only raised for the shutter the camera has now.
+        long base = shutterMs;
+        long reach = base;
+        if (settings.holyGrail) {
+            int[] max = ramp.tables().shutterAt(Math.min(settings.maxShutterSpeedIndex,
+                    ramp.tables().shutterCount() - 1));
+            reach = Math.max(reach, Util.shutterMs(max[0], max[1]));
+        }
+        int frames = plan.framesPerInterval();
+        int period = run.bracket.active ? run.bracket.periodTenths : 0;
+        LenrGuard.Action action = LenrGuard.decide(lenr, LenrGuard.longestFrameMs(reach, frames, period),
+                safeCamera.canSetLongExposureNr(), settings.disableLenr, plan.isBurst());
+        lenrStillOn = Boolean.TRUE.equals(lenr);
+        if (action == LenrGuard.Action.TURN_OFF) {
+            if (safeCamera.disableLongExposureNr().isOk()) {
+                lenrStillOn = false;
+                lenrNote = "LENR off for this run";
+                showStatus();
+                return;
+            }
+            action = LenrGuard.Action.WARN;
+        }
+        lenrNote = null;
+        if (action == LenrGuard.Action.WARN) {
+            long min = LenrGuard.minIntervalMs(lenr, base, frames, period);
+            long effective = LenrGuard.effectiveIntervalMs(plan.intervalMs(), lenr, base, frames, period);
+            if (effective > plan.intervalMs()) {
+                settings.interval = effective / 1000.0;
+                plan = ShotPlan.of(settings);
+                if (scheduler != null)
+                    scheduler.raiseInterval(effective);
+                log("LENR on: interval raised to " + effective + " ms");
+            }
+            lenrNote = "LENR on: min interval " + Util.formatTime((min + 999) / 1000);
+        }
+        showStatus();
+    }
+
     // The warning is estimated from the shutter time at start and replaced by the measured slot time after each
     // bracket. It only informs: the scheduler skips a slot that is still busy.
-    private void startBracketTiming() {
+    private void startBracketTiming(int[] shutter) {
         BracketTiming previous = bracketTiming;
         bracketTiming = new BracketTiming(plan);
         bracketTiming.inherit(previous);
-        updateBracketShutter(readShutter());
+        updateBracketShutter(shutter);
     }
 
     // The one camera read of the shutter; null when it can't be read.
@@ -325,7 +416,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (bracketTiming == null)
             return;
         if (sp != null && sp[1] > 0)
-            bracketTiming.setShutterMs(sp[0] * 1000L / sp[1]);
+            bracketTiming.setShutterMs(Util.shutterMs(sp[0], sp[1]));
         showBracketWarning();
     }
 
@@ -341,10 +432,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             if (warning != null)
                 log("warning: " + warning);
         }
-        if (bracketWarning == null) {
+        showStatus();
+    }
+
+    private void showStatus() {
+        String text = lenrNote == null ? bracketWarning : bracketWarning == null ? lenrNote : lenrNote + "\n" + bracketWarning;
+        if (text == null) {
             tvStatus.setVisibility(View.GONE);
         } else {
-            tvStatus.setText(bracketWarning);
+            tvStatus.setText(text);
             tvStatus.setVisibility(View.VISIBLE);
         }
     }
