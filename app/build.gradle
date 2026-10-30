@@ -33,7 +33,8 @@ android {
     }
 
     lint {
-        checkReleaseBuilds false
+        abortOnError true
+        fatal += ['NewApi', 'InlinedApi']
         // Play Store / ChromeOS policy checks; the app is sideloaded onto API 10 cameras.
         disable 'ExpiredTargetSdkVersion', 'PermissionImpliesUnsupportedChromeOsHardware'
     }
