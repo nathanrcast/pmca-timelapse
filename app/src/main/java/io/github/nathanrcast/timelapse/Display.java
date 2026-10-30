@@ -6,12 +6,16 @@ import android.os.Handler;
 
 import com.sony.scalar.hardware.avio.DisplayManager;
 
+import io.github.nathanrcast.timelapse.camera.ReflectiveCapabilities;
+import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
+
 /**
  * Created by jonas on 2/18/17.
  *
  * <p>DOFF safety: while a run may switch the panel off, a prefs flag is set (commit, once per run, never per
  * shot), so a process that dies with the panel dark is repaired by {@link #restoreIfLeftOff} at the next start.
- * {@link #emergencyRestore()} does the same from the crash handler. {@link #on()} and {@link #off()} never throw.
+ * {@link #emergencyRestore()} does the same from the crash handler. Every restore path targets the PANEL.
+ * {@link #on()} and {@link #off()} never throw.
  */
 public class Display {
     public static final int NO_AUTO_OFF = 0;
@@ -25,9 +29,7 @@ public class Display {
     private final DisplayManager displayManager;
     private final SharedPreferences prefs;
     private int autoOffDelay;
-    // The output that was active before the panel was switched off, so on() puts that one back.
-    private String origin;
-    private boolean off;
+    private final boolean canSwitch;
     private boolean armed;
 
     Display(DisplayManager displayManager, Context context) {
@@ -35,6 +37,17 @@ public class Display {
         this.prefs = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         autoOffDelay = 0;
         live = displayManager;
+        canSwitch = canSwitch();
+    }
+
+    // The two DisplayManager methods Display uses are SonyMethod entries; checked by reflection because
+    // restoreIfLeftOff runs before any probe. Cached for the process.
+    private static Boolean switchPresent;
+
+    private static synchronized boolean canSwitch() {
+        if (switchPresent == null)
+            switchPresent = ReflectiveCapabilities.has(Display.class.getClassLoader(), SonyMethod.SWITCH_DISPLAY_OUTPUT_TO);
+        return switchPresent;
     }
 
     private Handler turnOffRunnableHandler = new Handler();
@@ -83,35 +96,26 @@ public class Display {
     }
 
     public void off() {
-        if (!off) {
-            try {
-                String active = displayManager.getActiveDevice();
-                if (active != null && !DisplayManager.DEVICE_ID_NONE.equals(active))
-                    origin = active;
-            } catch (Throwable t) {
-                origin = null;
-            }
-        }
+        if (!canSwitch)
+            return;
         try {
             displayManager.switchDisplayOutputTo(DisplayManager.DEVICE_ID_NONE);
-            off = true;
         } catch (Throwable t) {
             Logger.error("display off failed: " + t);
             on();
         }
     }
 
-    /** True if the panel is confirmed on. Retries once; never throws. */
+    /** True if the panel is confirmed on (or this body can't switch it). Retries once; never throws. */
     public boolean on() {
-        String target = origin != null ? origin : DisplayManager.DEVICE_ID_PANEL;
+        if (!canSwitch)
+            return true;
         for (int attempt = 0; attempt < 2; attempt++) {
             try {
-                displayManager.switchDisplayOutputTo(target);
-                off = false;
+                displayManager.switchDisplayOutputTo(DisplayManager.DEVICE_ID_PANEL);
                 return true;
             } catch (Throwable t) {
                 Logger.error("display on failed: " + t);
-                target = DisplayManager.DEVICE_ID_PANEL;
             }
         }
         return false;
@@ -128,7 +132,7 @@ public class Display {
     /** Crash handler: put the panel back with whatever manager the run had. Best effort. */
     static void emergencyRestore() {
         DisplayManager dm = live;
-        if (dm == null)
+        if (dm == null || !canSwitch())
             return;
         try {
             dm.switchDisplayOutputTo(DisplayManager.DEVICE_ID_PANEL);
@@ -142,6 +146,10 @@ public class Display {
         SharedPreferences prefs = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         if (!prefs.getBoolean(KEY_OFF_ARMED, false))
             return;
+        if (!canSwitch()) {
+            prefs.edit().remove(KEY_OFF_ARMED).commit();
+            return;
+        }
         DisplayManager dm = null;
         try {
             dm = new DisplayManager();
@@ -152,10 +160,12 @@ public class Display {
             Logger.error("display restore failed: " + t);
         } finally {
             if (dm != null) {
-                try {
-                    dm.finish();
-                } catch (Throwable t) {
-                    // already gone
+                if (ReflectiveCapabilities.has(Display.class.getClassLoader(), SonyMethod.FINISH_DISPLAY_MANAGER)) {
+                    try {
+                        dm.finish();
+                    } catch (Throwable t) {
+                        // already gone
+                    }
                 }
             }
         }

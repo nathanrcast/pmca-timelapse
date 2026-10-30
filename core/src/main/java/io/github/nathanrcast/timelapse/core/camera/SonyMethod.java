@@ -53,11 +53,16 @@ public enum SonyMethod {
     IS_SUPPORTED_LONG_EXPOSURE_NR(false, T.MODIFIER, "isSupportedLongExposureNR"),
     GET_LONG_EXPOSURE_NR(false, T.MODIFIER, "getLongExposureNR"),
     SET_LONG_EXPOSURE_NR(false, T.MODIFIER, "setLongExposureNR", "boolean"),
-    IS_SUPPORTED_TOGGLE_FOCUS_MODE(false, T.MODIFIER, "isSupportedToggleFocusMode");
+    IS_SUPPORTED_TOGGLE_FOCUS_MODE(false, T.MODIFIER, "isSupportedToggleFocusMode"),
+
+    // Display (the DOFF switch and its restore); not camera calls, but guarded and reported the same way.
+    SWITCH_DISPLAY_OUTPUT_TO(false, T.DISPLAY, "switchDisplayOutputTo", T.STRING),
+    FINISH_DISPLAY_MANAGER(false, T.DISPLAY, "finish");
 
     private static final class T {
         static final String CAMERA_EX = "CameraEx";
         static final String MODIFIER = "CameraEx$ParametersModifier";
+        static final String DISPLAY = "DisplayManager";
         static final String PARAMETERS = "Camera$Parameters";
         static final String STRING = "String";
     }

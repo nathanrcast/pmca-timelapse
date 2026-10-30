@@ -19,6 +19,7 @@ import java.util.Map;
 // LinkageError, firmware exceptions), so it runs on any firmware and in JVM tests against the stubs jar.
 public final class ReflectiveCapabilities {
     private static final String SONY_HARDWARE = "com.sony.scalar.hardware.";
+    private static final String SONY_AVIO = "com.sony.scalar.hardware.avio.";
     private static final String ANDROID_HARDWARE = "android.hardware.";
 
     private ReflectiveCapabilities() {}
@@ -42,11 +43,30 @@ public final class ReflectiveCapabilities {
         return found;
     }
 
+    // True if this one method resolves on this firmware. For callers that run before, or without, the full probe.
+    public static boolean has(ClassLoader loader, SonyMethod m) {
+        try {
+            Map<String, Class<?>> classes = new HashMap<String, Class<?>>();
+            Class<?> owner = load(loader, classes, m.owner());
+            String[] names = m.parameterTypes();
+            Class<?>[] types = new Class<?>[names.length];
+            for (int i = 0; i < names.length; i++)
+                types[i] = load(loader, classes, names[i]);
+            owner.getMethod(m.methodName(), types);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     // Simple names as SonyMethod writes them back to class names: CameraEx* -> com.sony.scalar.hardware.,
+    // DisplayManager -> com.sony.scalar.hardware.avio.,
     // Camera$* -> android.hardware., String -> java.lang.String, plus int and boolean.
     static String className(String simpleName) {
         if (simpleName.startsWith("CameraEx") || simpleName.startsWith("CameraSequence"))
             return SONY_HARDWARE + simpleName;
+        if (simpleName.startsWith("DisplayManager"))
+            return SONY_AVIO + simpleName;
         if (simpleName.startsWith("Camera$"))
             return ANDROID_HARDWARE + simpleName;
         if (simpleName.equals("String"))

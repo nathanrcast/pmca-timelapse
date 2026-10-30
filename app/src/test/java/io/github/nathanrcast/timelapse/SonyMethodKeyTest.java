@@ -25,7 +25,7 @@ public class SonyMethodKeyTest {
     @Test
     public void keyTypeNamesAreCapsFormatTypeNames() {
         for (SonyMethod m : SonyMethod.values()) {
-            assertTrue(m.owner(), m.owner().startsWith("CameraEx"));
+            assertTrue(m.owner(), m.owner().startsWith("CameraEx") || m.owner().equals("DisplayManager"));
             for (String t : m.parameterTypes()) {
                 Class<?> c = NON_SONY.get(t);
                 if (c != null)

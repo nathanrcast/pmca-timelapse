@@ -91,6 +91,13 @@ public class ReflectiveCapabilitiesTest {
     }
 
     @Test
+    public void hasIsFalseWhenTheClassOrMethodIsMissing() throws Exception {
+        ClassLoader bare = new URLClassLoader(new URL[0], null);
+        assertFalse(ReflectiveCapabilities.has(bare, SonyMethod.SWITCH_DISPLAY_OUTPUT_TO));
+        assertFalse(ReflectiveCapabilities.has(StubsJar.loader(), SonyMethod.FINISH_DISPLAY_MANAGER));
+    }
+
+    @Test
     public void queriesAreListBooleanStringOrIntGettersOnTheStubs() throws Exception {
         for (Query q : Query.values()) {
             if (q.method() == null)
@@ -156,5 +163,6 @@ public class ReflectiveCapabilitiesTest {
                 ReflectiveCapabilities.className("CameraEx$ParametersModifier"));
         assertEquals("android.hardware.Camera$Parameters", ReflectiveCapabilities.className("Camera$Parameters"));
         assertEquals("java.lang.String", ReflectiveCapabilities.className("String"));
+        assertEquals("com.sony.scalar.hardware.avio.DisplayManager", ReflectiveCapabilities.className("DisplayManager"));
     }
 }
