@@ -217,7 +217,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         super.onResume();
         display = new Display(getDisplayManager());
 
-        Result<SafeCamera> opened = SafeCamera.open(this);
+        Result<SafeCamera> opened = SafeCamera.open(this, this);
         if (!opened.isOk()) {
             log("camera unavailable: " + opened);
             safeCamera = null;

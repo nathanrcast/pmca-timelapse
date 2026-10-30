@@ -2,6 +2,8 @@ package io.github.nathanrcast.timelapse.camera;
 
 import static io.github.nathanrcast.timelapse.core.camera.SonyMethod.*;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.hardware.Camera;
 import android.os.Build;
 import android.util.Pair;
@@ -42,6 +44,10 @@ public final class SafeCamera {
     }
 
     private static final String FOCUS_MODE_AUTO = "auto";
+    private static final String PREFS = "safe_camera";
+    // Set while the app holds the AF/MF toggle, so a run that never reached close() (crash, reboot, kill) can be
+    // released by the next open().
+    private static final String KEY_TOGGLE_ENGAGED = "toggleFocusEngagedByApp";
     // The settings-screen probe tries twice at most: once, then once more on the next onResume.
     private static final int PROBE_ATTEMPTS = 2;
 
@@ -53,16 +59,18 @@ public final class SafeCamera {
     private final CameraEx cameraEx;
     private final Camera normal;
     private final ProbedCapabilities caps;
+    private final SharedPreferences prefs;
     private final Set<String> reported = new HashSet<String>();
     private CameraEx.AutoPictureReviewControl reviewControl;
     private boolean toggleEngaged;
     private String savedFocusMode;
     private boolean released;
 
-    private SafeCamera(CameraEx cameraEx, Camera normal, ProbedCapabilities caps) {
+    private SafeCamera(CameraEx cameraEx, Camera normal, ProbedCapabilities caps, SharedPreferences prefs) {
         this.cameraEx = cameraEx;
         this.normal = normal;
         this.caps = caps;
+        this.prefs = prefs;
     }
 
     // The latest capabilities, or null before the first probe or open() finished.
@@ -106,8 +114,8 @@ public final class SafeCamera {
     }
 
     // Opens the camera for a shooting session and reads this session's values. Fails (without throwing) if a core
-    // method is missing or open fails.
-    public static synchronized Result<SafeCamera> open(ShutterCallback callback) {
+    // method is missing or open fails. A toggle focus left on by an earlier run is released first.
+    public static synchronized Result<SafeCamera> open(Context context, ShutterCallback callback) {
         Map<SonyMethod, Method> m = methods();
         for (SonyMethod c : SonyMethod.values())
             if (c.core() && !m.containsKey(c))
@@ -127,7 +135,8 @@ public final class SafeCamera {
             Camera normal = cam.getNormalCamera();
             if (normal == null)
                 throw new IllegalStateException("getNormalCamera() returned null");
-            camera = new SafeCamera(cam, normal, readSession(m, cam));
+            camera = new SafeCamera(cam, normal, readSession(m, cam),
+                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE));
             cam.setShutterListener(new ShutterBridge(callback));
         } catch (Throwable t) {
             try {
@@ -136,6 +145,7 @@ public final class SafeCamera {
             }
             return logged(Result.<SafeCamera>failed("SafeCamera.open", t));
         }
+        camera.releaseStaleToggle();
         camera.enableAutoReview();
         return Result.ok(camera);
     }
@@ -203,7 +213,8 @@ public final class SafeCamera {
     }
 
     // Applies drive mode, silent shutter, AEL, bracketing and focus in one setParameters, exactly as the run asks:
-    // the caller masked it with RunOptions.mask against capabilities(). Returns setParameters' result.
+    // the caller masked it with RunOptions.mask against capabilities(). Returns setParameters' result. Toggle focus
+    // is engaged only after setParameters succeeded.
     public Result<Void> configure(RunOptions run) {
         if (released)
             return closed("configure");
@@ -257,7 +268,7 @@ public final class SafeCamera {
         }
 
         Result<Void> applied = apply(params);
-        if (run.focus == FocusControl.TOGGLE)
+        if (applied.isOk() && run.focus == FocusControl.TOGGLE)
             engageToggleFocus();
         return applied;
     }
@@ -314,6 +325,7 @@ public final class SafeCamera {
         try {
             cameraEx.setToggleFocusMode(true);
             toggleEngaged = true;
+            setToggleFlag(true);
             Logger.info("SafeCamera: toggle focus on (focus mode " + before + " -> " + focusMode() + ")");
             return;
         } catch (Throwable t) {
@@ -341,6 +353,7 @@ public final class SafeCamera {
             toggleEngaged = false;
             try {
                 cameraEx.setToggleFocusMode(false);
+                setToggleFlag(false);
             } catch (Throwable t) {
                 failed(SET_TOGGLE_FOCUS_MODE.key(), t);
             }
@@ -355,6 +368,33 @@ public final class SafeCamera {
             } catch (Throwable t) {
                 failed("restore focus mode", t);
             }
+        }
+    }
+
+    // A run that engaged the toggle and never reached close() left the flag set: release the toggle before this run
+    // reads the focus mode. The flag stays set if the release throws, so the next open() tries again.
+    private void releaseStaleToggle() {
+        if (!prefs.getBoolean(KEY_TOGGLE_ENGAGED, false))
+            return;
+        if (!caps.has(SET_TOGGLE_FOCUS_MODE)) {
+            setToggleFlag(false);
+            return;
+        }
+        try {
+            cameraEx.setToggleFocusMode(false);
+            setToggleFlag(false);
+            Logger.info("SafeCamera: released toggle focus left on by an earlier run");
+        } catch (Throwable t) {
+            failed(SET_TOGGLE_FOCUS_MODE.key() + " (stale)", t);
+        }
+    }
+
+    // commit(), not apply(): the flag must be on the card before a crash could follow.
+    private void setToggleFlag(boolean engaged) {
+        try {
+            prefs.edit().putBoolean(KEY_TOGGLE_ENGAGED, engaged).commit();
+        } catch (Throwable t) {
+            failed("save " + KEY_TOGGLE_ENGAGED, t);
         }
     }
 
