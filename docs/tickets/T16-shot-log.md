@@ -26,3 +26,6 @@ Make every run self-describing, so that timing and exposure problems can be diag
 - [ ] Unit test for formatter escaping and header.
 - [ ] `tools/analyze_log.py tests/fixtures/sample.csv` matches the expected output (add the fixture, plus a tiny `tools/test_analyze_log.py`).
 - [ ] The writer never blocks the capture thread (writes are handed to a background `HandlerThread`).
+
+## Inherited from T03
+- With holy grail on, each shot makes about 7 `log()` calls on the main thread before the shutter fires (`shoot`, `holyGrailPrePhotoEvent`, and the entry logs in `updateShutterSpeed`/`updateISOLevel`). Each call builds a new `SimpleDateFormat` for its timestamp prefix, and `Logger` opens, appends to and closes `TIMELPS/LOG.TXT`. Replace them with one structured CSV row per shot on the background writer, and reuse a single formatter.
