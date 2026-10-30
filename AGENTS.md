@@ -10,7 +10,9 @@ Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17–21 (Gradle 8.7 cannot ru
 JAVA_HOME=<JDK 17–21> ./gradlew clean :core:check :app:assembleDebug :app:assembleRelease :app:lint :app:testDebugUnitTest   # full build = pre-push gate
 JAVA_HOME=<JDK 17–21> ./gradlew :core:test                                                                                 # JVM unit tests only
 python3 -I tools/analyze_log.py <LOG.CSV> [--max-drift-ms 100]                                                              # per-run drift/skips/battery; exit 1 on drift or unexplained skips
-python3 -I -m unittest discover -s tools -p 'test_*.py'                                                                    # analyzer tests (stdlib only; CI runs them too)
+python3 -I -m unittest discover -s tools -p 'test_*.py'                                                                    # analyzer tests (stdlib only; CI runs them too, including the assemble.sh dry-run tests)
+tools/assemble.sh <dir> [--fps 24] [--deflicker] [--crop 16:9] [--out f.mp4] [--run <run_id>] [--dry-run]                      # JPEGs -> H.264 MP4 via ffmpeg (needed at run time only); --dry-run prints the command
+python3 -I tools/frames_for_run.py <dir> --log LOG.CSV --run <run_id> [--window-s 2] [--offset-s 0]                              # frame list for one run (FIRE/SLOT_DONE wall times vs file mtime); --list-runs prints ids
 ```
 
 - Outputs: `app/build/outputs/apk/debug/app-debug.apk` (debug-signed, v1+v2) and `app/build/outputs/apk/release/app-release-unsigned.apk` (unsigned until T18; T02 names release assets). Lint report: `app/build/reports/lint-results-debug.html`.
