@@ -18,6 +18,8 @@ public enum Feature {
     HOLY_GRAIL(SET_PROGRAM_LINE_RANGE_OVER_LISTENER, GET_SHUTTER_SPEED, GET_ISO_SENSITIVITY, SET_ISO_SENSITIVITY,
             INCREMENT_SHUTTER_SPEED, DECREMENT_SHUTTER_SPEED, CREATE_EMPTY_PARAMETERS),
     TOGGLE_FOCUS(SET_TOGGLE_FOCUS_MODE, IS_SUPPORTED_TOGGLE_FOCUS_MODE),
+    // Turning long-exposure NR off for a run and back on after: needs the getter to read the original state.
+    SET_LENR(SET_LONG_EXPOSURE_NR, GET_LONG_EXPOSURE_NR, IS_SUPPORTED_LONG_EXPOSURE_NR),
     // Camera.Parameters.setFocusMode("manual"): Android API, so no Sony method; gated on the focus-mode list only.
     FOCUS_MODE_MANUAL;
 
@@ -49,6 +51,8 @@ public enum Feature {
                 return isTrue(caps, Query.SILENT_SHUTTER_SUPPORTED);
             case TOGGLE_FOCUS:
                 return isTrue(caps, Query.TOGGLE_FOCUS_SUPPORTED);
+            case SET_LENR:
+                return isTrue(caps, Query.LONG_EXPOSURE_NR_SUPPORTED);
             case AE_LOCK:
                 return allows(caps, Query.AE_LOCKS, AE_LOCK_ON);
             case BRACKET_3:
