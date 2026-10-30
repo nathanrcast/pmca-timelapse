@@ -97,7 +97,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             if(burstShooting) {
                 shoot();
             }
-            else if(shotCount < settings.shotCount * getcnt()) {
+            else if(shotCount < (long) settings.shotCount * getcnt()) {
                 long remainingTime = Math.round(shootTime + settings.interval * 1000 - System.currentTimeMillis());
                 if(brck.get()>0){
                     remainingTime = -1;
@@ -356,7 +356,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private void updateScreen(){
-        tvCount.setText(Integer.toString(shotCount)+"/"+Integer.toString(settings.shotCount * getcnt()));
+        tvCount.setText(Integer.toString(shotCount)+"/"+Long.toString((long) settings.shotCount * getcnt()));
         tvRemaining.setText(getRemainingTime());
         tvBattery.setText(getBatteryPercentage());
 
@@ -571,7 +571,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             });
 
             // just keep shooting until we have all shots
-            if (System.currentTimeMillis() >= shootStartTime + settings.shotCount * 1000) {
+            if (System.currentTimeMillis() >= shootStartTime + (long) settings.shotCount * 1000) {
                 this.cameraEx.cancelTakePicture();
                 stopPicturePreview = true;
                 display.on();
@@ -592,7 +592,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
             //camera.startPreview();
 
-            if (shotCount < settings.shotCount * getcnt()) {
+            if (shotCount < (long) settings.shotCount * getcnt()) {
 
                 // remaining time to the next shot
                 double remainingTime = shootTime + settings.interval * 1000 - System.currentTimeMillis();
@@ -646,9 +646,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private String getRemainingTime() {
         if(burstShooting)
-            return "" + Math.round((settings.shotCount * 1000 - System.currentTimeMillis() + shootStartTime) / 1000) + "s";
+            return "" + Math.round(((long) settings.shotCount * 1000 - System.currentTimeMillis() + shootStartTime) / 1000) + "s";
         else
-            return "" + Math.round((settings.shotCount * getcnt() - shotCount) * settings.interval / 60) + "min";
+            return "" + Math.round(((long) settings.shotCount * getcnt() - shotCount) * settings.interval / 60) + "min";
     }
 
     @Override
