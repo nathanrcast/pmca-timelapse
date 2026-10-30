@@ -118,14 +118,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if(false) {
-                            tvCount.setText("Thanks for using this app!");
-                            tvBattery.setVisibility(View.INVISIBLE);
-                            tvRemaining.setVisibility(View.INVISIBLE);
-                        }
-                        else {
-                            onBackPressed();
-                        }
+                        onBackPressed();
                     }
                 });
             }
@@ -448,28 +441,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         catch (IOException e) {}
     }
 
-    // Never registered (the fork never called setShutterSpeedChangeListener). It lives in its own
-    // class so ShootActivity doesn't depend on this interface when it loads on older bodies.
-    private static class HolyGrailShutterSpeedListener implements CameraEx.ShutterSpeedChangeListener
-    {
-        @Override
-        public void onShutterSpeedChange(CameraEx.ShutterSpeedInfo shutterSpeedInfo, CameraEx cameraEx)
-        {
-            int numerator = shutterSpeedInfo.currentShutterSpeed_n;
-            int denominator = shutterSpeedInfo.currentShutterSpeed_d;
-            //find the shutterspeed in the list (list of int[][])
-            int shutterSpeedIndex = 0;
-            for(int i = 0; i < SHUTTER_SPEEDS.length; i++){
-                if(SHUTTER_SPEEDS[i][0] == numerator && SHUTTER_SPEEDS[i][1] == denominator){
-                    shutterSpeedIndex = i;
-                    break;
-                }
-            }
-        }
-    }
-
-
-
     private void shoot() {
         if(takingPicture)
             return;
@@ -608,15 +579,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if(false) {
-                            tvCount.setText("Thanks for using this app!");
-                            tvBattery.setVisibility(View.INVISIBLE);
-                            tvRemaining.setVisibility(View.INVISIBLE);
-                            tvExposureLevel.setVisibility(View.INVISIBLE);
-                        }
-                        else {
-                            onBackPressed();
-                        }
+                        onBackPressed();
                     }
                 });
             }
@@ -687,15 +650,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         else
             return "" + Math.round((settings.shotCount * getcnt() - shotCount) * settings.interval / 60) + "min";
     }
-
-    private String getExposureLevel() {
-        CameraEx.ExposureInfo exposureInfo = new CameraEx.ExposureInfo();
-        CameraEx.ExifInfo exifInfo = new CameraEx.ExifInfo();
-
-        return "1: " + exposureInfo.FNo + " 2: " + exposureInfo.IsoSpeedRate + " 3: " + exposureInfo.ShutterSpeedDeanom + " 4: " + exposureInfo.ShutterSpeedNumber + " 5: " + exifInfo.fNumberNumer;
-    }
-
-
 
     @Override
     protected void onAnyKeyDown() {
