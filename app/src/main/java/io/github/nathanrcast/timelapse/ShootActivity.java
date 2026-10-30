@@ -6,15 +6,11 @@ import static io.github.nathanrcast.timelapse.core.Util.SHUTTER_SPEEDS;
 import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeedIndex;
 
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.hardware.Camera;
-import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
-import android.os.StatFs;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -53,11 +49,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private int shotCount;
 
     // LOG.CSV: one row per scheduler decision, written on a background thread.
-    private static final int FREE_SPACE_EVERY_SHOTS = 20;
     private ShotLog shotLog;
-    private int batteryPct = ShotRecord.NONE;
-    private long freeMb = ShotRecord.NONE;
-    private int firesSinceFreeSpace = FREE_SPACE_EVERY_SHOTS;
     private final SimpleDateFormat logTime = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
 
     private TextView tvCount, tvBattery, tvRemaining;
@@ -251,7 +243,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (scheduler == null) {
             scheduler = new Scheduler(plan, clock, Scheduler.StopOn.CAPTURED);
             scheduler.start();
-            shotLog = new ShotLog(Build.MODEL, Build.VERSION.INCREMENTAL, appVersion(), clock.nowMs(),
+            shotLog = new ShotLog(this, Build.MODEL, Build.VERSION.INCREMENTAL, appVersion(), clock.nowMs(),
                     ShotLogCsv.settingsJson(settings));
         } else {
             scheduler.resume();
@@ -397,10 +389,11 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("on pause");
 
         handler.removeCallbacksAndMessages(null);
-        if (scheduler != null)
-            scheduler.pause();
-        if (shotLog != null)
-            shotLog.flush();
+        if (scheduler != null) {
+            logDecision(scheduler.pause());
+            if (shotLog != null)
+                shotLog.flush();
+        }
         stopReview(false);
         finishing = false;
 
@@ -556,47 +549,28 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (decision.skipReason == Scheduler.SkipReason.LOST)
             log(decision.toString());
         String ss = "", iso = "", ev = "";
-        if (decision.action == Scheduler.Action.FIRE)
-            sampleEnvironment();
         boolean idle = decision.action == Scheduler.Action.SLOT_DONE;
         if (settings.holyGrail && (idle || decision.action == Scheduler.Action.FIRE)) {
             ss = formatShutterSpeedIndex(shutterSpeedIndex);
             iso = Integer.toString(ISO_VALUES[ISOLevelIndex]);
             ev = String.format(Locale.US, "%.2f", exposureLevel);
-        } else if (idle && safeCamera != null) {
-            // Read once the camera is idle, never while a capture is in flight.
-            Result<int[]> sp = safeCamera.shutterSpeed();
-            if (sp.isOk())
-                ss = sp.get()[0] + "/" + sp.get()[1];
-            Result<Integer> isoResult = safeCamera.isoSensitivity();
-            if (isoResult.isOk())
-                iso = Integer.toString(isoResult.get());
+        } else if (idle && !burstShooting && safeCamera != null) {
+            // One read, once the camera is idle: never while a capture or a burst is in flight.
+            Result<int[]> exposure = safeCamera.exposure();
+            if (exposure.isOk()) {
+                int[] e = exposure.get();
+                if (e[0] >= 0)
+                    ss = Util.formatShutterSpeed(e[0], e[1]);
+                if (e[2] >= 0)
+                    iso = Integer.toString(e[2]);
+            }
         }
-        ShotRecord row = ShotRecord.of(shotLog.runId, decision, ss, iso, ev, batteryPct, freeMb);
+        // The writer thread adds battery and free space.
+        ShotRecord row = ShotRecord.of(shotLog.runId, decision, ss, iso, ev, ShotRecord.NONE, ShotRecord.NONE);
         if (row != null)
             shotLog.add(row);
         if (scheduler.isDone())
             shotLog.flush();
-    }
-
-    // Battery on every shot (a sticky broadcast, cheap); free space only every few shots, as StatFs on a big card is not.
-    private void sampleEnvironment() {
-        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        if (battery != null) {
-            int level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-            int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-            if (level >= 0 && scale > 0)
-                batteryPct = (int) (level * 100L / scale);
-        }
-        if (++firesSinceFreeSpace >= FREE_SPACE_EVERY_SHOTS) {
-            firesSinceFreeSpace = 0;
-            try {
-                StatFs fs = new StatFs(Environment.getExternalStorageDirectory().getPath());
-                freeMb = (long) fs.getAvailableBlocks() * fs.getBlockSize() / (1024 * 1024);
-            } catch (RuntimeException e) {
-                freeMb = ShotRecord.NONE;
-            }
-        }
     }
 
     private String appVersion() {
@@ -661,24 +635,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private String getBatteryPercentage()
     {
-        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = registerReceiver(null, ifilter);
-
-        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-
-        int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-        int chargePlug = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
-        boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL ||
-                chargePlug == BatteryManager.BATTERY_PLUGGED_USB ||
-                chargePlug == BatteryManager.BATTERY_PLUGGED_AC;
-
-        String s = "";
-        if(isCharging)
-            s = "c ";
-
-        return s + (int)(level / (float)scale * 100) + "%";
+        Battery battery = Battery.read(this);
+        if (battery.pct < 0)
+            return "?";
+        return (battery.charging ? "c " : "") + battery.pct + "%";
     }
 
     @Override

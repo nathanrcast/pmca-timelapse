@@ -43,6 +43,13 @@ public class ShotLogCsvTest {
     }
 
     @Test
+    public void withEnvironmentOnlyChangesBatteryAndFreeSpace() {
+        ShotRecord r = new ShotRecord("r", 1, 2, 3, ShotRecord.NONE, ShotRecord.Result.FIRE, null, "1/60", "100", "",
+                0, ShotRecord.NONE, ShotRecord.NONE);
+        assertEquals("r,1,2,3,,FIRE,,1/60,100,,0,55,900", ShotLogCsv.row(r.withEnvironment(55, 900)));
+    }
+
+    @Test
     public void runHeaderIsCommentLinesOnOneLineEach() {
         String h = ShotLogCsv.runHeader("run1", "ILCE-6500", "fw\n1.0", "1.4.0 (5)", 1700000000000L, "{\"a\":1}");
         assertEquals("# run_id=run1\n# model=ILCE-6500\n# firmware=fw 1.0\n# app_version=1.4.0 (5)\n"

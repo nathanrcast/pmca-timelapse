@@ -46,6 +46,12 @@ public final class ShotRecord {
         this.freeMb = freeMb;
     }
 
+    /** A copy with the battery and free-space fields set; the writer thread fills these in as it writes. */
+    public ShotRecord withEnvironment(int batteryPct, long freeMb) {
+        return new ShotRecord(runId, slot, scheduledMs, actualMs, captureDoneMs, result, skipReason, ss, iso, ev,
+                bracketIdx, batteryPct, freeMb);
+    }
+
     /** The row for a scheduler decision, or null for WAIT (which has no row). */
     public static ShotRecord of(String runId, Scheduler.Decision d, String ss, String iso, String ev,
                                 int batteryPct, long freeMb) {
