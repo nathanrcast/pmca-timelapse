@@ -4,12 +4,18 @@ TimeLapse+: an in-camera intervalometer for Sony PlayMemories (PMCA) cameras, ha
 
 ## Commands
 
-The build is still upstream's AGP 3.5 / jcenter setup until T01 lands. T01 then owns this section, along with T02 for CI. After T01 the pre-push gate is:
+Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17–21 (Gradle 8.7 cannot run on 22+, and a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. T02 owns CI.
 
 ```
-./gradlew :app:assembleDebug :app:lint        # + :core:test once T05 adds :core
-python3 tools/analyze_log.py <LOG.CSV>        # once T16 lands (stdlib only)
+JAVA_HOME=<JDK 17–21> ./gradlew clean :app:assembleDebug :app:assembleRelease :app:lint   # full build
+JAVA_HOME=<JDK 17–21> ./gradlew :app:assembleDebug :app:lint                              # pre-push gate; + :core:test once T05 adds :core
+python3 tools/analyze_log.py <LOG.CSV>                                                  # once T16 lands (stdlib only)
 ```
+
+- Outputs: `app/build/outputs/apk/debug/app-debug.apk` (debug-signed, v1+v2) and `app/build/outputs/apk/release/app-release-unsigned.apk` (unsigned until T18; T02 names release assets). Lint report: `app/build/reports/lint-results-debug.html`.
+- API-10 guard: NewApi and InlinedApi are fatal lint issues. `assembleRelease` enforces them through `lintVitalRelease`; `assembleDebug` runs no lint, which is why the gate includes `:app:lint`.
+- Check an APK: `$ANDROID_HOME/build-tools/34.0.0/aapt dump badging <apk> | head -3` must show package `io.github.nathanrcast.timelapse`, `sdkVersion:'10'` and `targetSdkVersion:'10'`. `unzip -p <apk> classes.dex | head -c 8 | od -c` must read `dex\n035`, the only dex version Dalvik 2.3 loads.
+- OpenMemories-Framework is vendored in `app/libs/` at commit `f8df350` (sha256s in `app/libs/README.md`); there is no jitpack dependency. `stubs` must stay `compileOnly`: the `com.sony.*` classes come from the camera firmware, and packaging the stubs would shadow them.
 
 ## Layout
 
@@ -37,6 +43,7 @@ python3 tools/analyze_log.py <LOG.CSV>        # once T16 lands (stdlib only)
 - Long-exposure NR makes the camera shoot a dark frame after each exposure, which shows up as "skipped every other shot" (upstream issues 26/50). Rule it out before blaming the scheduler.
 - The Frosbe fork moved sources to `com/frosbe/holygrail/` and added `com.jjoe64:graphview:3.1.4`.
 - `local.properties` is machine-specific and untracked.
+- Release minify is off on purpose; re-enabling it (R8) needs an on-camera Dalvik 2.3 test.
 
 ## Hardware
 

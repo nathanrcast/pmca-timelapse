@@ -6,7 +6,7 @@ Run this at the end of every wave on **both** bodies, using the build from merge
 
 - Camera in M mode. Use a fresh or fully charged battery, or a dummy battery for soaks. Card has ≥ 8 GB free.
 - **Long-exposure NR off** unless the test says otherwise.
-- Install: `pmca-console install --apk TimeLapsePlus-debug.apk`, or `adb install -r` over Tweak Wi-Fi ADB.
+- Install: `pmca-console install --apk app-debug.apk`, or `adb install -r` over Tweak Wi-Fi ADB.
 - Note the firmware version: MENU → Setup → Version.
 
 ## Smoke (every wave)

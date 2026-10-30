@@ -42,11 +42,11 @@ Start the app, set the interval and the number of pictures. The screen shows how
 
 ## Building
 
-See [AGENTS.md](AGENTS.md) § Commands. The build is being modernized (ticket T01); until then it needs the legacy Android Gradle Plugin 3.5 toolchain.
+Needs a JDK 17–21 and the Android SDK with platform 34 (`sdk.dir` in `local.properties`). `./gradlew :app:assembleDebug` writes `app/build/outputs/apk/debug/app-debug.apk`. Full commands: [AGENTS.md](AGENTS.md) § Commands.
 
 ## Credits
 
-- [ma1co](https://github.com/ma1co) — OpenMemories framework, Sony-PMCA-RE, OpenMemories-Tweak
+- [ma1co](https://github.com/ma1co) — [OpenMemories-Framework](https://github.com/ma1co/OpenMemories-Framework) (MIT; vendored at commit `f8df350` in [app/libs/](app/libs/README.md)), Sony-PMCA-RE, OpenMemories-Tweak
 - [obs1dium](https://github.com/obs1dium) — FocusBracket, the original code base
 - [jonasjuffinger](https://github.com/jonasjuffinger) — TimeLapse
 - [Frosbe](https://github.com/Frosbe) — holy-grail ramping
