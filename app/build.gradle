@@ -1,41 +1,44 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
-    compileSdkVersion 10
+    namespace 'com.jonasjuffinger.timelapse'
+    compileSdk 34
 
     defaultConfig {
-        applicationId "io.github.nathanrcast.timelapse"
-        minSdkVersion 10
-        targetSdkVersion 10
+        applicationId 'io.github.nathanrcast.timelapse'
+        minSdk 10
+        targetSdk 10
         versionCode 7
-        versionName "1.4.0"
+        versionName '1.4.0'
     }
+
     buildTypes {
         release {
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_6
-        targetCompatibility JavaVersion.VERSION_1_6
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    lintOptions {
+    lint {
         checkReleaseBuilds false
     }
 }
 
 android.applicationVariants.all { variant ->
     variant.outputs.all { output ->
-        outputFileName =  "TimeLapsePlus-${output.baseName}-${variant.versionName}.apk"
+        outputFileName = "TimeLapsePlus-${output.baseName}-${variant.versionName}.apk"
     }
 }
 
-repositories {
-    jcenter()
-    maven { url "https://jitpack.io" }
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs << '-Xlint:-options'
 }
 
 dependencies {
