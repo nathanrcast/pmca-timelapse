@@ -3,6 +3,7 @@ package io.github.nathanrcast.timelapse;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.os.StatFs;
 
 import java.io.File;
@@ -53,7 +54,7 @@ final class CardSpace {
 
     /** Queues a read unless one is queued or the last was under MIN_GAP_MS ago. Main thread only. */
     void request() {
-        long now = System.currentTimeMillis();
+        long now = SystemClock.uptimeMillis();
         if (stopped || queued || (lastMs != 0 && now - lastMs < MIN_GAP_MS))
             return;
         queued = true;
@@ -86,7 +87,7 @@ final class CardSpace {
             } catch (RuntimeException e) {
                 freeBytes = HudModel.UNKNOWN;
             }
-            long now = System.currentTimeMillis();
+            long now = SystemClock.uptimeMillis();
             if (avgBytes == HudModel.UNKNOWN || now - lastAvgMs >= AVG_GAP_MS) {
                 lastAvgMs = now;
                 double avg = averageFrameBytes(newestFolder(new File(root, "DCIM")));

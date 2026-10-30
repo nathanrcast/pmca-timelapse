@@ -6,6 +6,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -35,7 +36,12 @@ public class Logger
         return e;
     }
 
+    private static final long FLUSH_WAIT_MS = 500;
+    private static volatile boolean draining;
+
     protected static void log(final String msg) {
+        if (draining)
+            return;
         try {
             IO.execute(new Runnable() {
                 @Override
@@ -48,8 +54,31 @@ public class Logger
         }
     }
 
-    /** Writes on the calling thread; for the crash handler, which has no time to queue. */
+    /**
+     * Waits (at most about 500 ms) until every line queued so far is on the card. For teardown, where the camera's
+     * power-off may kill the process right after.
+     */
+    static void flush() {
+        final CountDownLatch done = new CountDownLatch(1);
+        try {
+            IO.execute(new Runnable() {
+                @Override
+                public void run() {
+                    done.countDown();
+                }
+            });
+            done.await(FLUSH_WAIT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (RuntimeException e) {
+            // best effort
+        }
+    }
+
+    /** For the crash handler: stops accepting lines, drains the queue (bounded), then writes the trace in order. */
     static void logNow(String type, String msg) {
+        draining = true;
+        flush();
         write("[" + type + "] " + msg);
     }
 
