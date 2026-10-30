@@ -374,6 +374,67 @@ public class SchedulerTest {
     }
 
     @Test
+    public void aRefusedFrameClosesTheSlotAtOnceAsLost() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(10, 3, 0, 1), clock, CAPTURED);
+        s.start();
+        assertEquals(FIRE, s.onTimer().action);
+        clock.advance(40);
+        Decision d = s.captureFailed();
+        assertEquals(SKIP, d.action);
+        assertEquals(LOST, d.skipReason);
+        assertEquals(0, d.slot);
+        assertEquals(0, d.frame);
+        assertEquals(START + 40, d.nowMs);
+        assertFalse(s.isCapturing());
+        assertEquals(1, s.skipped(LOST));
+        assertEquals(0, s.captured());
+        assertEquals(START + 10000, s.nextWakeMs());
+        clock.set(START + 10000);
+        assertEquals(FIRE, s.onTimer().action);
+        assertEquals(0, s.skipped(BUSY));
+    }
+
+    @Test
+    public void aRefusedBracketFrameIsLostAtItsFrame() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(10, 3, 0, 3), clock, CAPTURED);
+        s.start();
+        s.onTimer();
+        assertEquals(FIRE, s.onFrameCaptured().action);
+        Decision d = s.captureFailed();
+        assertEquals(LOST, d.skipReason);
+        assertEquals(1, d.frame);
+        assertEquals(0, s.captured());
+    }
+
+    @Test
+    public void aRefusedLastSlotEndsAStopOnSlotsRun() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(10, 1, 0, 1), clock, SLOTS);
+        s.start();
+        s.onTimer();
+        assertEquals(LOST, s.captureFailed().skipReason);
+        assertTrue(s.isDone());
+    }
+
+    @Test
+    public void captureFailedWithNothingInFlightOrInABurstIsIgnored() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(10, 3, 0, 1), clock, CAPTURED);
+        s.start();
+        assertSame(Scheduler.Decision.WAIT, s.captureFailed());
+        assertEquals(0, s.skipped());
+
+        Scheduler burst = new Scheduler(new ShotPlan(0, 5, 0, 1), clock, CAPTURED);
+        burst.start();
+        assertEquals(FIRE, burst.onTimer().action);
+        assertEquals(WAIT, burst.captureFailed().action);
+        assertTrue(burst.isCapturing());
+        assertEquals(0, burst.skipped());
+    }
+
+    @Test
     public void theTimeoutRunsFromEachBracketFrame() {
         SchedulerRig rig = new SchedulerRig(new ShotPlan(10, 2, 0, 3), CAPTURED, 5000).captureMs(400).loseFrame(2);
         rig.run();
