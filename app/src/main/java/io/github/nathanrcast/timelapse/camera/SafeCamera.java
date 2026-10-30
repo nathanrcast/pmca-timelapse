@@ -13,6 +13,7 @@ import com.sony.scalar.hardware.CameraEx;
 import com.sony.scalar.hardware.CameraEx.ParametersModifier;
 
 import io.github.nathanrcast.timelapse.Logger;
+import io.github.nathanrcast.timelapse.core.LenrGuard;
 import io.github.nathanrcast.timelapse.core.camera.BracketPlan;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.Feature;
@@ -49,6 +50,9 @@ public final class SafeCamera {
     // Set while the app holds the AF/MF toggle, so a run that never reached close() (crash, reboot, kill) can be
     // released by the next open().
     private static final String KEY_TOGGLE_ENGAGED = "toggleFocusEngagedByApp";
+    // Set while the app holds long-exposure NR off for a run, so a run that never reached close() can be undone by
+    // the next open(). Only ever set when LENR was on, so "set" means "turn it back on".
+    private static final String KEY_LENR_OFF_BY_APP = "lenrOffByApp";
     // The body's drive and bracket state from before configure() changed it, "drive|bracketMode|exposureBracketMode|
     // count|period" with an empty field for a value that couldn't be read. Set while a run is active, so close() or,
     // after a crash, the next open() puts the user's own state back.
@@ -68,6 +72,7 @@ public final class SafeCamera {
     private final Set<String> reported = new HashSet<String>();
     private CameraEx.AutoPictureReviewControl reviewControl;
     private boolean toggleEngaged;
+    private boolean lenrDisabled;
     private String savedFocusMode;
     private volatile boolean released;
     // close() and cancelTakePicture() share it: onShutter calls cancel from the camera thread while close() runs
@@ -146,6 +151,7 @@ public final class SafeCamera {
             SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             // Before the values are read: a run that never reached close() left its bracket drive on the body.
             restoreDriveState(cam, normal, m.keySet(), prefs, "an earlier run");
+            restoreStaleLenr(cam, normal, m.keySet(), prefs);
             camera = new SafeCamera(cam, normal, readSession(m, cam), prefs);
             cam.setShutterListener(new ShutterBridge(callback));
         } catch (Throwable t) {
@@ -461,6 +467,87 @@ public final class SafeCamera {
         }
     }
 
+    // ---- long-exposure NR ----
+
+    // Whether long-exposure NR was on when this session opened (the probe's one read, taken after any stale restore);
+    // null if the body can't say. A run that turns it off knows the original from this.
+    public Boolean longExposureNr() {
+        List<String> v = caps.values(Query.LONG_EXPOSURE_NR);
+        if (v == null || v.isEmpty())
+            return null;
+        return Boolean.valueOf("true".equals(v.get(0)));
+    }
+
+    // True if this body can switch long-exposure NR (Feature.SET_LENR).
+    public boolean canSetLongExposureNr() {
+        return caps.supports(Feature.SET_LENR);
+    }
+
+    // Turns long-exposure NR off for the run. The caller read it as on first. A flag in the preferences stays set
+    // until close() turns it back on, so a crash or kill is undone by the next open().
+    public Result<Void> disableLongExposureNr() {
+        if (released)
+            return closed(SET_LONG_EXPOSURE_NR.key());
+        if (!canSetLongExposureNr())
+            return unsupported(SET_LONG_EXPOSURE_NR.key());
+        setLenrFlag(true);
+        Result<Void> set = setLongExposureNr(false);
+        if (set.isOk())
+            lenrDisabled = true;
+        else
+            setLenrFlag(false);
+        return set;
+    }
+
+    private Result<Void> setLongExposureNr(boolean on) {
+        try {
+            Camera.Parameters params = normal.getParameters();
+            cameraEx.createParametersModifier(params).setLongExposureNR(on);
+            normal.setParameters(params);
+            return Result.ok(null);
+        } catch (Throwable t) {
+            return failed(SET_LONG_EXPOSURE_NR.key(), t);
+        }
+    }
+
+    private void restoreLenr() {
+        if (!lenrDisabled)
+            return;
+        lenrDisabled = false;
+        if (setLongExposureNr(true).isOk())
+            setLenrFlag(false);
+    }
+
+    // A run that turned LENR off and never reached close() left the flag set. Runs before the session's values are
+    // read, so those show the restored state. The flag stays set if the restore fails, so the next open() tries again.
+    private static void restoreStaleLenr(CameraEx cam, Camera normal, Set<SonyMethod> present,
+                                         SharedPreferences prefs) {
+        if (!prefs.getBoolean(KEY_LENR_OFF_BY_APP, false))
+            return;
+        try {
+            if (present.contains(SET_LONG_EXPOSURE_NR) && present.contains(GET_LONG_EXPOSURE_NR)) {
+                Camera.Parameters params = normal.getParameters();
+                ParametersModifier mod = cam.createParametersModifier(params);
+                if (LenrGuard.shouldRestore(true, Boolean.valueOf(mod.getLongExposureNR()))) {
+                    mod.setLongExposureNR(true);
+                    normal.setParameters(params);
+                    Logger.info("SafeCamera: long-exposure NR restored after an earlier run");
+                }
+            }
+            prefs.edit().putBoolean(KEY_LENR_OFF_BY_APP, false).commit();
+        } catch (Throwable t) {
+            Logger.error("SafeCamera: restore long-exposure NR: " + Result.failed(SET_LONG_EXPOSURE_NR.key(), t));
+        }
+    }
+
+    private void setLenrFlag(boolean set) {
+        try {
+            prefs.edit().putBoolean(KEY_LENR_OFF_BY_APP, set).commit();
+        } catch (Throwable t) {
+            failed("save " + KEY_LENR_OFF_BY_APP, t);
+        }
+    }
+
     private void enableAutoReview() {
         if (!caps.has(SET_AUTO_PICTURE_REVIEW_CONTROL)) {
             unsupported(SET_AUTO_PICTURE_REVIEW_CONTROL.key());
@@ -620,6 +707,7 @@ public final class SafeCamera {
         if (released)
             return;
         restoreFocus();
+        restoreLenr();
         restoreDriveState(cameraEx, normal, methods().keySet(), prefs, "this run");
         if (reviewControl != null) {
             reviewControl = null;

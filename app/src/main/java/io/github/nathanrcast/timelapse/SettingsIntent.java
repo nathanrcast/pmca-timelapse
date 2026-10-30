@@ -3,12 +3,17 @@ package io.github.nathanrcast.timelapse;
 import android.content.Intent;
 
 import io.github.nathanrcast.timelapse.core.Settings;
+import io.github.nathanrcast.timelapse.core.StartMode;
 
 // Hands the derived shoot settings from SettingsActivity to ShootActivity.
 final class SettingsIntent {
     private static final String EXTRA_INTERVAL = "io.github.nathanrcast.timelapse.INTERVAL";
     private static final String EXTRA_SHOTCOUNT = "io.github.nathanrcast.timelapse.SHOTCOUNT";
     private static final String EXTRA_DELAY = "io.github.nathanrcast.timelapse.DELAY";
+    private static final String EXTRA_STARTMODE = "io.github.nathanrcast.timelapse.STARTMODE";
+    private static final String EXTRA_ATHOUR = "io.github.nathanrcast.timelapse.ATHOUR";
+    private static final String EXTRA_ATMINUTE = "io.github.nathanrcast.timelapse.ATMINUTE";
+    private static final String EXTRA_DISABLELENR = "io.github.nathanrcast.timelapse.DISABLELENR";
     private static final String EXTRA_DISPLAYOFF = "io.github.nathanrcast.timelapse.DISPLAYOFF";
     private static final String EXTRA_REVIEWSECONDS = "io.github.nathanrcast.timelapse.REVIEWSECONDS";
     private static final String EXTRA_SILENTSHUTTER = "io.github.nathanrcast.timelapse.SILENTSHUTTER";
@@ -32,6 +37,10 @@ final class SettingsIntent {
         intent.putExtra(EXTRA_INTERVAL, settings.interval);
         intent.putExtra(EXTRA_SHOTCOUNT, settings.shotCount);
         intent.putExtra(EXTRA_DELAY, settings.delay);
+        intent.putExtra(EXTRA_STARTMODE, settings.startMode.ordinal());
+        intent.putExtra(EXTRA_ATHOUR, settings.atHour);
+        intent.putExtra(EXTRA_ATMINUTE, settings.atMinute);
+        intent.putExtra(EXTRA_DISABLELENR, settings.disableLenr);
         intent.putExtra(EXTRA_DISPLAYOFF, settings.displayOff);
         intent.putExtra(EXTRA_REVIEWSECONDS, settings.reviewSeconds);
         intent.putExtra(EXTRA_SILENTSHUTTER, settings.silentShutter);
@@ -55,6 +64,10 @@ final class SettingsIntent {
         settings.interval = intent.getDoubleExtra(EXTRA_INTERVAL, 1);
         settings.shotCount = intent.getIntExtra(EXTRA_SHOTCOUNT, 1);
         settings.delay = intent.getIntExtra(EXTRA_DELAY, 1);
+        settings.startMode = StartMode.fromOrdinal(intent.getIntExtra(EXTRA_STARTMODE, 0), StartMode.NOW);
+        settings.atHour = intent.getIntExtra(EXTRA_ATHOUR, 0);
+        settings.atMinute = intent.getIntExtra(EXTRA_ATMINUTE, 0);
+        settings.disableLenr = intent.getBooleanExtra(EXTRA_DISABLELENR, true);
         settings.displayOff = intent.getBooleanExtra(EXTRA_DISPLAYOFF, false);
         settings.reviewSeconds = intent.getIntExtra(EXTRA_REVIEWSECONDS, 0);
         settings.silentShutter = intent.getBooleanExtra(EXTRA_SILENTSHUTTER, true);

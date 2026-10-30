@@ -97,10 +97,10 @@ public final class Scheduler {
         }
     }
 
-    private final ShotPlan plan;
+    private ShotPlan plan;
     private final Clock clock;
     private final StopOn stopOn;
-    private final long intervalMs;
+    private long intervalMs;
     private final long slotTarget;
     private final long captureTimeoutMs;
 
@@ -109,6 +109,7 @@ public final class Scheduler {
     private boolean done;
     private long t0;
     private long startedAtMs;
+    private long plannedT0Ms;
     private long pausedAtMs;
 
     private long nextSlot;
@@ -145,11 +146,17 @@ public final class Scheduler {
 
     /** Starts the run now; the first slot is due after the plan's delay. */
     public void start() {
+        start(clock.nowMs() + plan.delayMs());
+    }
+
+    /** Starts the run with the first slot due at {@code t0Ms} (the clock's time base), e.g. a scheduled start. */
+    public void start(long t0Ms) {
         if (started)
             throw new IllegalStateException("already started");
         started = true;
         startedAtMs = clock.nowMs();
-        t0 = startedAtMs + plan.delayMs();
+        t0 = t0Ms;
+        plannedT0Ms = t0Ms;
     }
 
     /** When the caller's timer should next call {@link #onTimer()}; {@link #NEVER} if no timer is needed. */
@@ -230,13 +237,36 @@ public final class Scheduler {
 
     /** Shifts {@code t0} by the paused time, so every remaining deadline keeps its place in the run. */
     public void resume() {
+        resume(false);
+    }
+
+    /**
+     * Like {@link #resume()}, but with {@code keepT0} a run that hasn't fired or skipped a slot yet keeps its
+     * {@code t0}: a start fixed on the wall clock must not move by the time spent paused.
+     */
+    public void resume(boolean keepT0) {
         if (!paused)
             return;
         paused = false;
+        if (keepT0 && nextSlot == 0 && !capturing)
+            return;
         long shift = clock.nowMs() - pausedAtMs;
         t0 += shift;
         if (lastCaptureEndMs != Long.MIN_VALUE)
             lastCaptureEndMs += shift;
+    }
+
+    /**
+     * Runs the rest of the run at a longer interval (long-exposure NR found on a later resume). The next slot keeps
+     * its deadline and the slots after it follow at the new spacing. Ignored for bursts, before start and for a
+     * shorter interval.
+     */
+    public void raiseInterval(long newIntervalMs) {
+        if (!started || plan.isBurst() || newIntervalMs <= intervalMs)
+            return;
+        t0 += nextSlot * (intervalMs - newIntervalMs);
+        intervalMs = newIntervalMs;
+        plan = plan.withIntervalMs(newIntervalMs);
     }
 
     /**
@@ -265,6 +295,11 @@ public final class Scheduler {
 
     public long captureTimeoutMs() {
         return captureTimeoutMs;
+    }
+
+    /** When the first slot was scheduled at start; unlike {@link #t0Ms()}, never shifted by a pause. */
+    public long plannedFirstSlotMs() {
+        return plannedT0Ms;
     }
 
     /** When {@link #start()} ran; unlike {@link #t0Ms()}, never shifted by a pause. */

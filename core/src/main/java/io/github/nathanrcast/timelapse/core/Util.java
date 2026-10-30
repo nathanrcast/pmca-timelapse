@@ -3,6 +3,11 @@ package io.github.nathanrcast.timelapse.core;
 public final class Util {
     private Util() {}
 
+    /** A shutter time n/d seconds in milliseconds, rounded; -1 when d is not positive. */
+    public static long shutterMs(int n, int d) {
+        return d <= 0 ? -1 : Math.round(n * 1000.0 / d);
+    }
+
     public static String formatShutterSpeed(int n, int d)
     {
         if (n == 1 && d != 2 && d != 1)

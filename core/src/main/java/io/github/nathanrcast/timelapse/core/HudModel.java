@@ -60,7 +60,7 @@ public final class HudModel {
     public static String elapsed(Scheduler s, long nowMs) {
         if (!s.isStarted())
             return "0s";
-        long sinceFirstSlot = nowMs - s.startedAtMs() - s.plan().delayMs();
+        long sinceFirstSlot = nowMs - s.plannedFirstSlotMs();
         return Util.formatTime(Math.max(0, sinceFirstSlot / 1000));
     }
 

@@ -31,6 +31,8 @@ import io.github.nathanrcast.timelapse.core.ExposureRamp;
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
 import io.github.nathanrcast.timelapse.core.SliderMapping;
+import io.github.nathanrcast.timelapse.core.StartMode;
+import io.github.nathanrcast.timelapse.core.StartTime;
 import io.github.nathanrcast.timelapse.core.StepTables;
 import io.github.nathanrcast.timelapse.core.Util;
 
@@ -77,6 +79,12 @@ public class SettingsActivity extends BaseActivity
     private TextView tvAverageAmountValue, tvAverageAmountUnit;
     private AdvancedSeekBar sbDeadbandIndex;
     private TextView tvDeadbandIndexValue, tvDeadbandIndexUnit;
+
+    private Spinner spnStartMode;
+    private View laDelay, laAt;
+    private AdvancedSeekBar sbAtHour, sbAtMinute;
+    private TextView tvAtHour, tvAtMinute;
+    private CheckBox cbDisableLenr;
 
     private int fps;
     private Spinner spnFps;
@@ -137,6 +145,33 @@ public class SettingsActivity extends BaseActivity
         sbDelay = (AdvancedSeekBar) findViewById(R.id.sbDelay);
         tvDelayValue = (TextView) findViewById(R.id.tvDelayValue);
         tvDelayUnit = (TextView) findViewById(R.id.tvDelayUnit);
+
+        spnStartMode = (Spinner) findViewById(R.id.spnStartMode);
+        laDelay = findViewById(R.id.laDelay);
+        laAt = findViewById(R.id.laAt);
+        sbAtHour = (AdvancedSeekBar) findViewById(R.id.sbAtHour);
+        sbAtMinute = (AdvancedSeekBar) findViewById(R.id.sbAtMinute);
+        tvAtHour = (TextView) findViewById(R.id.tvAtHour);
+        tvAtMinute = (TextView) findViewById(R.id.tvAtMinute);
+        cbDisableLenr = (CheckBox) findViewById(R.id.cbDisableLenr);
+
+        spnStartMode.setSelection(settings.startMode.ordinal());
+        spnStartMode.setOnItemSelectedListener(spnStartModeOnItemSelectedListener);
+        showStartMode();
+        sbAtHour.setMax(23);
+        sbAtHour.setOnSeekBarChangeListener(sbAtOnSeekBarChangeListener);
+        sbAtHour.setProgress(settings.atHour);
+        sbAtMinute.setMax(59);
+        sbAtMinute.setOnSeekBarChangeListener(sbAtOnSeekBarChangeListener);
+        sbAtMinute.setProgress(settings.atMinute);
+        sbAtOnSeekBarChangeListener.onProgressChanged(sbAtHour, settings.atHour, false);
+        cbDisableLenr.setChecked(settings.disableLenr);
+        cbDisableLenr.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                settings.disableLenr = b;
+            }
+        });
 
         //Holy Grail
         laHolyGrailSection = (LinearLayout) findViewById(R.id.laHolyGrailSection);
@@ -324,6 +359,7 @@ public class SettingsActivity extends BaseActivity
         showIf(cbAEL, options.aeLock());
         showIf(cbBRS, options.bracket3());
         showIf(cbHolyGrail, options.holyGrail());
+        showIf(cbDisableLenr, options.lenrOff());
         laHolyGrailSection.setVisibility(options.holyGrail() && cbHolyGrail.isChecked() ? View.VISIBLE : View.GONE);
         burstUnavailable = !options.burst();
         showIntervalText();
@@ -513,6 +549,41 @@ public class SettingsActivity extends BaseActivity
 
         @Override
         public void onStartTrackingTouch(SeekBar seekBar) {}
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {}
+    };
+
+    private void showStartMode() {
+        laDelay.setVisibility(settings.startMode == StartMode.DELAY ? View.VISIBLE : View.GONE);
+        laAt.setVisibility(settings.startMode == StartMode.AT ? View.VISIBLE : View.GONE);
+    }
+
+    AdapterView.OnItemSelectedListener spnStartModeOnItemSelectedListener
+            = new AdapterView.OnItemSelectedListener() {
+        @Override
+        public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+            settings.startMode = StartMode.fromOrdinal(i, StartMode.NOW);
+            showStartMode();
+        }
+
+        @Override
+        public void onNothingSelected(AdapterView<?> adapterView) {}
+    };
+
+    SeekBar.OnSeekBarChangeListener sbAtOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
+            if (seekBar == sbAtHour)
+                settings.atHour = i;
+            else
+                settings.atMinute = i;
+            tvAtHour.setText(StartTime.format(settings.atHour, 0).substring(0, 2));
+            tvAtMinute.setText(StartTime.format(0, settings.atMinute).substring(3));
+        }
+
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {}
+
         @Override
         public void onStopTrackingTouch(SeekBar seekBar) {}
     };
