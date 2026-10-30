@@ -28,8 +28,8 @@ public class SettingsTest {
         assertFalse(s.holyGrail);
         assertTrue(s.useCurrentExposure);
         assertEquals(0, s.targetExposure);
-        assertEquals(0, s.maxShutterSpeedIndex);
-        assertEquals(0, s.maxISOIndex);
+        assertEquals(Util.DEFAULT_MAX_SHUTTER_INDEX, s.maxShutterSpeedIndex);
+        assertEquals(Util.DEFAULT_MAX_ISO_INDEX, s.maxISOIndex);
         assertEquals(5, s.cooldown);
         assertEquals(1, s.averageExposureAmount);
         assertEquals(0, s.deadbandIndex);
