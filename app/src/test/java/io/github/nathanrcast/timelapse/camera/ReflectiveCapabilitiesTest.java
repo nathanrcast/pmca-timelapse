@@ -91,12 +91,14 @@ public class ReflectiveCapabilitiesTest {
     }
 
     @Test
-    public void queriesAreListOrBooleanGettersOnTheStubs() throws Exception {
+    public void queriesAreListBooleanStringOrIntGettersOnTheStubs() throws Exception {
         for (Query q : Query.values()) {
             if (q.method() == null)
                 continue;
             String d = declared(q.method());
             assertTrue(q.name() + " is " + d, d.equals(q.method().methodName() + "()Z")
+                    || d.equals(q.method().methodName() + "()I")
+                    || d.equals(q.method().methodName() + "()Ljava/lang/String;")
                     || d.equals(q.method().methodName() + "()Ljava/util/List;"));
         }
     }
