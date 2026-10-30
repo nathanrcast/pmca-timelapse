@@ -74,6 +74,22 @@ class AnalyzeLogTest(unittest.TestCase):
         self.assertEqual(0, rc)
         self.assertEqual(2, out.count("run "))
 
+    def test_header_comments_are_raw_text(self):
+        settings = '{"interval":1.0,"note":"a,b","q":"x"y,"}'
+        text = ("# run_id=r\n# model=M,\"X\n# settings=" + settings + "\n" + COLS
+                + "r,0,1000,1001,,FIRE,,,,,0,,\nr,1,2000,2002,,FIRE,,,,,0,,\n")
+        runs = analyze_log.read_runs(io.StringIO(text))
+        self.assertEqual(1, len(runs))
+        self.assertEqual(settings, runs[0].meta["settings"])
+        self.assertEqual('M,"X', runs[0].meta["model"])
+        self.assertEqual(2, len(runs[0].rows))
+
+    def test_stray_quote_in_header_does_not_swallow_rows(self):
+        path = write_temp(self, '# run_id=r\n# settings={"a":1,"b":"\n' + COLS + "r,0,1000,1001,,FIRE,,,,,0,,\n")
+        rc, out, _ = run_main(path)
+        self.assertEqual(0, rc)
+        self.assertIn("shots: 1 fired", out)
+
     def test_percentile(self):
         self.assertEqual(95, analyze_log.percentile(list(range(1, 101)), 95))
         self.assertIsNone(analyze_log.percentile([], 95))

@@ -28,12 +28,13 @@ def read_runs(lines):
     order = []
     current = None
     columns = None
-    for number, row in enumerate(csv.reader(lines), 1):
-        if not row or not "".join(row).strip():
+    for number, line in enumerate(lines, 1):
+        line = line.rstrip("\r\n")
+        if not line.strip():
             continue
-        first = row[0]
-        if first.startswith("#"):
-            key, _, value = ",".join(row)[1:].strip().partition("=")
+        if line.startswith("#"):
+            # Header comments are raw text, never CSV: a settings JSON may hold commas and quotes.
+            key, _, value = line[1:].strip().partition("=")
             key, value = key.strip(), value.strip()
             if key == "run_id":
                 if value not in runs:
@@ -43,6 +44,8 @@ def read_runs(lines):
             elif current is not None:
                 current.meta[key] = value
             continue
+        row = next(csv.reader([line]))
+        first = row[0]
         if first == "run_id":
             columns = row
             continue
