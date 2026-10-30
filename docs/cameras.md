@@ -1,6 +1,6 @@
 # Camera bodies
 
-What each supported body's Sony API actually offers, from its CAPS file (T08), and how the app decides which options to show (T07). The per-body sections summarize each CAPS file; T10/T19 read their key codes and long-exposure findings from it.
+What each supported body's Sony API actually offers, from its CAPS file (T08), and how the app decides which options to show (T07). The per-body sections summarize each CAPS file; T10 reads their key codes (see Dial and wheel input) and T19 their long-exposure findings from it.
 
 ## How to capture CAPS files
 
@@ -43,6 +43,17 @@ An option the body lacks is hidden on the settings screen, but its saved value i
 | Burst (interval 0) | `BURST` | `setDriveMode`, `getSupportedBurstDriveSpeeds`, `setBurstDriveSpeed`, `setBurstDriveButtonReleaseBehave` | drive modes have `burst`, burst speeds not empty; otherwise the settings screen shows the burst position as *n/a* and the run uses the shortest interval (1 s) |
 
 MF prefers the AF/MF toggle. The stubs have no getter for the toggle state, so the app reads the focus mode first: if the body is already in manual focus it leaves the toggle alone, otherwise it engages the toggle and releases it when the run ends. While the app holds the toggle, a flag in its preferences says so; a run that never ended cleanly (crash, reboot) leaves the flag set, and the next run start releases the toggle before anything else. The toggle is engaged only after the run's parameters applied. If the toggle call throws, it falls back to `setFocusMode("manual")` and restores the previous focus mode afterwards. `isSupportedLongExposureNR` and `getSupportedISOSensitivities` are read and logged for T12 and T14 but gate nothing yet. There is no shutter-speed list API in the stubs; the holy-grail ramp uses `Util.SHUTTER_SPEEDS`.
+
+## Dial and wheel input (T10)
+
+`SettingsActivity` maps every `ScalarInput` dial or wheel event (`ISV_DIAL_1/2/3_*` and `ISV_DIAL_KURU_*`, the control wheel) to the same action: clockwise is the next table value, counter-clockwise the previous one, for the focused setting (seek bar, spinner or checkbox). Up/down move the focus and left/right step a focused bar, on every body, so input never depends on a dial. Holding left/right accelerates (T04). The interval, shots and delay bars are indices into the tables in `core/StepTables`.
+
+Which dials a body reports is **unverified** until its CAPS file's key log shows it:
+
+| Body | Expected input | Status |
+|---|---|---|
+| ILCE-6500 | control wheel (KURU), front dial, rear dial, plus the arrow keys | unverified |
+| NEX-5T | control wheel only (`DIAL_UNRELIABLE`, see `up#5`), plus the arrow keys | unverified |
 
 ## ILCE-6500
 
