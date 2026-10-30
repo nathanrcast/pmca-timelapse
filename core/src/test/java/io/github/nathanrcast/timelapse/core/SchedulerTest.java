@@ -455,6 +455,32 @@ public class SchedulerTest {
     }
 
     @Test
+    public void nBracketSlotsGiveThreeNFramesWithNoDoubleCounting() {
+        for (int n : new int[] {1, 2, 7, 40}) {
+            SchedulerRig rig = new SchedulerRig(new ShotPlan(5, n, 0, 3), CAPTURED).captureMs(400);
+            long lastCaptured = 0;
+            long lastSlots = 0;
+            while (!rig.scheduler.isDone()) {
+                rig.runUntil(rig.clock.nowMs() + 100);
+                Scheduler s = rig.scheduler;
+                assertTrue("captured never jumps", s.captured() - lastCaptured <= 1);
+                assertTrue("slots never jump", s.slotsElapsed() - lastSlots <= 1);
+                assertTrue(s.captured() <= n);
+                lastCaptured = s.captured();
+                lastSlots = s.slotsElapsed();
+            }
+            Scheduler s = rig.scheduler;
+            assertEquals(3L * n, s.framesFired());
+            assertEquals(n, s.captured());
+            assertEquals(n, s.slotsElapsed());
+            assertEquals(0, s.skipped());
+            assertEquals(3 * n, rig.only(FIRE).size());
+            assertEquals(n, rig.only(SLOT_DONE).size());
+            assertEquals(n + "/" + n, Progress.count(s, rig.clock.nowMs()));
+        }
+    }
+
+    @Test
     public void bracketsSlowerThanTheIntervalSkipTheNextSlot() {
         SchedulerRig rig = new SchedulerRig(new ShotPlan(1, 3, 0, 3), CAPTURED).captureMs(400);
         rig.run();

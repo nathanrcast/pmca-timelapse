@@ -23,6 +23,7 @@ import io.github.nathanrcast.timelapse.camera.SafeCamera;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 
+import io.github.nathanrcast.timelapse.core.BracketTiming;
 import io.github.nathanrcast.timelapse.core.Clock;
 import io.github.nathanrcast.timelapse.core.Progress;
 import io.github.nathanrcast.timelapse.core.Scheduler;
@@ -45,7 +46,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private int shotCount;
 
-    private TextView tvCount, tvBattery, tvRemaining;
+    private TextView tvCount, tvBattery, tvRemaining, tvStatus;
+    private BracketTiming bracketTiming;
+    private String bracketWarning;
 
     //Holy Grail
     private TextView tvExposureLevel;
@@ -88,6 +91,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         @Override
         public void run() {
             Scheduler.Decision decision = scheduler.onTimer();
+            trackBracket(decision);
             if (decision.action == Scheduler.Action.FIRE) {
                 takeFrame();
                 if (burstShooting) {
@@ -166,6 +170,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         tvCount = (TextView) findViewById(R.id.tvCount);
         tvBattery = (TextView) findViewById(R.id.tvBattery);
         tvRemaining = (TextView) findViewById(R.id.tvRemaining);
+        tvStatus = (TextView) findViewById(R.id.tvStatus);
 
         //Holy Grail
         tvExposureLevel = (TextView) findViewById(R.id.tvExposureLevel);
@@ -231,6 +236,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         cameraSurfaceHolder.addCallback(this);
         safeCamera.configure(run);
 
+        startBracketTiming();
+
         // Built after applyCapabilities, from the masked plan (BRC3 or burst may be off on this body).
         // A resumed run keeps its slots: the scheduler shifts every remaining deadline by the pause.
         if (scheduler == null) {
@@ -263,12 +270,44 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         updateScreen();
     }
 
+    // The warning is estimated from the shutter time at start and replaced by the measured slot time after each
+    // bracket. It only informs: the scheduler skips a slot that is still busy.
+    private void startBracketTiming() {
+        if (bracketTiming == null)
+            bracketTiming = new BracketTiming(plan);
+        Result<int[]> sp = safeCamera.shutterSpeed();
+        if (sp.isOk() && sp.get()[1] > 0)
+            bracketTiming.setShutterMs(sp.get()[0] * 1000L / sp.get()[1]);
+        showBracketWarning();
+    }
+
+    private void trackBracket(Scheduler.Decision decision) {
+        if (bracketTiming != null && bracketTiming.onDecision(decision))
+            showBracketWarning();
+    }
+
+    private void showBracketWarning() {
+        String warning = bracketTiming.warning();
+        if (warning == null ? bracketWarning != null : !warning.equals(bracketWarning)) {
+            bracketWarning = warning;
+            if (warning != null)
+                log("warning: " + warning);
+        }
+        if (bracketWarning == null) {
+            tvStatus.setVisibility(View.GONE);
+        } else {
+            tvStatus.setText(bracketWarning);
+            tvStatus.setVisibility(View.VISIBLE);
+        }
+    }
+
     // Masks this run's settings (the intent's copy; the saved ones are untouched) against the values the camera
     // reported on open. Frames per interval follow BRC3 and burst follows the interval, so the plan is rebuilt.
     private RunOptions applyCapabilities(Capabilities caps) {
         RunOptions run = RunOptions.mask(caps, settings);
         if (!run.masked().isEmpty())
             log("not on this body, off for this run: " + run.masked());
+        log("bracket: " + run.bracket.describe());
         if (!settings.holyGrail) {
             findViewById(R.id.divider2).setVisibility(View.GONE);
             findViewById(R.id.textView4).setVisibility(View.GONE);
@@ -531,6 +570,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private void frameCaptured() {
         Scheduler.Decision decision = scheduler.onFrameCaptured();
+        trackBracket(decision);
         if (decision.action == Scheduler.Action.FIRE) {
             takeFrame();
         } else if (decision.action == Scheduler.Action.SLOT_DONE) {
