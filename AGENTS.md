@@ -20,12 +20,19 @@ python3 tools/analyze_log.py <LOG.CSV>                                          
 ## Layout
 
 - `app/src/main/java/io/github/nathanrcast/timelapse/`: app sources; the Java namespace matches `applicationId`. `ShootActivity` holds the capture loop and the holy-grail ramp, `SettingsActivity` the setup UI, `Settings` the persisted options, and `Util` the shutter/ISO/deadband step tables.
+- `app/src/main/java/io/github/nathanrcast/timelapse/camera/`: the capability layer. `SafeCamera` makes every `CameraEx`/`ParametersModifier` call (its listener bridges `ShutterBridge` and `ExposureBridge` sit beside it). `ReflectiveCapabilities` is the once-per-session probe, and `ModelProfile` holds the per-body overrides. How the probe decides is in `docs/cameras.md`.
+- `app/src/main/java/io/github/nathanrcast/timelapse/camera/model/`: the pure-Java capability types, with no `android.*` or `com.sony.*` imports so they can move to `:core`. `SonyMethod` lists every Sony method used, `Query` the supported-value reads, `Feature` each option's rules, `Capabilities`/`ProbedCapabilities` the probe result, and `OptionVisibility` the settings-screen decision.
 - `app/src/main/java/com/github/ma1co/pmcademo/app/`: `BaseActivity` (Sony `ScalarInput` key handling) and `AppNotificationManager`, vendored from PMCADemo. They keep their own package and `LICENSE.txt`.
 
 ## Invariants
 
 - **Runtime is Android 2.3.7 Dalvik (API 10) on both cameras.** Keep `minSdk`/`targetSdk` at 10. Don't use any API above 10, and no AndroidX, Kotlin stdlib or core-library desugaring. Java language level is 8 at most.
-- **Never call a Sony `CameraEx`/`ParametersModifier` method directly** once T07 lands. Go through the capability layer. A method missing on an older body throws `NoSuchMethodError` and reboots the camera (upstream issue 4).
+- **Only `camera/` touches `CameraEx`, `ParametersModifier` or `CameraSequence`; everything else goes through `SafeCamera`.** A method missing on an older body throws `NoSuchMethodError` and reboots the camera (upstream issue 4). So a new Sony call needs:
+  - a `SonyMethod` entry, which also puts it in the CAPS *Used methods* report;
+  - a `caps.has()`/`caps.supports()` guard before the call;
+  - for any Sony interface it implements, a small class of its own in `camera/` that is only loaded once the probe has found the method.
+
+  `CapsDumpActivity` and `CapsFormat` are exempt: they are the probe tool, and they catch `Throwable` per call. Check: `grep -rn "CameraEx\|ParametersModifier" app/src/main/java | grep -v /camera/ | grep -v CapsDump | grep -v CapsFormat` must print nothing.
 - `applicationId` and the release signing key are permanent. Installers pin the certificate on first install, so changing either forces every user to uninstall.
 - Pure logic (scheduling, exposure ramp, shot-plan math) belongs in `:core` with JVM unit tests, not in Activities.
 
