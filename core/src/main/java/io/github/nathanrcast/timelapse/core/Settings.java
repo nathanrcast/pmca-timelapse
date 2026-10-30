@@ -130,19 +130,15 @@ public final class Settings {
     // Pulls persisted values into the ranges the sliders and step tables can show. Every value
     // the settings screen writes is already in range, so this only changes corrupt stores.
     public void clamp() {
-        rawInterval = clamp(rawInterval, 0, RAW_INTERVAL_MAX);
-        rawShotCount = clamp(rawShotCount, 0, RAW_SHOT_COUNT_MAX);
-        rawDelay = clamp(rawDelay, 0, RAW_DELAY_MAX);
+        rawInterval = SliderMapping.clamp(rawInterval, 0, RAW_INTERVAL_MAX);
+        rawShotCount = SliderMapping.clamp(rawShotCount, 0, RAW_SHOT_COUNT_MAX);
+        rawDelay = SliderMapping.clamp(rawDelay, 0, RAW_DELAY_MAX);
         int halfTarget = SliderMapping.TARGET_EXPOSURE_MAX / 2;
-        targetExposure = clamp(targetExposure, -halfTarget, halfTarget);
-        maxShutterSpeedIndex = clamp(maxShutterSpeedIndex, 0, Util.SHUTTER_SPEEDS.length - 1);
-        maxISOIndex = clamp(maxISOIndex, 0, Util.ISO_VALUES.length - 1);
-        cooldown = clamp(cooldown, 1, SliderMapping.COUNT_MAX + 1);
-        averageExposureAmount = clamp(averageExposureAmount, 1, SliderMapping.COUNT_MAX + 1);
-        deadbandIndex = clamp(deadbandIndex, 0, Util.DEADBAND_VALUES.length - 1);
-    }
-
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
+        targetExposure = SliderMapping.clamp(targetExposure, -halfTarget, halfTarget);
+        maxShutterSpeedIndex = SliderMapping.clamp(maxShutterSpeedIndex, 0, Util.SHUTTER_SPEEDS.length - 1);
+        maxISOIndex = SliderMapping.clamp(maxISOIndex, 0, Util.ISO_VALUES.length - 1);
+        cooldown = SliderMapping.clamp(cooldown, 1, SliderMapping.COUNT_MAX + 1);
+        averageExposureAmount = SliderMapping.clamp(averageExposureAmount, 1, SliderMapping.COUNT_MAX + 1);
+        deadbandIndex = SliderMapping.clamp(deadbandIndex, 0, Util.DEADBAND_VALUES.length - 1);
     }
 }

@@ -10,7 +10,7 @@ public final class SliderMapping {
 
     // Target exposure is stored in 1/3-EV steps, -30..30.
     public static int targetExposureToProgress(int targetExposure) {
-        return clamp(targetExposure + TARGET_EXPOSURE_MAX / 2, TARGET_EXPOSURE_MAX);
+        return clamp(targetExposure + TARGET_EXPOSURE_MAX / 2, 0, TARGET_EXPOSURE_MAX);
     }
 
     public static int progressToTargetExposure(int progress) {
@@ -19,14 +19,14 @@ public final class SliderMapping {
 
     // Cooldown and average amount are stored as counts, 1..COUNT_MAX + 1.
     public static int countToProgress(int count) {
-        return clamp(count - 1, COUNT_MAX);
+        return clamp(count - 1, 0, COUNT_MAX);
     }
 
     public static int progressToCount(int progress) {
         return progress + 1;
     }
 
-    private static int clamp(int progress, int max) {
-        return Math.max(0, Math.min(max, progress));
+    static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 }
