@@ -9,7 +9,6 @@ import static org.junit.Assert.assertTrue;
 
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
-import io.github.nathanrcast.timelapse.core.SliderMapping;
 
 import org.junit.Test;
 
@@ -135,8 +134,8 @@ public class BracketPlanTest {
     private static Settings settings(boolean brs, int interval) {
         Settings s = new Settings();
         s.brs = brs;
-        s.rawInterval = interval;
-        s.interval = SliderMapping.progressToInterval(interval);
+        s.intervalIndex = interval;
+        s.deriveFromIndex();
         return s;
     }
 
