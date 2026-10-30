@@ -40,12 +40,6 @@ android {
     }
 }
 
-android.applicationVariants.all { variant ->
-    variant.outputs.all { output ->
-        outputFileName = "TimeLapsePlus-${output.baseName}-${variant.versionName}.apk"
-    }
-}
-
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs << '-Xlint:-options'
 }
