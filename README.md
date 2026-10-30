@@ -46,7 +46,7 @@ See [AGENTS.md](AGENTS.md) § Commands. The build is being modernized (ticket T0
 
 ## Credits
 
-- [ma1co](https://github.com/ma1co) — OpenMemories framework, Sony-PMCA-RE, OpenMemories-Tweak
+- [ma1co](https://github.com/ma1co) — [OpenMemories-Framework](https://github.com/ma1co/OpenMemories-Framework) (MIT; built against commit `f8df350`), Sony-PMCA-RE, OpenMemories-Tweak
 - [obs1dium](https://github.com/obs1dium) — FocusBracket, the original code base
 - [jonasjuffinger](https://github.com/jonasjuffinger) — TimeLapse
 - [Frosbe](https://github.com/Frosbe) — holy-grail ramping
