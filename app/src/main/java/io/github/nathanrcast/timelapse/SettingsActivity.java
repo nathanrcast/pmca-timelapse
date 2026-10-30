@@ -99,6 +99,8 @@ public class SettingsActivity extends BaseActivity
         bnClose = (Button) findViewById(R.id.bnClose);
         bnClose.setOnClickListener(bnCloseOnClickListener);
 
+        findViewById(R.id.bnCameraInfo).setOnClickListener(bnCameraInfoOnClickListener);
+
         tvIntervalValue = (TextView) findViewById(R.id.tvIntervalValue);
         tvIntervalUnit = (TextView) findViewById(R.id.tvIntervalUnit);
 
@@ -260,6 +262,13 @@ public class SettingsActivity extends BaseActivity
         public void onClick(View view) {
             settings.save(that);
             finish();
+        }
+    };
+
+    View.OnClickListener bnCameraInfoOnClickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            startActivity(new Intent(that, CapsDumpActivity.class));
         }
     };
 
