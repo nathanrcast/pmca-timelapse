@@ -13,11 +13,13 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
+import com.sony.scalar.sysutil.ScalarInput;
 
 import io.github.nathanrcast.timelapse.camera.Result;
 import io.github.nathanrcast.timelapse.camera.SafeCamera;
@@ -27,7 +29,6 @@ import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 import io.github.nathanrcast.timelapse.core.BracketTiming;
 import io.github.nathanrcast.timelapse.core.Clock;
 import io.github.nathanrcast.timelapse.core.HudModel;
-import io.github.nathanrcast.timelapse.core.Progress;
 import io.github.nathanrcast.timelapse.core.Scheduler;
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotLogCsv;
@@ -90,7 +91,12 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private boolean reviewShowing;
     private boolean finishing;
     private boolean stopping;
-    private boolean tornDown;
+    private volatile boolean tornDown;
+    // The panel is off (DOFF): nothing is drawn until a key or the next shot turns it on.
+    private boolean panelOff;
+    // A key woke the panel; automatic DOFF waits until this uptime.
+    private long wakeUntilMs;
+    private boolean buttonKey;
 
     private float exposureLevel = 0;
     private int ISOLevelIndex = 0;
@@ -146,14 +152,17 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     };
 
-    private final Runnable hudRunnable = new Runnable() {
+    // The one screen refresh (HUD, count, delay countdown, burst seconds). It idles while the panel is off.
+    private final Runnable refreshRunnable = new Runnable() {
         @Override
         public void run() {
             if (tornDown)
                 return;
-            if (cardSpace != null)
-                cardSpace.request();
-            updateScreen();
+            if (!panelOff) {
+                if (cardSpace != null)
+                    cardSpace.request();
+                updateScreen();
+            }
             handler.postDelayed(this, HUD_MS);
         }
     };
@@ -162,18 +171,13 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final Runnable wakeOffRunnable = new Runnable() {
         @Override
         public void run() {
-            if (!finishing && !tornDown && display != null && settings.displayOff)
-                display.off();
-        }
-    };
-
-    private final Runnable delayCountdownRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (delaySecondsRemaining() > 0) {
-                updateScreen();
-                handler.postDelayed(this, 1000);
-            }
+            if (finishing || tornDown || display == null || !settings.displayOff)
+                return;
+            long wait = wakeUntilMs - clock.nowMs();
+            if (wait > 0)
+                handler.postDelayed(this, wait);
+            else
+                panelOff();
         }
     };
 
@@ -182,7 +186,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final Runnable burstPollRunnable = new Runnable() {
         @Override
         public void run() {
-            updateScreen();
             frameCaptured();
             handler.postDelayed(this, BURST_POLL_MS);
         }
@@ -294,20 +297,18 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         else
             armTimer();
 
-        if (settings.delay > 0) {
-            handler.post(delayCountdownRunnable);
-        }
-
-        if(settings.displayOff) {
-            display.turnAutoOff(5000);
+        panelOff = false;
+        if (settings.displayOff) {
+            wakeUntilMs = clock.nowMs() + KEY_WAKE_MS;
+            handler.postDelayed(wakeOffRunnable, KEY_WAKE_MS);
         }
 
         setAutoPowerOffMode(false);
 
         if (cardSpace == null)
             cardSpace = new CardSpace(runStartWallMs);
-        handler.removeCallbacks(hudRunnable);
-        handler.postDelayed(hudRunnable, HUD_MS);
+        handler.removeCallbacks(refreshRunnable);
+        handler.postDelayed(refreshRunnable, HUD_MS);
 
         // applyCapabilities turned HG off if this body lacks any of its methods.
         if (settings.holyGrail) {
@@ -414,22 +415,16 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     }
 
-    private long delaySecondsRemaining() {
-        return Progress.delaySecondsRemaining(scheduler, clock.nowMs());
-    }
-
     private void updateScreen(){
+        if (panelOff || tornDown)
+            return;
         long now = clock.nowMs();
-        long delaySeconds = Progress.delaySecondsRemaining(scheduler, now);
-        if (delaySeconds > 0)
-            tvCount.setText("Delay: " + Util.formatTime(delaySeconds));
-        else
-            tvCount.setText(Progress.count(scheduler, now));
-        tvRemaining.setText(Progress.remaining(scheduler, now));
         Battery battery = Battery.read(this);
         HudModel hud = HudModel.of(scheduler, now, battery.pct, battery.charging,
                 cardSpace == null ? HudModel.UNKNOWN : cardSpace.freeBytes(),
                 cardSpace == null ? HudModel.UNKNOWN : cardSpace.avgBytes());
+        tvCount.setText(hud.count);
+        tvRemaining.setText(hud.remaining);
         tvBattery.setText(hud.battery);
         tvHud.setText("Skipped: " + hud.skips + "   Next: " + hud.next + "\nElapsed: " + hud.elapsed
                 + "   Card: " + hud.cardLeft + " left");
@@ -723,7 +718,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         stopReview(true);
         shoot();
         if (!burstShooting)
-            display.on();
+            panelOn();
     }
 
     // Shows the last capture until the next deadline, for at most the review setting (default off: no review, and
@@ -733,7 +728,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         long until = reviewMs > 0 ? scheduler.reviewUntilMs(reviewMs) : -1;
         if (until < 0) {
             if (settings.displayOff && !burstShooting)
-                display.off();
+                panelOff();
             return;
         }
         reviewSurfaceView.setVisibility(View.VISIBLE);
@@ -750,7 +745,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         stopPreview();
         reviewSurfaceView.setVisibility(View.GONE);
         if (displayOff && settings.displayOff)
-            display.off();
+            panelOff();
     }
 
     // The run is over: stop the preview, show a summary for END_SCREEN_MS or until a key, then return to settings.
@@ -767,10 +762,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         reviewShowing = false;
         stopPreview();
         reviewSurfaceView.setVisibility(View.GONE);
-        display.on();
-        updateScreen();
+        panelOn();
         tvStatus.setText("Done: " + HudModel.summary(scheduler, clock.nowMs()) + ". Press any key.");
         tvStatus.setVisibility(View.VISIBLE);
+        updateScreen();
         handler.postDelayed(finishRunnable, END_SCREEN_MS);
     }
 
@@ -782,23 +777,69 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         finish();
     }
 
-    // Any key wakes the display and never stops the run (MENU stops it, on key up). Under DOFF the display
-    // goes back to sleep after KEY_WAKE_MS. Once the end screen shows, a key leaves it.
+    private void panelOn() {
+        panelOff = false;
+        display.on();
+    }
+
+    // Not while a key wake is still running.
+    private void panelOff() {
+        if (clock.nowMs() < wakeUntilMs)
+            return;
+        panelOff = true;
+        display.off();
+    }
+
+    private static boolean isButton(int scanCode) {
+        switch (scanCode) {
+            case ScalarInput.ISV_KEY_UP:
+            case ScalarInput.ISV_KEY_DOWN:
+            case ScalarInput.ISV_KEY_LEFT:
+            case ScalarInput.ISV_KEY_RIGHT:
+            case ScalarInput.ISV_KEY_ENTER:
+            case ScalarInput.ISV_KEY_FN:
+            case ScalarInput.ISV_KEY_AEL:
+            case ScalarInput.ISV_KEY_MENU:
+            case ScalarInput.ISV_KEY_SK1:
+            case ScalarInput.ISV_KEY_S1_1:
+            case ScalarInput.ISV_KEY_S1_2:
+            case ScalarInput.ISV_KEY_S2:
+            case ScalarInput.ISV_KEY_PLAY:
+            case ScalarInput.ISV_KEY_STASTOP:
+            case ScalarInput.ISV_KEY_CUSTOM1:
+            case ScalarInput.ISV_KEY_DELETE:
+            case ScalarInput.ISV_KEY_SK2:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // BaseActivity calls onAnyKeyDown() for dials, the mode dial and lens events too; only buttons count.
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        buttonKey = isButton(event.getScanCode());
+        return super.onKeyDown(keyCode, event);
+    }
+
+    // A button wakes the display and never stops the run (MENU stops it, on key up). Under DOFF the display
+    // goes back to sleep after KEY_WAKE_MS. Once the end screen shows, a button leaves it.
     @Override
     protected void onAnyKeyDown() {
-        if (display == null || tornDown)
+        if (!buttonKey || display == null || tornDown)
             return;
-        display.on();
+        panelOn();
+        updateScreen();
         if (finishing) {
             leaveEndScreen();
             return;
         }
         if (settings.displayOff) {
+            wakeUntilMs = clock.nowMs() + KEY_WAKE_MS;
             handler.removeCallbacks(wakeOffRunnable);
             handler.postDelayed(wakeOffRunnable, KEY_WAKE_MS);
         }
     }
-
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
