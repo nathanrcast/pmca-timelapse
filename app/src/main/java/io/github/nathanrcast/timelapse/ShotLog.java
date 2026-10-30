@@ -52,12 +52,12 @@ final class ShotLog {
     private int rowsSinceFreeSpace = FREE_SPACE_EVERY_ROWS;
 
     ShotLog(Context context, String model, String firmware, String appVersion, long uptimeNowMs,
-            String settingsJson) {
+            String settingsJson, String lenr) {
         this.context = context.getApplicationContext();
         long wallNow = System.currentTimeMillis();
         runId = new SimpleDateFormat(RUN_ID_FORMAT, Locale.US).format(new Date(wallNow));
         file = new File(Environment.getExternalStorageDirectory(), "TIMELPS/LOG.CSV");
-        header = ShotLogCsv.runHeader(runId, model, firmware, appVersion, wallNow - uptimeNowMs, settingsJson);
+        header = ShotLogCsv.runHeader(runId, model, firmware, appVersion, wallNow - uptimeNowMs, settingsJson, lenr);
         thread = new HandlerThread("ShotLog");
         thread.start();
         handler = new Handler(thread.getLooper());

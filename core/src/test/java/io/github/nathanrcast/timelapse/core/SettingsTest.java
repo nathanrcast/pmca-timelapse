@@ -70,6 +70,10 @@ public class SettingsTest {
         expected.put("intervalMs", 4000);
         expected.put("shots", 250);
         expected.put("delayMin", 3);
+        expected.put("startMode", 0);
+        expected.put("atHour", 0);
+        expected.put("atMinute", 0);
+        expected.put("disableLenr", true);
         expected.put("silentShutter", false);
         expected.put("ael", false);
         expected.put("fps", 2);

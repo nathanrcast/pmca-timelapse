@@ -51,6 +51,8 @@ public enum SonyMethod {
     SET_ISO_SENSITIVITY(false, T.MODIFIER, "setISOSensitivity", "int"),
     GET_SUPPORTED_ISO_SENSITIVITIES(false, T.MODIFIER, "getSupportedISOSensitivities"),
     IS_SUPPORTED_LONG_EXPOSURE_NR(false, T.MODIFIER, "isSupportedLongExposureNR"),
+    GET_LONG_EXPOSURE_NR(false, T.MODIFIER, "getLongExposureNR"),
+    SET_LONG_EXPOSURE_NR(false, T.MODIFIER, "setLongExposureNR", "boolean"),
     IS_SUPPORTED_TOGGLE_FOCUS_MODE(false, T.MODIFIER, "isSupportedToggleFocusMode");
 
     private static final class T {

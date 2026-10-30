@@ -51,9 +51,10 @@ public class ShotLogCsvTest {
 
     @Test
     public void runHeaderIsCommentLinesOnOneLineEach() {
-        String h = ShotLogCsv.runHeader("run1", "ILCE-6500", "fw\n1.0", "1.4.0 (5)", 1700000000000L, "{\"a\":1}");
+        String h = ShotLogCsv.runHeader("run1", "ILCE-6500", "fw\n1.0", "1.4.0 (5)", 1700000000000L, "{\"a\":1}",
+                "on");
         assertEquals("# run_id=run1\n# model=ILCE-6500\n# firmware=fw 1.0\n# app_version=1.4.0 (5)\n"
-                + "# uptime_to_wall_ms=1700000000000\n# settings={\"a\":1}\n", h);
+                + "# uptime_to_wall_ms=1700000000000\n# settings={\"a\":1}\n# lenr=on\n", h);
         for (String line : h.split("\n"))
             assertTrue(line.startsWith("# "));
     }
@@ -63,6 +64,12 @@ public class ShotLogCsvTest {
         String json = ShotLogCsv.settingsJson(new Settings());
         assertTrue(json.startsWith("{\"interval\":1.0,\"delay\":0,\"shotCount\":10,"
                 + "\"intervalIndex\":2,\"shotsIndex\":4,\"delayIndex\":0,"));
+        Settings at = new Settings();
+        at.startMode = StartMode.AT;
+        at.atHour = 7;
+        at.atMinute = 5;
+        assertTrue(ShotLogCsv.settingsJson(at).contains("\"startMode\":\"AT\",\"at\":\"07:05\""));
+        assertTrue(json.contains("\"startMode\":\"NOW\",\"at\":\"00:00\",\"disableLenr\":true"));
         assertTrue(json.contains("\"holyGrail\":false"));
         assertTrue(json.endsWith("\"holyGrailAllowExposureDown\":false}"));
         Settings s = new Settings();

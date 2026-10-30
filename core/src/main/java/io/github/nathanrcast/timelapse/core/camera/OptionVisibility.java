@@ -12,9 +12,11 @@ public final class OptionVisibility {
     private final boolean holyGrail;
     private final boolean burst;
     private final FocusControl focusControl;
+    private final boolean lenrOff;
 
     private OptionVisibility(boolean silentShutter, boolean aeLock, boolean bracket3, boolean holyGrail,
-                             boolean burst, FocusControl focusControl) {
+                             boolean burst, FocusControl focusControl, boolean lenrOff) {
+        this.lenrOff = lenrOff;
         this.silentShutter = silentShutter;
         this.aeLock = aeLock;
         this.bracket3 = bracket3;
@@ -33,7 +35,12 @@ public final class OptionVisibility {
             focus = FocusControl.NONE;
         return new OptionVisibility(caps.supports(Feature.SILENT_SHUTTER), caps.supports(Feature.AE_LOCK),
                 caps.supports(Feature.BRACKET_3), caps.supports(Feature.HOLY_GRAIL), caps.supports(Feature.BURST),
-                focus);
+                focus, caps.supports(Feature.SET_LENR));
+    }
+
+    // The body can turn long-exposure NR off and back on, so "Turn LENR off during runs" is offered.
+    public boolean lenrOff() {
+        return lenrOff;
     }
 
     public boolean silentShutter() {
