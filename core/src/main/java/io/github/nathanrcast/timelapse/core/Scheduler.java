@@ -17,7 +17,7 @@ package io.github.nathanrcast.timelapse.core;
  * <li>A timer that wakes after a slot's window has ended makes it a {@link SkipReason#LATE} skip,
  *     one slot per call, until the current slot.</li>
  * <li>A frame with no onShutter within the capture timeout closes its slot as LOST, so a missing
- *     callback can't stall the run.</li>
+ *     callback can't stall the run; {@link #captureFailed()} closes it at once when the camera refuses the frame.</li>
  * <li>With brackets, a slot fires {@code framesPerInterval} frames back to back and completes
  *     after the last one is captured.</li>
  * <li>Burst mode (interval 0) is one slot: it fires at {@code t0} and the timer completes it at
@@ -215,6 +215,21 @@ public final class Scheduler {
             return new Decision(Action.FIRE, captureSlot, captureFrame, deadlineMs(captureSlot), now, null);
         }
         return completeSlot(now);
+    }
+
+    /**
+     * The camera refused the frame just fired (takePicture failed at once), so no onShutter will come: closes
+     * the slot now as a {@link SkipReason#LOST} skip instead of waiting out the capture timeout. Ignored, as WAIT,
+     * when no frame is in flight. A refused burst is the run's only slot: it ends the run, is never counted as
+     * captured and never re-fires.
+     */
+    public Decision captureFailed() {
+        if (!capturing)
+            return Decision.WAIT;
+        Decision decision = closeCapture(clock.nowMs(), SkipReason.LOST);
+        if (plan.isBurst())
+            done = true;
+        return decision;
     }
 
     /**

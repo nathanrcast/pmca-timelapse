@@ -19,7 +19,8 @@ public class CustomExceptionHandler implements Thread.UncaughtExceptionHandler
         e.printStackTrace(printWriter);
         String stacktrace = result.toString();
         printWriter.close();
-        Logger.error(stacktrace);
+        Logger.logNow("ERROR", stacktrace);
+        Display.emergencyRestore();
         defaultUEH.uncaughtException(t, e);
     }
 }
