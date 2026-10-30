@@ -23,6 +23,8 @@ public class ShotPlanTest {
         assertEquals(120, plan.totalFrames());
         assertEquals(100, plan.durationSeconds());
         assertEquals(180000, plan.delayMs());
+        assertEquals(2500, plan.intervalMs());
+        assertEquals(40, plan.shotCount());
         assertFalse(plan.isBurst());
         assertFalse(plan.isInfinite());
 
@@ -65,6 +67,7 @@ public class ShotPlanTest {
     public void burstModeCountsSecondsNotShots() {
         ShotPlan burst = new ShotPlan(0, 15, 0, 1);
         assertTrue(burst.isBurst());
+        assertEquals(0, burst.intervalMs());
         assertEquals(15, burst.durationSeconds());
         assertEquals(-1, burst.clipSeconds(24));
         assertEquals(-1, burst.clipSeconds(0));

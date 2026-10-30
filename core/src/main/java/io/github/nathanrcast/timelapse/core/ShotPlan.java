@@ -41,6 +41,15 @@ public final class ShotPlan {
         return framesPerInterval;
     }
 
+    /** Shots (intervals) in the run; in burst mode the burst length in seconds. */
+    public int shotCount() {
+        return shotCount;
+    }
+
+    public long intervalMs() {
+        return Math.round(intervalSeconds * 1000);
+    }
+
     public long totalFrames() {
         return (long) shotCount * framesPerInterval;
     }
