@@ -79,6 +79,61 @@ public class SchedulerTest {
     }
 
     @Test
+    public void resumeKeepingT0HoldsAScheduledStartButShiftsOnceRunning() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(5, 3, 0, 1), clock, CAPTURED);
+        s.start(START + 600000L);
+        s.pause();
+        clock.advance(120000);
+        s.resume(true);
+        assertEquals(START + 600000L, s.t0Ms());
+
+        FakeClock clock2 = new FakeClock(START);
+        Scheduler delayed = new Scheduler(new ShotPlan(5, 3, 0, 1), clock2, CAPTURED);
+        delayed.start(START + 600000L);
+        delayed.pause();
+        clock2.advance(120000);
+        delayed.resume();
+        assertEquals(START + 720000L, delayed.t0Ms());
+
+        FakeClock clock3 = new FakeClock(START);
+        Scheduler running = new Scheduler(new ShotPlan(5, 3, 0, 1), clock3, CAPTURED);
+        running.start(START);
+        assertEquals(FIRE, running.onTimer().action);
+        running.pause();
+        clock3.advance(1000);
+        running.resume(true);
+        assertEquals(START + 1000, running.t0Ms());
+    }
+
+    @Test
+    public void raiseIntervalKeepsTheNextDeadlineAndSpacesTheRestWider() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(3, 10, 0, 1), clock, CAPTURED);
+        s.start();
+        assertEquals(FIRE, s.onTimer().action);
+        s.onFrameCaptured();
+        long next = s.deadlineMs(1);
+        s.raiseInterval(5000);
+        assertEquals(next, s.deadlineMs(1));
+        assertEquals(next + 5000, s.deadlineMs(2));
+        assertEquals(5000, s.plan().intervalMs());
+        s.raiseInterval(4000);
+        assertEquals(5000, s.plan().intervalMs());
+    }
+
+    @Test
+    public void raiseIntervalIgnoresBurstAndUnstartedRuns() {
+        Scheduler burst = new Scheduler(new ShotPlan(0, 5, 0, 1), new FakeClock(START), CAPTURED);
+        burst.start();
+        burst.raiseInterval(5000);
+        assertEquals(0, burst.plan().intervalMs());
+        Scheduler idle = new Scheduler(new ShotPlan(3, 5, 0, 1), new FakeClock(START), CAPTURED);
+        idle.raiseInterval(5000);
+        assertEquals(3000, idle.plan().intervalMs());
+    }
+
+    @Test
     public void captureSlowerThanTheIntervalSkipsSlotsWithoutBursts() {
         SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 10, 0, 1), CAPTURED).captureMs(3000);
         rig.run();

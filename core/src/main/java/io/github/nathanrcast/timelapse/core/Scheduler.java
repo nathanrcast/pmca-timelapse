@@ -97,10 +97,10 @@ public final class Scheduler {
         }
     }
 
-    private final ShotPlan plan;
+    private ShotPlan plan;
     private final Clock clock;
     private final StopOn stopOn;
-    private final long intervalMs;
+    private long intervalMs;
     private final long slotTarget;
     private final long captureTimeoutMs;
 
@@ -233,13 +233,36 @@ public final class Scheduler {
 
     /** Shifts {@code t0} by the paused time, so every remaining deadline keeps its place in the run. */
     public void resume() {
+        resume(false);
+    }
+
+    /**
+     * Like {@link #resume()}, but with {@code keepT0} a run that hasn't fired or skipped a slot yet keeps its
+     * {@code t0}: a start fixed on the wall clock must not move by the time spent paused.
+     */
+    public void resume(boolean keepT0) {
         if (!paused)
             return;
         paused = false;
+        if (keepT0 && nextSlot == 0 && !capturing)
+            return;
         long shift = clock.nowMs() - pausedAtMs;
         t0 += shift;
         if (lastCaptureEndMs != Long.MIN_VALUE)
             lastCaptureEndMs += shift;
+    }
+
+    /**
+     * Runs the rest of the run at a longer interval (long-exposure NR found on a later resume). The next slot keeps
+     * its deadline and the slots after it follow at the new spacing. Ignored for bursts, before start and for a
+     * shorter interval.
+     */
+    public void raiseInterval(long newIntervalMs) {
+        if (!started || plan.isBurst() || newIntervalMs <= intervalMs)
+            return;
+        t0 += nextSlot * (intervalMs - newIntervalMs);
+        intervalMs = newIntervalMs;
+        plan = plan.withIntervalMs(newIntervalMs);
     }
 
     /**

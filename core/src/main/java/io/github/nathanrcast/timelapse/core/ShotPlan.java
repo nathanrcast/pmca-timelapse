@@ -29,6 +29,10 @@ public final class ShotPlan {
                 settings.brs ? BRACKET_FRAMES : 1);
     }
 
+    public ShotPlan withIntervalMs(long intervalMs) {
+        return new ShotPlan(intervalMs / 1000.0, shotCount, delayMinutes, framesPerInterval);
+    }
+
     public boolean isBurst() {
         return intervalSeconds == 0;
     }
