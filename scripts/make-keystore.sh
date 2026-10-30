@@ -85,9 +85,9 @@ printf '%s\n' "$pw" > "$cred"
 chmod 600 "$cred"
 
 # keytool reads the password from stdin when there is no console; it asks for it twice.
-# Its stderr holds no secret (the password arrives on stdin); show it only on failure.
+# Its stderr holds no secret (the password arrives on stdin); show its output only on failure.
 if ! err="$(printf '%s\n%s\n' "$pw" "$pw" | "$keytool" -genkeypair -keystore "$ks" -alias "$alias_name" \
-     -keyalg RSA -keysize 2048 -validity 10950 -dname "$dname" 2>&1 >/dev/null)"; then
+     -keyalg RSA -keysize 2048 -validity 10950 -dname "$dname" 2>&1)"; then
   rm -f "$ks" "$cred"
   printf '%s\n' "$err" >&2
   echo "error: keytool failed (output above); removed partial files" >&2
