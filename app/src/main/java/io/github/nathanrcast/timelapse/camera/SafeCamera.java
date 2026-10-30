@@ -42,10 +42,13 @@ public final class SafeCamera {
     }
 
     private static final String FOCUS_MODE_AUTO = "auto";
+    // The settings-screen probe tries twice at most: once, then once more on the next onResume.
+    private static final int PROBE_ATTEMPTS = 2;
 
     private static Map<SonyMethod, Method> methods;
     // The latest capabilities with values: from the settings-screen probe or the last open().
     private static ProbedCapabilities latest;
+    private static int failedProbes;
 
     private final CameraEx cameraEx;
     private final Camera normal;
@@ -62,9 +65,20 @@ public final class SafeCamera {
         this.caps = caps;
     }
 
-    // The settings-screen probe: opens the camera, reads the values and releases it. Kept once the values are read.
+    // The latest capabilities, or null before the first probe or open() finished.
+    public static synchronized Capabilities lastCapabilities() {
+        return latest;
+    }
+
+    // True until a probe has read the values, or it has failed PROBE_ATTEMPTS times.
+    public static synchronized boolean probeWanted() {
+        return latest == null || (!latest.valuesRead() && failedProbes < PROBE_ATTEMPTS);
+    }
+
+    // The settings-screen probe; blocks, so call it from a Looper thread other than the UI thread. Opens the camera,
+    // reads the values and releases it. A probe that couldn't read the values counts as failed.
     public static synchronized Capabilities probe() {
-        if (latest != null && latest.valuesRead())
+        if (!probeWanted())
             return latest;
         Map<SonyMethod, Method> m = methods();
         CameraEx cam = null;
@@ -76,7 +90,10 @@ public final class SafeCamera {
             }
         }
         try {
-            return readSession(m, cam);
+            ProbedCapabilities probed = readSession(m, cam);
+            if (!probed.valuesRead())
+                failedProbes++;
+            return probed;
         } finally {
             if (cam != null) {
                 try {

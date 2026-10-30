@@ -7,6 +7,8 @@ import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeed;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -83,6 +85,11 @@ public class SettingsActivity extends BaseActivity
     private CheckBox cbMF;
     private CheckBox cbDOFF;
 
+    // The capability probe opens the camera, so it runs on its own Looper thread (as CapsDump does).
+    private HandlerThread probeThread;
+    private boolean probing;
+    // A Start or Camera info pressed while the probe holds the camera; launched when the probe finishes.
+    private Intent pendingLaunch;
     private boolean burstUnavailable;
 
     @Override
@@ -243,8 +250,53 @@ public class SettingsActivity extends BaseActivity
 
         cbDOFF.setChecked(settings.displayOff);
         cbDOFF.setOnCheckedChangeListener(cbDOFFOnCheckListener);
+    }
 
-        applyCapabilities(SafeCamera.probe());
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Capabilities known = SafeCamera.lastCapabilities();
+        if (known != null)
+            applyCapabilities(known);
+        if (!probing && SafeCamera.probeWanted())
+            startProbe();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (probeThread != null)
+            probeThread.quit();
+        super.onDestroy();
+    }
+
+    private void startProbe() {
+        if (probeThread == null) {
+            probeThread = new HandlerThread("CapabilityProbe");
+            probeThread.start();
+        }
+        probing = true;
+        new Handler(probeThread.getLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                final Capabilities caps = SafeCamera.probe();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        probing = false;
+                        if (isFinishing()) {
+                            pendingLaunch = null;
+                            return;
+                        }
+                        applyCapabilities(caps);
+                        if (pendingLaunch != null) {
+                            Intent launch = pendingLaunch;
+                            pendingLaunch = null;
+                            startActivity(launch);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     // Shows only the options this body supports (core.camera.OptionVisibility). Visual only: a hidden option keeps
@@ -273,13 +325,21 @@ public class SettingsActivity extends BaseActivity
         tvIntervalUnit.setText(noBurst ? "" : SliderMapping.intervalUnit(settings.interval));
     }
 
+    // Waits for a running probe, so the next activity's camera open doesn't collide with it.
+    private void launch(Intent intent) {
+        if (probing)
+            pendingLaunch = intent;
+        else
+            startActivity(intent);
+    }
+
     View.OnClickListener bnStartOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
             settings.save(store);
             Intent intent = new Intent(that, ShootActivity.class);
             SettingsIntent.put(intent, settings);
-            startActivity(intent);
+            launch(intent);
         }
     },
     bnCloseOnClickListener = new View.OnClickListener() {
@@ -293,7 +353,7 @@ public class SettingsActivity extends BaseActivity
     View.OnClickListener bnCameraInfoOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            startActivity(new Intent(that, CapsDumpActivity.class));
+            launch(new Intent(that, CapsDumpActivity.class));
         }
     };
 
