@@ -398,7 +398,7 @@ public class SettingsActivity extends BaseActivity
             tvIntervalUnit.setText(intervalUnit);
 
             if(settings.interval == 0)
-                lblShots.setText("Dur. (s)GF");
+                lblShots.setText("Dur. (s)");
             else
                 lblShots.setText("Shots");
 

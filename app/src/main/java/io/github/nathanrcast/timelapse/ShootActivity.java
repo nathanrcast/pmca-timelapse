@@ -171,6 +171,11 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         tvShotsSinceLastChange = (TextView) findViewById(R.id.tvShotsSinceLastChange);
         tvCooldown = (TextView) findViewById(R.id.tvCooldown);
         tvDeadband = (TextView) findViewById(R.id.tvDeadband);
+        if (!settings.holyGrail) {
+            findViewById(R.id.divider2).setVisibility(View.GONE);
+            findViewById(R.id.textView4).setVisibility(View.GONE);
+            findViewById(R.id.tlHolyGrail).setVisibility(View.GONE);
+        }
         //end Holy Grail
 
         if (settings.useCurrentExposure){
@@ -480,7 +485,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         shotCount++;
         shotsSinceLastChange++;
 
-        exposureLevelList.add(exposureLevel);
+        if (settings.holyGrail)
+            exposureLevelList.add(exposureLevel);
 
         runOnUiThread(new Runnable() {
             @Override
