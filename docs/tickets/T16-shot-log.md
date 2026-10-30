@@ -8,7 +8,7 @@ Make every run self-describing, so that timing and exposure problems can be diag
 ## Design
 - `TIMELPS/LOG.CSV`, appended and flushed every 10 rows and on stop. Columns:
 
-  `run_id,slot,scheduled_ms,actual_ms,capture_done_ms,result(FIRE|SKIP),skip_reason,ss,iso,ev,bracket_idx,battery_pct,free_mb`
+  `run_id,slot,scheduled_ms,actual_ms,capture_done_ms,result(FIRE|SKIP|SLOT_DONE),skip_reason,ss,iso,ev,bracket_idx,battery_pct,free_mb`
 
   A header row carries the model, firmware, app version and settings JSON.
 - Keep the existing LOG.TXT for exceptions.
@@ -24,7 +24,7 @@ Make every run self-describing, so that timing and exposure problems can be diag
 
 ## Acceptance
 - [ ] Unit test for formatter escaping and header.
-- [ ] `tools/analyze_log.py tests/fixtures/sample.csv` matches the expected output (add the fixture, plus a tiny `tools/test_analyze_log.py`).
+- [ ] `tools/analyze_log.py tests/fixtures/sample.csv` matches `tests/fixtures/sample.expected.txt` (add the fixture, plus a tiny `tools/test_analyze_log.py`).
 - [ ] The writer never blocks the capture thread (writes are handed to a background `HandlerThread`).
 
 ## Inherited from T03

@@ -1,0 +1,14 @@
+run 20261030-090000 (ILCE-6500, 1.4.0 (5))
+  shots: 10 fired, 10 completed
+  drift ms: max 12  mean 4.5  p95 12
+  skips: 2 (BUSY=1, LATE=1)
+  shots/min: 4.9
+  capture ms p95: 360
+  battery: 100% -> 98%  (65.4 %/h)
+run 20261030-100000 (ILCE-6500, 1.4.0 (5))
+  shots: 4 fired, 4 completed
+  drift ms: max 3  mean 1.5  p95 3
+  skips: 0
+  shots/min: 12.0
+  capture ms p95: 180
+  battery: 90% -> 90%  (0.0 %/h)
