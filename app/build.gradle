@@ -40,10 +40,6 @@ android {
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.compilerArgs << '-Xlint:-options'
-}
-
 dependencies {
     compileOnly files('libs/openmemories-stubs-f8df350.jar')
     implementation files('libs/openmemories-framework-f8df350.jar')
