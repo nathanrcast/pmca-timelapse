@@ -82,7 +82,7 @@ class MainTests(unittest.TestCase):
         rc, out, _ = run_main(path)
         self.assertEqual(1, rc)
         self.assertIn("dalvik", out)
-        self.assertIn("MONOTONIC GROWTH", out)
+        self.assertIn("GROWTH", out)
         self.assertIn("kB/h", out)
 
     def test_monotonic_growth_below_threshold_passes(self):
@@ -93,10 +93,22 @@ class MainTests(unittest.TestCase):
         path = write_temp(self, log([old_block(9000 + i * 10, 5000) for i in range(8)]))
         self.assertEqual(1, run_main(path, "--threshold-kb", "50")[0])
 
-    def test_growth_that_shrinks_once_is_not_monotonic(self):
-        vals = [5000, 6000, 7000, 6500, 8000, 9000, 10000, 11000]
+    def test_a_leak_with_one_gc_dip_still_fails(self):
+        vals = [3000, 4500, 4400, 6000, 8000, 10000]
+        path = write_temp(self, log([old_block(9000, v) for v in vals]))
+        rc, out, _ = run_main(path)
+        self.assertEqual(1, rc)
+        self.assertIn("dalvik", out)
+
+    def test_sawtooth_around_a_flat_level_passes(self):
+        vals = [5000, 7000, 5100, 7100, 5000, 7200, 5100, 7000]
         path = write_temp(self, log([old_block(9000, v) for v in vals]))
         self.assertEqual(0, run_main(path)[0])
+
+    def test_quartile_rule_catches_a_step_the_slope_underrates(self):
+        vals = [5000] * 6 + [8000] * 2
+        path = write_temp(self, log([old_block(9000, v) for v in vals]))
+        self.assertEqual(1, run_main(path)[0])
 
     def test_newer_format_native_growth_fails(self):
         path = write_temp(self, log([new_block(4000 + i * 800, 3000) for i in range(6)]))

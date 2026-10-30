@@ -33,7 +33,7 @@ case "$target" in
 esac
 
 if [ "$dry" -eq 1 ]; then
-  echo "would append to $LOG every $interval min:"
+  echo "would append to $LOG every $((10#$interval)) min:"
   echo "  $ADB connect $target"
   echo "  $ADB -s $target shell dumpsys meminfo $PKG"
   exit 0
@@ -54,5 +54,5 @@ while true; do
     echo "$out"
   } >> "$LOG"
   echo "$stamp sampled ($(printf '%s\n' "$out" | wc -l) lines)"
-  sleep "$((interval * 60))"
+  sleep "$((10#$interval * 60))"
 done
