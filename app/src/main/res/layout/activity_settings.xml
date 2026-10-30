@@ -108,7 +108,8 @@
 
                 <TextView
                     android:id="@+id/tvDurationValue"
-                    android:layout_width="50dp"
+                    android:minWidth="50dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_centerVertical="true"
                     android:layout_marginRight="10dp"
@@ -118,7 +119,7 @@
 
                 <TextView
                     android:id="@+id/tvDurationUnit"
-                    android:layout_width="35dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentTop="true"
                     android:layout_centerVertical="true"

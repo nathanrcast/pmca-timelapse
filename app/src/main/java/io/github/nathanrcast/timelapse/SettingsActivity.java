@@ -600,14 +600,8 @@ public class SettingsActivity extends BaseActivity
             videoTime = settings.shotCount / fps;
         }
 
-        if(duration < 60) {
-            tvDurationValue.setText("" + duration);
-            tvDurationUnit.setText("s");
-        }
-        else {
-            tvDurationValue.setText("" + (duration / 60));
-            tvDurationUnit.setText("min");
-        }
+        tvDurationValue.setText(Util.formatTime(duration));
+        tvDurationUnit.setText("");
 
         if(videoTime == -1) {
             tvVideoTimeValue.setText("");

@@ -73,6 +73,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private Display display;
 
+    private String savedFocusMode;
+
     int getcnt(){
         if(settings.brs){
             return 3;
@@ -97,7 +99,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             if(burstShooting) {
                 shoot();
             }
-            else if(shotCount < settings.shotCount * getcnt()) {
+            else if(shotCount < (long) settings.shotCount * getcnt()) {
                 long remainingTime = Math.round(shootTime + settings.interval * 1000 - System.currentTimeMillis());
                 if(brck.get()>0){
                     remainingTime = -1;
@@ -121,6 +123,16 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                         onBackPressed();
                     }
                 });
+            }
+        }
+    };
+
+    private final Runnable delayCountdownRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (delaySecondsRemaining() > 0) {
+                updateScreen();
+                shootRunnableHandler.postDelayed(this, 1000);
             }
         }
     };
@@ -213,8 +225,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         final Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
 
         try {
-            if(settings.mf)
+            if(settings.mf) {
+                savedFocusMode = params.getFocusMode();
                 params.setFocusMode(CameraEx.ParametersModifier.FOCUS_MODE_MANUAL);
+            }
             else
                 params.setFocusMode("auto");
         }
@@ -275,6 +289,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         shotCount = 0;
         shootRunnableHandler.postDelayed(shootRunnable, (long) settings.delay * 1000 * 60);
         shootStartTime = System.currentTimeMillis() + settings.delay * 1000 * 60;
+
+        if (settings.delay > 0) {
+            shootRunnableHandler.post(delayCountdownRunnable);
+        }
 
         if(burstShooting) {
             manualShutterCallbackCallRunnableHandler.postDelayed(manualShutterCallbackCallRunnable, 500);
@@ -355,8 +373,19 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("ISOLevelIndex: " + ISOLevelIndex);
     }
 
+    private long delaySecondsRemaining() {
+        if (shotCount != 0 || shootStartTime <= 0)
+            return 0;
+        long ms = shootStartTime - System.currentTimeMillis();
+        return ms > 0 ? (ms + 999) / 1000 : 0;
+    }
+
     private void updateScreen(){
-        tvCount.setText(Integer.toString(shotCount)+"/"+Integer.toString(settings.shotCount * getcnt()));
+        long delaySeconds = delaySecondsRemaining();
+        if (delaySeconds > 0)
+            tvCount.setText("Delay: " + Util.formatTime(delaySeconds));
+        else
+            tvCount.setText(Integer.toString(shotCount)+"/"+Long.toString((long) settings.shotCount * getcnt()));
         tvRemaining.setText(getRemainingTime());
         tvBattery.setText(getBatteryPercentage());
 
@@ -404,6 +433,17 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("on pause");
 
         shootRunnableHandler.removeCallbacks(shootRunnable);
+        shootRunnableHandler.removeCallbacks(delayCountdownRunnable);
+
+        // Restore the focus mode the camera had before MF was forced
+        if (savedFocusMode != null && cameraEx != null) {
+            try {
+                Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
+                params.setFocusMode(savedFocusMode);
+                cameraEx.getNormalCamera().setParameters(params);
+            } catch (Exception ignored) {}
+        }
+        savedFocusMode = null;
 
         if(cameraSurfaceHolder == null)
             log("cameraSurfaceHolder == null");
@@ -571,7 +611,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             });
 
             // just keep shooting until we have all shots
-            if (System.currentTimeMillis() >= shootStartTime + settings.shotCount * 1000) {
+            if (System.currentTimeMillis() >= shootStartTime + (long) settings.shotCount * 1000) {
                 this.cameraEx.cancelTakePicture();
                 stopPicturePreview = true;
                 display.on();
@@ -592,7 +632,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
             //camera.startPreview();
 
-            if (shotCount < settings.shotCount * getcnt()) {
+            if (shotCount < (long) settings.shotCount * getcnt()) {
 
                 // remaining time to the next shot
                 double remainingTime = shootTime + settings.interval * 1000 - System.currentTimeMillis();
@@ -645,10 +685,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private String getRemainingTime() {
+        long seconds;
         if(burstShooting)
-            return "" + Math.round((settings.shotCount * 1000 - System.currentTimeMillis() + shootStartTime) / 1000) + "s";
-        else
-            return "" + Math.round((settings.shotCount * getcnt() - shotCount) * settings.interval / 60) + "min";
+            seconds = Math.round(((long) settings.shotCount * 1000 - System.currentTimeMillis() + shootStartTime) / 1000.0);
+        else {
+            // bracketed frames are taken back to back within one interval
+            long intervalsLeft = settings.shotCount - shotCount / getcnt();
+            seconds = Math.round(intervalsLeft * settings.interval) + delaySecondsRemaining();
+        }
+        return Util.formatTime(seconds);
     }
 
     @Override
@@ -691,6 +736,4 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             log("null");
         log("\n");
     }
-
-
 }
