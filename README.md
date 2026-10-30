@@ -46,7 +46,7 @@ Needs a JDK 17+ and the Android SDK with platform 34 (`sdk.dir` in `local.proper
 
 ## Credits
 
-- [ma1co](https://github.com/ma1co) — [OpenMemories-Framework](https://github.com/ma1co/OpenMemories-Framework) (MIT; built against commit `f8df350`), Sony-PMCA-RE, OpenMemories-Tweak
+- [ma1co](https://github.com/ma1co) — [OpenMemories-Framework](https://github.com/ma1co/OpenMemories-Framework) (MIT; vendored at commit `f8df350` in [app/libs/](app/libs/README.md)), Sony-PMCA-RE, OpenMemories-Tweak
 - [obs1dium](https://github.com/obs1dium) — FocusBracket, the original code base
 - [jonasjuffinger](https://github.com/jonasjuffinger) — TimeLapse
 - [Frosbe](https://github.com/Frosbe) — holy-grail ramping

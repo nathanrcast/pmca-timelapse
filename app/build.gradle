@@ -51,7 +51,6 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-    def omf = 'f8df350'
-    compileOnly "com.github.ma1co.OpenMemories-Framework:stubs:$omf"
-    implementation "com.github.ma1co.OpenMemories-Framework:framework:$omf"
+    compileOnly files('libs/openmemories-stubs-f8df350.jar')
+    implementation files('libs/openmemories-framework-f8df350.jar')
 }

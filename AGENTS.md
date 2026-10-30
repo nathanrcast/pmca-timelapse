@@ -15,7 +15,7 @@ python3 tools/analyze_log.py <LOG.CSV>                                          
 - Outputs: `app/build/outputs/apk/debug/TimeLapsePlus-debug-<versionName>.apk` (debug-signed, v1+v2) and `app/build/outputs/apk/release/TimeLapsePlus-release-<versionName>.apk` (unsigned until T18). Lint report: `app/build/reports/lint-results-debug.html`.
 - Check an APK: `$ANDROID_HOME/build-tools/34.0.0/aapt dump badging <apk> | head -3` must show package `io.github.nathanrcast.timelapse`, `sdkVersion:'10'` and `targetSdkVersion:'10'`. `unzip -p <apk> classes.dex | head -c 8 | od -c` must read `dex\n035`, the only dex version Dalvik 2.3 loads.
 - Release `minifyEnabled` is off on purpose, so debug and release go through the same D8 path. The R8 keep rules in `app/proguard-rules.pro` are kept ready for when it is turned back on.
-- OpenMemories-Framework is pinned to jitpack `f8df350`. `stubs` must stay `compileOnly`: the `com.sony.*` classes come from the camera firmware, and packaging the stubs would shadow them.
+- OpenMemories-Framework is vendored in `app/libs/` at commit `f8df350` (sha256s in `app/libs/README.md`); there is no jitpack dependency. `stubs` must stay `compileOnly`: the `com.sony.*` classes come from the camera firmware, and packaging the stubs would shadow them.
 
 ## Layout
 
