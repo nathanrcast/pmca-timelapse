@@ -14,11 +14,11 @@ public class SettingsTest {
     public void defaults() {
         Settings s = new Settings();
         assertEquals(1.0, s.interval, 0);
-        assertEquals(1, s.rawInterval);
+        assertEquals(1000, StepTables.INTERVAL_MS.value(s.intervalIndex));
         assertEquals(0, s.delay);
-        assertEquals(0, s.rawDelay);
-        assertEquals(1, s.shotCount);
-        assertEquals(1, s.rawShotCount);
+        assertEquals(0, s.delayIndex);
+        assertEquals(10, s.shotCount);
+        assertEquals(0, s.shotsIndex);
         assertFalse(s.displayOff);
         assertTrue(s.silentShutter);
         assertTrue(s.ael);
@@ -37,16 +37,13 @@ public class SettingsTest {
         assertFalse(s.holyGrailAllowExposureDown);
     }
 
-    // Existing installs hold these exact keys and types; renaming one silently resets that setting.
+    // Renaming a key silently resets that setting; interval, shots and delay persist values, not positions.
     @Test
-    public void saveWritesTheExistingKeysAndEncodings() {
+    public void saveWritesTheKeysAndEncodings() {
         Settings s = new Settings();
-        s.rawInterval = 7;
-        s.interval = 4.0;
-        s.rawShotCount = 21;
-        s.shotCount = 25;
-        s.rawDelay = 3;
-        s.delay = 3;
+        s.intervalIndex = StepTables.INTERVAL_MS.nearestIndex(4000);
+        s.shotsIndex = StepTables.SHOTS.nearestIndex(250);
+        s.delayIndex = StepTables.DELAY_MIN.nearestIndex(3);
         s.silentShutter = false;
         s.ael = false;
         s.fps = 2;
@@ -68,9 +65,9 @@ public class SettingsTest {
         s.save(store);
 
         Map<String, Object> expected = new TreeMap<String, Object>();
-        expected.put("interval", 7);
-        expected.put("shotCount", 21);
-        expected.put("delay", 3);
+        expected.put("intervalMs", 4000);
+        expected.put("shots", 250);
+        expected.put("delayMin", 3);
         expected.put("silentShutter", false);
         expected.put("ael", false);
         expected.put("fps", 2);
@@ -94,9 +91,9 @@ public class SettingsTest {
     @Test
     public void loadRestoresWhatSaveWrote() {
         Settings saved = new Settings();
-        saved.rawInterval = SliderMapping.INTERVAL_MAX;
-        saved.rawShotCount = SliderMapping.SHOTS_MAX;
-        saved.rawDelay = SliderMapping.DELAY_MAX;
+        saved.intervalIndex = StepTables.INTERVAL_MS.maxIndex();
+        saved.shotsIndex = StepTables.SHOTS.maxIndex();
+        saved.delayIndex = StepTables.DELAY_MIN.maxIndex();
         saved.fps = 6;
         saved.brs = false;
         saved.holyGrail = true;
@@ -132,20 +129,20 @@ public class SettingsTest {
     @Test
     public void clampLeavesEveryValueTheScreenCanWrite() {
         Settings s = new Settings();
-        for (int raw = 0; raw <= SliderMapping.INTERVAL_MAX; raw++) {
-            s.rawInterval = raw;
+        for (int i = 0; i < StepTables.INTERVAL_MS.size(); i++) {
+            s.intervalIndex = i;
             s.clamp();
-            assertEquals(raw, s.rawInterval);
+            assertEquals(i, s.intervalIndex);
         }
-        for (int raw = 0; raw <= SliderMapping.SHOTS_MAX; raw++) {
-            s.rawShotCount = raw;
+        for (int i = 0; i < StepTables.SHOTS.size(); i++) {
+            s.shotsIndex = i;
             s.clamp();
-            assertEquals(raw, s.rawShotCount);
+            assertEquals(i, s.shotsIndex);
         }
-        for (int raw = 0; raw <= SliderMapping.DELAY_MAX; raw++) {
-            s.rawDelay = raw;
+        for (int i = 0; i < StepTables.DELAY_MIN.size(); i++) {
+            s.delayIndex = i;
             s.clamp();
-            assertEquals(raw, s.rawDelay);
+            assertEquals(i, s.delayIndex);
         }
         for (int p = 0; p <= SliderMapping.TARGET_EXPOSURE_MAX; p++) {
             s.targetExposure = SliderMapping.progressToTargetExposure(p);
@@ -179,9 +176,9 @@ public class SettingsTest {
     @Test
     public void loadClampsCorruptValuesIntoRange() {
         MapSettingsStore store = new MapSettingsStore();
-        store.values.put("interval", 500);
-        store.values.put("shotCount", -3);
-        store.values.put("delay", 40);
+        store.values.put("intervalMs", 99999999);
+        store.values.put("shots", 3);
+        store.values.put("delayMin", 100000);
         store.values.put("targetExposure", -90);
         store.values.put("maxShutterSpeedIndex", 99);
         store.values.put("maxIsoIndex", -1);
@@ -191,38 +188,52 @@ public class SettingsTest {
 
         Settings s = new Settings();
         s.load(store);
-        assertEquals(SliderMapping.INTERVAL_MAX, s.rawInterval);
-        assertEquals(0, s.rawShotCount);
-        assertEquals(SliderMapping.DELAY_MAX, s.rawDelay);
+        assertEquals(StepTables.INTERVAL_MS.maxIndex(), s.intervalIndex);
+        assertEquals(0, s.shotsIndex);
+        assertEquals(StepTables.DELAY_MIN.maxIndex(), s.delayIndex);
         assertEquals(-30, s.targetExposure);
         assertEquals(Util.SHUTTER_SPEEDS.length - 1, s.maxShutterSpeedIndex);
         assertEquals(0, s.maxISOIndex);
         assertEquals(1, s.cooldown);
         assertEquals(SliderMapping.COUNT_MAX + 1, s.averageExposureAmount);
         assertEquals(Util.DEADBAND_VALUES.length - 1, s.deadbandIndex);
-        assertEquals(2280.0, s.interval, 0);
-        assertEquals(1, s.shotCount);
-        assertEquals(1440, s.delay);
+        assertEquals(300.0, s.interval, 0);
+        assertEquals(10, s.shotCount);
+        assertEquals(60, s.delay);
     }
 
     @Test
-    public void loadDerivesIntervalShotsAndDelayFromTheSliderPositions() {
+    public void loadDerivesIntervalShotsAndDelayFromTheSavedValues() {
         MapSettingsStore store = new MapSettingsStore();
-        store.values.put("interval", 0);
-        store.values.put("shotCount", SliderMapping.SHOTS_MAX);
-        store.values.put("delay", 6);
+        store.values.put("intervalMs", 0);
+        store.values.put("shots", Settings.SHOTS_INFINITE);
+        store.values.put("delayMin", 10);
         Settings s = new Settings();
         s.load(store);
         assertEquals(0.0, s.interval, 0);
         assertEquals(Settings.SHOTS_INFINITE, s.shotCount);
         assertEquals(10, s.delay);
 
-        s.rawInterval = 92;
-        s.rawShotCount = 36;
-        s.rawDelay = 39;
-        s.deriveFromRaw();
-        assertEquals(660.0, s.interval, 0);
-        assertEquals(120, s.shotCount);
-        assertEquals(1440, s.delay);
+        s.intervalIndex = StepTables.INTERVAL_MS.nearestIndex(500);
+        s.shotsIndex = StepTables.SHOTS.nearestIndex(130);
+        s.delayIndex = StepTables.DELAY_MIN.maxIndex();
+        s.deriveFromIndex();
+        assertEquals(0.5, s.interval, 0);
+        assertEquals(150, s.shotCount);
+        assertEquals(60, s.delay);
+    }
+
+    @Test
+    public void loadSnapsSavedValuesToTheNearestEntry() {
+        MapSettingsStore store = new MapSettingsStore();
+        store.values.put("intervalMs", 7100);
+        store.values.put("shots", 480);
+        store.values.put("delayMin", 33);
+        Settings s = new Settings();
+        s.load(store);
+        assertEquals(8.0, s.interval, 0);
+        assertEquals(500, s.shotCount);
+        assertEquals(30, s.delay);
+        assertEquals(0, store.applies);
     }
 }

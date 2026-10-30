@@ -4,14 +4,20 @@ package io.github.nathanrcast.timelapse.core;
  * Created by jonas on 2/18/17.
  */
 
-// The shoot options. Interval, shots and delay persist only their raw slider positions, and
-// interval/shotCount/delay are derived from them. The keys and encodings are what existing installs hold.
+// The shoot options. Interval, shots and delay are indices into StepTables (what the seek bars hold) and
+// interval/shotCount/delay are the values derived from them. They persist as values under the *_VALUE keys;
+// installs that only hold the old raw slider positions are migrated on load.
 public final class Settings {
     public static final int SHOTS_INFINITE = Integer.MAX_VALUE;
 
-    static final String KEY_INTERVAL = "interval";
-    static final String KEY_SHOT_COUNT = "shotCount";
-    static final String KEY_DELAY = "delay";
+    static final String KEY_INTERVAL_MS = "intervalMs";
+    static final String KEY_SHOTS = "shots";
+    static final String KEY_DELAY_MIN = "delayMin";
+    // Pre-T10 raw slider positions. Read once by load() to migrate, never written.
+    static final String LEGACY_KEY_INTERVAL = "interval";
+    static final String LEGACY_KEY_SHOT_COUNT = "shotCount";
+    static final String LEGACY_KEY_DELAY = "delay";
+    private static final int ABSENT = -1;
     static final String KEY_SILENT_SHUTTER = "silentShutter";
     static final String KEY_AEL = "ael";
     static final String KEY_FPS = "fps";
@@ -31,8 +37,9 @@ public final class Settings {
 
     public double interval;     // seconds; 0 = burst
     public int delay;           // minutes
-    public int rawInterval, rawDelay;
-    public int shotCount, rawShotCount;     // burst: shotCount is the burst length in seconds
+    public int shotCount;       // burst: the burst length in seconds
+    // Positions in StepTables.INTERVAL_MS / SHOTS / DELAY_MIN; call deriveFromIndex() after changing one.
+    public int intervalIndex, shotsIndex, delayIndex;
     public boolean displayOff;
     public boolean silentShutter;
     public boolean ael;
@@ -51,12 +58,10 @@ public final class Settings {
     public boolean holyGrailAllowExposureDown;
 
     public Settings() {
-        interval = 1;
-        rawInterval = 1;
-        delay = 0;
-        rawDelay = 0;
-        shotCount = 1;
-        rawShotCount = 1;
+        intervalIndex = StepTables.INTERVAL_MS.nearestIndex(1000);
+        shotsIndex = 0;
+        delayIndex = 0;
+        deriveFromIndex();
         displayOff = false;
         silentShutter = true;
         ael = true;
@@ -77,9 +82,9 @@ public final class Settings {
 
     public void save(SettingsStore store) {
         store.edit()
-                .putInt(KEY_INTERVAL, rawInterval)
-                .putInt(KEY_SHOT_COUNT, rawShotCount)
-                .putInt(KEY_DELAY, rawDelay)
+                .putInt(KEY_INTERVAL_MS, (int) StepTables.INTERVAL_MS.value(intervalIndex))
+                .putInt(KEY_SHOTS, (int) StepTables.SHOTS.value(shotsIndex))
+                .putInt(KEY_DELAY_MIN, (int) StepTables.DELAY_MIN.value(delayIndex))
                 .putBoolean(KEY_SILENT_SHUTTER, silentShutter)
                 .putBoolean(KEY_AEL, ael)
                 .putInt(KEY_FPS, fps)
@@ -101,9 +106,7 @@ public final class Settings {
 
     // Missing keys keep the current values.
     public void load(SettingsStore store) {
-        rawInterval = store.getInt(KEY_INTERVAL, rawInterval);
-        rawShotCount = store.getInt(KEY_SHOT_COUNT, rawShotCount);
-        rawDelay = store.getInt(KEY_DELAY, rawDelay);
+        boolean migrated = loadSteps(store);
         silentShutter = store.getBoolean(KEY_SILENT_SHUTTER, silentShutter);
         ael = store.getBoolean(KEY_AEL, ael);
         fps = store.getInt(KEY_FPS, fps);
@@ -121,21 +124,63 @@ public final class Settings {
         holyGrailAllowExposureUp = store.getBoolean(KEY_HOLY_GRAIL_ALLOW_EXPOSURE_UP, holyGrailAllowExposureUp);
         holyGrailAllowExposureDown = store.getBoolean(KEY_HOLY_GRAIL_ALLOW_EXPOSURE_DOWN, holyGrailAllowExposureDown);
         clamp();
-        deriveFromRaw();
+        deriveFromIndex();
+        if (migrated)
+            saveSteps(store);
     }
 
-    public void deriveFromRaw() {
-        interval = SliderMapping.progressToInterval(rawInterval);
-        shotCount = SliderMapping.progressToShotCount(rawShotCount);
-        delay = SliderMapping.progressToDelay(rawDelay);
+    // Each of the three comes from its value key, else from the old raw position (converted with the old mapping and
+    // snapped to the nearest table entry), else keeps the current one. True if any came from an old key.
+    private boolean loadSteps(SettingsStore store) {
+        boolean migrated = false;
+        int ms = store.getInt(KEY_INTERVAL_MS, ABSENT);
+        int legacy = store.getInt(LEGACY_KEY_INTERVAL, ABSENT);
+        if (ms != ABSENT) {
+            intervalIndex = StepTables.INTERVAL_MS.nearestIndex(ms);
+        } else if (legacy != ABSENT) {
+            long legacyMs = Math.round(LegacySliderMapping.progressToInterval(legacy) * 1000);
+            intervalIndex = StepTables.INTERVAL_MS.nearestIndex(legacyMs);
+            migrated = true;
+        }
+        int shots = store.getInt(KEY_SHOTS, ABSENT);
+        legacy = store.getInt(LEGACY_KEY_SHOT_COUNT, ABSENT);
+        if (shots != ABSENT) {
+            shotsIndex = StepTables.SHOTS.nearestIndex(shots);
+        } else if (legacy != ABSENT) {
+            shotsIndex = StepTables.SHOTS.nearestIndex(LegacySliderMapping.progressToShotCount(legacy));
+            migrated = true;
+        }
+        int min = store.getInt(KEY_DELAY_MIN, ABSENT);
+        legacy = store.getInt(LEGACY_KEY_DELAY, ABSENT);
+        if (min != ABSENT) {
+            delayIndex = StepTables.DELAY_MIN.nearestIndex(min);
+        } else if (legacy != ABSENT) {
+            delayIndex = StepTables.DELAY_MIN.nearestIndex(LegacySliderMapping.progressToDelay(legacy));
+            migrated = true;
+        }
+        return migrated;
+    }
+
+    private void saveSteps(SettingsStore store) {
+        store.edit()
+                .putInt(KEY_INTERVAL_MS, (int) StepTables.INTERVAL_MS.value(intervalIndex))
+                .putInt(KEY_SHOTS, (int) StepTables.SHOTS.value(shotsIndex))
+                .putInt(KEY_DELAY_MIN, (int) StepTables.DELAY_MIN.value(delayIndex))
+                .apply();
+    }
+
+    public void deriveFromIndex() {
+        interval = StepTables.INTERVAL_MS.value(intervalIndex) / 1000.0;
+        shotCount = (int) StepTables.SHOTS.value(shotsIndex);
+        delay = (int) StepTables.DELAY_MIN.value(delayIndex);
     }
 
     // Pulls persisted values into the ranges the sliders and step tables can show. Every value
     // the settings screen writes is already in range, so this only changes corrupt stores.
     public void clamp() {
-        rawInterval = SliderMapping.clamp(rawInterval, 0, SliderMapping.INTERVAL_MAX);
-        rawShotCount = SliderMapping.clamp(rawShotCount, 0, SliderMapping.SHOTS_MAX);
-        rawDelay = SliderMapping.clamp(rawDelay, 0, SliderMapping.DELAY_MAX);
+        intervalIndex = StepTables.INTERVAL_MS.clamp(intervalIndex);
+        shotsIndex = StepTables.SHOTS.clamp(shotsIndex);
+        delayIndex = StepTables.DELAY_MIN.clamp(delayIndex);
         int halfTarget = SliderMapping.TARGET_EXPOSURE_MAX / 2;
         targetExposure = SliderMapping.clamp(targetExposure, -halfTarget, halfTarget);
         maxShutterSpeedIndex = SliderMapping.clamp(maxShutterSpeedIndex, 0, Util.SHUTTER_SPEEDS.length - 1);

@@ -181,10 +181,10 @@ public class ShotPlanTest {
     // SettingsActivity.updateTimes.
     @Test
     public void settingsScreenMathMatchesTheOldInlineCode() {
-        for (int rawInterval = 0; rawInterval <= SliderMapping.INTERVAL_MAX; rawInterval++) {
-            double interval = SliderMapping.progressToInterval(rawInterval);
-            for (int rawShots = 0; rawShots <= SliderMapping.SHOTS_MAX; rawShots++) {
-                int shots = SliderMapping.progressToShotCount(rawShots);
+        for (int rawInterval = 0; rawInterval <= LegacySliderMapping.INTERVAL_MAX; rawInterval++) {
+            double interval = LegacySliderMapping.progressToInterval(rawInterval);
+            for (int rawShots = 0; rawShots <= LegacySliderMapping.SHOTS_MAX; rawShots++) {
+                int shots = LegacySliderMapping.progressToShotCount(rawShots);
                 for (boolean brs : new boolean[]{false, true}) {
                     ShotPlan plan = new ShotPlan(interval, shots, 0, brs ? 3 : 1);
                     assertEquals(shots == Integer.MAX_VALUE, plan.isInfinite());
@@ -209,9 +209,9 @@ public class ShotPlanTest {
         int[] delays = {0, 1, 5, 60, 1440};
         long[] offsets = {-200000, -60001, -1000, -999, -1, 0, 1, 999, 1000, 4321, 90000, 86400000};
         for (int ri : rawIntervals) {
-            double interval = SliderMapping.progressToInterval(ri);
+            double interval = LegacySliderMapping.progressToInterval(ri);
             for (int rs : rawShots) {
-                int shots = SliderMapping.progressToShotCount(rs);
+                int shots = LegacySliderMapping.progressToShotCount(rs);
                 for (int delay : delays) {
                     for (boolean brs : new boolean[]{false, true}) {
                         int cnt = brs ? 3 : 1;
@@ -253,5 +253,20 @@ public class ShotPlanTest {
             return Math.round(((long) settingsShotCount * 1000 - now + shootStartTime) / 1000.0);
         long intervalsLeft = settingsShotCount - shotCount / cnt;
         return Math.round(intervalsLeft * interval) + legacyDelaySeconds(shotCount, shootStartTime, now);
+    }
+
+    @Test
+    public void halfSecondIntervalPlansWithoutRoundingError() {
+        Settings s = new Settings();
+        s.intervalIndex = StepTables.INTERVAL_MS.nearestIndex(500);
+        s.shotsIndex = StepTables.SHOTS.nearestIndex(100);
+        s.deriveFromIndex();
+        s.brs = false;
+        ShotPlan plan = ShotPlan.of(s);
+        assertEquals(0.5, s.interval, 0);
+        assertEquals(50, plan.durationSeconds());
+        assertEquals(50000, plan.endMs(0));
+        assertEquals(25, plan.secondsRemaining(1000, 1000, 50));
+        assertEquals(4, plan.clipSeconds(25));
     }
 }
