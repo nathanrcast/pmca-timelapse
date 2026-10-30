@@ -125,10 +125,10 @@ public class ShotPlanTest {
     // SettingsActivity.updateTimes.
     @Test
     public void settingsScreenMathMatchesTheOldInlineCode() {
-        for (int rawInterval = 0; rawInterval <= SliderMapping.INTERVAL_MAX; rawInterval++) {
-            double interval = SliderMapping.progressToInterval(rawInterval);
-            for (int rawShots = 0; rawShots <= SliderMapping.SHOTS_MAX; rawShots++) {
-                int shots = SliderMapping.progressToShotCount(rawShots);
+        for (int rawInterval = 0; rawInterval <= LegacySliderMapping.INTERVAL_MAX; rawInterval++) {
+            double interval = LegacySliderMapping.progressToInterval(rawInterval);
+            for (int rawShots = 0; rawShots <= LegacySliderMapping.SHOTS_MAX; rawShots++) {
+                int shots = LegacySliderMapping.progressToShotCount(rawShots);
                 for (boolean brs : new boolean[]{false, true}) {
                     ShotPlan plan = new ShotPlan(interval, shots, 0, brs ? 3 : 1);
                     assertEquals(shots == Integer.MAX_VALUE, plan.isInfinite());
@@ -143,5 +143,20 @@ public class ShotPlanTest {
                 }
             }
         }
+    }
+
+    @Test
+    public void halfSecondIntervalPlansWithoutRoundingError() {
+        Settings s = new Settings();
+        s.intervalIndex = StepTables.INTERVAL_MS.nearestIndex(500);
+        s.shotsIndex = StepTables.SHOTS.nearestIndex(100);
+        s.deriveFromIndex();
+        s.brs = false;
+        ShotPlan plan = ShotPlan.of(s);
+        assertEquals(0.5, s.interval, 0);
+        assertEquals(500, plan.intervalMs());
+        assertEquals(50, plan.durationSeconds());
+        assertEquals(50000, plan.endMs(0));
+        assertEquals(4, plan.clipSeconds(25));
     }
 }

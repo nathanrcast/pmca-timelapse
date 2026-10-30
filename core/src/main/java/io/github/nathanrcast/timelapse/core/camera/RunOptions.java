@@ -1,7 +1,7 @@
 package io.github.nathanrcast.timelapse.core.camera;
 
 import io.github.nathanrcast.timelapse.core.Settings;
-import io.github.nathanrcast.timelapse.core.SliderMapping;
+import io.github.nathanrcast.timelapse.core.StepTables;
 import io.github.nathanrcast.timelapse.core.camera.OptionVisibility.FocusControl;
 
 import java.util.ArrayList;
@@ -11,32 +11,32 @@ import java.util.List;
 // What one run asks of the camera, after masking the options this body lacks. The single capability gate:
 // SafeCamera.configure applies a RunOptions as given.
 public final class RunOptions {
-    // Slider position 1, the shortest interval that isn't burst.
-    static final int SHORTEST_INTERVAL_PROGRESS = 1;
+    // The interval a body without burst runs at instead (1 s, the shortest the pre-T10 slider offered).
+    static final long FALLBACK_INTERVAL_MS = 1000;
 
     public final boolean burst;
     // null: the body has no silent shutter, so the run leaves it alone. Otherwise it is set either way.
     public final Boolean silentShutter;
     public final boolean aeLock;
-    public final boolean bracket3;
+    public final BracketPlan bracket;
     public final boolean holyGrail;
     // NONE when MF is off for the run.
     public final FocusControl focus;
     private final List<String> masked;
 
-    private RunOptions(boolean burst, Boolean silentShutter, boolean aeLock, boolean bracket3, boolean holyGrail,
+    private RunOptions(boolean burst, Boolean silentShutter, boolean aeLock, BracketPlan bracket, boolean holyGrail,
                        FocusControl focus, List<String> masked) {
         this.burst = burst;
         this.silentShutter = silentShutter;
         this.aeLock = aeLock;
-        this.bracket3 = bracket3;
+        this.bracket = bracket;
         this.holyGrail = holyGrail;
         this.focus = focus;
         this.masked = Collections.unmodifiableList(masked);
     }
 
     // Masks the run's copy of the settings (the one from the intent; the saved settings are never passed here) and
-    // returns what the run asks for. Options the body lacks are turned off; burst becomes the shortest interval.
+    // returns what the run asks for. Options the body lacks are turned off; burst becomes a 1 s interval.
     public static RunOptions mask(Capabilities caps, Settings run) {
         OptionVisibility options = OptionVisibility.of(caps);
         List<String> masked = new ArrayList<String>();
@@ -48,10 +48,9 @@ public final class RunOptions {
             run.ael = false;
             masked.add(Feature.AE_LOCK.name());
         }
-        if (run.brs && !options.bracket3()) {
-            run.brs = false;
+        boolean bracketRequested = run.brs;
+        if (bracketRequested && !options.bracket3())
             masked.add(Feature.BRACKET_3.name());
-        }
         if (run.mf && !options.manualFocus()) {
             run.mf = false;
             masked.add("MANUAL_FOCUS");
@@ -61,13 +60,20 @@ public final class RunOptions {
             masked.add(Feature.HOLY_GRAIL.name());
         }
         if (run.interval == 0 && !options.burst()) {
-            run.rawInterval = SHORTEST_INTERVAL_PROGRESS;
-            run.interval = SliderMapping.progressToInterval(SHORTEST_INTERVAL_PROGRESS);
+            // Only the interval changes: the run's copy comes from the intent, whose indices are not the run's values.
+            run.intervalIndex = StepTables.INTERVAL_MS.nearestIndex(FALLBACK_INTERVAL_MS);
+            run.interval = FALLBACK_INTERVAL_MS / 1000.0;
             masked.add(Feature.BURST.name() + " (interval " + run.interval + " s)");
         }
+        // A burst run is never auto-detected as bracketed; the box alone still asks for it.
+        BracketPlan bracket = run.interval == 0 && !bracketRequested ? BracketPlan.off()
+                : BracketPlan.resolve(caps, options.bracket3(), run.brs);
+        if (bracket.unsupportedReason != null)
+            masked.add(Feature.BRACKET_3.name() + " (" + bracket.unsupportedReason + ")");
+        run.brs = bracket.active;
         return new RunOptions(run.interval == 0,
                 options.silentShutter() ? Boolean.valueOf(run.silentShutter) : null,
-                run.ael, run.brs, run.holyGrail,
+                run.ael, bracket, run.holyGrail,
                 run.mf ? options.focusControl() : FocusControl.NONE, masked);
     }
 

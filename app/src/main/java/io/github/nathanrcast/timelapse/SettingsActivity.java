@@ -31,6 +31,7 @@ import io.github.nathanrcast.timelapse.core.ExposureRamp;
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
 import io.github.nathanrcast.timelapse.core.SliderMapping;
+import io.github.nathanrcast.timelapse.core.StepTables;
 import io.github.nathanrcast.timelapse.core.Util;
 
 public class SettingsActivity extends BaseActivity
@@ -220,20 +221,21 @@ public class SettingsActivity extends BaseActivity
         cbMF   = (CheckBox) findViewById(R.id.cbMF);
         cbDOFF = (CheckBox) findViewById(R.id.cbDOFF);
 
-        sbInterval.setMax(SliderMapping.INTERVAL_MAX);
+        // The three bars are indices into core.StepTables.
+        sbInterval.setMax(StepTables.INTERVAL_MS.maxIndex());
         sbInterval.setOnSeekBarChangeListener(sbIntervalOnSeekBarChangeListener);
-        sbInterval.setProgress(settings.rawInterval);
-        sbIntervalOnSeekBarChangeListener.onProgressChanged(sbInterval, settings.rawInterval, false);
+        sbInterval.setProgress(settings.intervalIndex);
+        sbIntervalOnSeekBarChangeListener.onProgressChanged(sbInterval, settings.intervalIndex, false);
 
-        sbShots.setMax(SliderMapping.SHOTS_MAX);
+        sbShots.setMax(StepTables.SHOTS.maxIndex());
         sbShots.setOnSeekBarChangeListener(sbShotsOnSeekBarChangeListener);
-        sbShots.setProgress(settings.rawShotCount);
-        sbShotsOnSeekBarChangeListener.onProgressChanged(sbShots, settings.rawShotCount, false);
+        sbShots.setProgress(settings.shotsIndex);
+        sbShotsOnSeekBarChangeListener.onProgressChanged(sbShots, settings.shotsIndex, false);
 
-        sbDelay.setMax(SliderMapping.DELAY_MAX);
+        sbDelay.setMax(StepTables.DELAY_MIN.maxIndex());
         sbDelay.setOnSeekBarChangeListener(sbDelayOnSeekBarChangeListener);
-        sbDelay.setProgress(settings.rawDelay);
-        sbDelayOnSeekBarChangeListener.onProgressChanged(sbDelay, settings.rawDelay, false);
+        sbDelay.setProgress(settings.delayIndex);
+        sbDelayOnSeekBarChangeListener.onProgressChanged(sbDelay, settings.delayIndex, false);
 
         spnFps.setSelection(settings.fps);
         spnFps.setOnItemSelectedListener(spnFpsOnItemSelectedListener);
@@ -455,8 +457,8 @@ public class SettingsActivity extends BaseActivity
             = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            settings.rawInterval = i;
-            settings.interval = SliderMapping.progressToInterval(i);
+            settings.intervalIndex = i;
+            settings.deriveFromIndex();
             showIntervalText();
 
             if(settings.interval == 0)
@@ -475,8 +477,8 @@ public class SettingsActivity extends BaseActivity
     sbShotsOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            settings.rawShotCount = i;
-            settings.shotCount = SliderMapping.progressToShotCount(i);
+            settings.shotsIndex = i;
+            settings.deriveFromIndex();
             tvShotsValue.setText(SliderMapping.shotCountText(settings.shotCount));
             updateTimes();
         }
@@ -489,8 +491,8 @@ public class SettingsActivity extends BaseActivity
     sbDelayOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            settings.rawDelay = i;
-            settings.delay = SliderMapping.progressToDelay(i);
+            settings.delayIndex = i;
+            settings.deriveFromIndex();
             tvDelayValue.setText(SliderMapping.delayText(settings.delay));
             tvDelayUnit.setText(SliderMapping.delayUnit(settings.delay));
 
@@ -623,55 +625,40 @@ public class SettingsActivity extends BaseActivity
         }
     }
 
+    // Every dial and the control wheel does the same thing: next/previous value of the focused setting. Up/down
+    // move focus through the default focus search, and left/right step a focused bar through AdvancedSeekBar,
+    // so all of them work on a body whose wheel is unreliable.
     protected boolean onUpperDialChanged(int value) {
-        sbInterval.dialChanged(value);
-        sbShots.dialChanged(value);
-        sbDelay.dialChanged(value);
-        sbTargetExposure.dialChanged(value);
-        sbMaxShutterSpeed.dialChanged(value);
-        sbMaxISO.dialChanged(value);
-        sbCooldown.dialChanged(value);
-        sbAverageAmount.dialChanged(value);
-        sbDeadbandIndex.dialChanged(value);
-        return true;
+        return dialStep(value);
     }
 
     protected boolean onLowerDialChanged(int value) {
-        sbInterval.dialChanged(value);
-        sbShots.dialChanged(value);
-        sbDelay.dialChanged(value);
-        sbTargetExposure.dialChanged(value);
-        sbMaxShutterSpeed.dialChanged(value);
-        sbMaxISO.dialChanged(value);
-        sbCooldown.dialChanged(value);
-        sbAverageAmount.dialChanged(value);
-        sbDeadbandIndex.dialChanged(value);
-        return true;
+        return dialStep(value);
     }
 
     protected boolean onThirdDialChanged(int value) {
-        sbInterval.dialChanged(value);
-        sbShots.dialChanged(value);
-        sbDelay.dialChanged(value);
-        sbTargetExposure.dialChanged(value);
-        sbMaxShutterSpeed.dialChanged(value);
-        sbMaxISO.dialChanged(value);
-        sbCooldown.dialChanged(value);
-        sbAverageAmount.dialChanged(value);
-        sbDeadbandIndex.dialChanged(value);
-        return true;
+        return dialStep(value);
     }
 
     protected boolean onKuruDialChanged(int value) {
-        sbInterval.dialChanged(value);
-        sbShots.dialChanged(value);
-        sbDelay.dialChanged(value);
-        sbTargetExposure.dialChanged(value);
-        sbMaxShutterSpeed.dialChanged(value);
-        sbMaxISO.dialChanged(value);
-        sbCooldown.dialChanged(value);
-        sbAverageAmount.dialChanged(value);
-        sbDeadbandIndex.dialChanged(value);
+        return dialStep(value);
+    }
+
+    private boolean dialStep(int value) {
+        if (value == 0)
+            return true;
+        int direction = value > 0 ? 1 : -1;
+        View focused = getCurrentFocus();
+        if (focused instanceof AdvancedSeekBar) {
+            ((AdvancedSeekBar) focused).dialChanged(direction);
+        } else if (focused instanceof Spinner) {
+            Spinner spinner = (Spinner) focused;
+            int next = spinner.getSelectedItemPosition() + direction;
+            if (next >= 0 && next < spinner.getCount())
+                spinner.setSelection(next);
+        } else if (focused instanceof CheckBox) {
+            ((CheckBox) focused).toggle();
+        }
         return true;
     }
 

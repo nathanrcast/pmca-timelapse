@@ -61,12 +61,19 @@ public class ShotLogCsvTest {
     @Test
     public void settingsJsonCoversDefaults() {
         String json = ShotLogCsv.settingsJson(new Settings());
-        assertTrue(json.startsWith("{\"interval\":1.0,\"delay\":0,\"shotCount\":1,"));
+        assertTrue(json.startsWith("{\"interval\":1.0,\"delay\":0,\"shotCount\":10,"
+                + "\"intervalIndex\":2,\"shotsIndex\":4,\"delayIndex\":0,"));
         assertTrue(json.contains("\"holyGrail\":false"));
         assertTrue(json.endsWith("\"holyGrailAllowExposureDown\":false}"));
         Settings s = new Settings();
         s.shotCount = Settings.SHOTS_INFINITE;
         assertTrue(ShotLogCsv.settingsJson(s).contains("\"shotCount\":\"infinite\""));
+        assertTrue(ShotLogCsv.settingsJson(s).contains("\"shotsIndex\":" + StepTables.SHOTS.maxIndex()));
+        s.interval = 0.5;
+        s.delay = 90;
+        String half = ShotLogCsv.settingsJson(s);
+        assertTrue(half.contains("\"intervalIndex\":1,"));
+        assertTrue(half.contains("\"delayIndex\":12,"));
     }
 
     @Test
