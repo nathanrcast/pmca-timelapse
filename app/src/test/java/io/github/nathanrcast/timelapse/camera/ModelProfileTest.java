@@ -26,11 +26,19 @@ public class ModelProfileTest {
     }
 
     @Test
-    public void nex5tHasNoSilentShutterAndAnUnreliableDial() {
-        ModelProfile p = ModelProfile.forModel("NEX-5T");
-        assertEquals("NEX-5T", p.name());
-        assertEquals(EnumSet.of(Feature.SILENT_SHUTTER), p.disabled());
-        assertEquals(EnumSet.of(Quirk.DIAL_UNRELIABLE), p.quirks());
+    public void everyNexBodyHasNoSilentShutterAndAnUnreliableDial() {
+        for (String model : new String[] {"NEX-5T", "NEX-5R", "NEX-6", "NEX-7", "NEX-3N"}) {
+            ModelProfile p = ModelProfile.forModel(model);
+            assertEquals(model, "NEX", p.name());
+            assertEquals(model, EnumSet.of(Feature.SILENT_SHUTTER), p.disabled());
+            assertEquals(model, EnumSet.of(Quirk.DIAL_UNRELIABLE), p.quirks());
+        }
+    }
+
+    @Test
+    public void nexNeedsTheDashAndAModelAfterIt() {
+        for (String model : new String[] {"NEX", "NEX-", "NEX5T", "XNEX-5T", "ILCE-NEX-5"})
+            assertEquals(model, ModelProfile.DEFAULT_NAME, ModelProfile.forModel(model).name());
     }
 
     @Test
@@ -48,7 +56,8 @@ public class ModelProfileTest {
 
     @Test
     public void modelMatchIgnoresCaseAndWhitespace() {
-        assertEquals("NEX-5T", ModelProfile.forModel(" nex-5t ").name());
+        assertEquals("NEX", ModelProfile.forModel(" nex-5t ").name());
+        assertEquals("ILCE-6500", ModelProfile.forModel("ilce-6500\n").name());
     }
 
     @Test
@@ -59,7 +68,9 @@ public class ModelProfileTest {
         assertTrue(nex.disabledByProfile(Feature.SILENT_SHUTTER));
         assertTrue(nex.hasQuirk(Quirk.DIAL_UNRELIABLE));
         assertTrue(nex.supports(Feature.HOLY_GRAIL));
-        assertEquals("NEX-5T", nex.profile());
+        assertEquals("NEX", nex.profile());
+        assertFalse(ReflectiveCapabilities.build("NEX-5R", all, silentShutterSupported(), true)
+                .supports(Feature.SILENT_SHUTTER));
 
         ProbedCapabilities a6500 = ReflectiveCapabilities.build("ILCE-6500", all, silentShutterSupported(), true);
         assertTrue(a6500.supports(Feature.SILENT_SHUTTER));

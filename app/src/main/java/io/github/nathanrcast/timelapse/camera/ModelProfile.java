@@ -14,32 +14,44 @@ import java.util.Set;
 public final class ModelProfile {
     public static final String DEFAULT_NAME = "default";
 
-    private static final ModelProfile DEFAULT = new ModelProfile(DEFAULT_NAME,
+    private static final ModelProfile DEFAULT = new ModelProfile(DEFAULT_NAME, DEFAULT_NAME, false,
             EnumSet.noneOf(Feature.class), EnumSet.noneOf(Quirk.class));
 
     private static final ModelProfile[] KNOWN = {
-            // Upstream issue 5: the NEX-5R/5T have no silent shutter, and their wheel isn't read reliably (T10).
-            new ModelProfile("NEX-5T", EnumSet.of(Feature.SILENT_SHUTTER), EnumSet.of(Quirk.DIAL_UNRELIABLE)),
-            new ModelProfile("ILCE-6500", EnumSet.noneOf(Feature.class), EnumSet.noneOf(Quirk.class)),
+            // Every model starting with NEX-. No NEX body has a silent shutter (upstream issue 5 reports it for the
+            // NEX-5R/5T), and the NEX-5R wheel isn't read reliably there; the quirk only means input must also work
+            // with the arrow keys (T10), so it is safe for the whole family.
+            new ModelProfile("NEX", "NEX-", true, EnumSet.of(Feature.SILENT_SHUTTER),
+                    EnumSet.of(Quirk.DIAL_UNRELIABLE)),
+            new ModelProfile("ILCE-6500", "ILCE-6500", false, EnumSet.noneOf(Feature.class),
+                    EnumSet.noneOf(Quirk.class)),
     };
 
     private final String name;
+    private final String match;
+    private final boolean prefix;
     private final Set<Feature> disabled;
     private final Set<Quirk> quirks;
 
-    private ModelProfile(String name, Set<Feature> disabled, Set<Quirk> quirks) {
+    private ModelProfile(String name, String match, boolean prefix, Set<Feature> disabled, Set<Quirk> quirks) {
         this.name = name;
+        this.match = match;
+        this.prefix = prefix;
         this.disabled = Collections.unmodifiableSet(disabled);
         this.quirks = Collections.unmodifiableSet(quirks);
     }
 
+    // Case and surrounding whitespace are ignored. An exact match wins over a prefix match.
     public static ModelProfile forModel(String model) {
-        if (model != null) {
-            String key = model.trim().toUpperCase(Locale.US);
-            for (ModelProfile p : KNOWN)
-                if (p.name.equals(key))
-                    return p;
-        }
+        if (model == null)
+            return DEFAULT;
+        String key = model.trim().toUpperCase(Locale.US);
+        for (ModelProfile p : KNOWN)
+            if (!p.prefix && p.match.equals(key))
+                return p;
+        for (ModelProfile p : KNOWN)
+            if (p.prefix && key.startsWith(p.match) && key.length() > p.match.length())
+                return p;
         return DEFAULT;
     }
 
