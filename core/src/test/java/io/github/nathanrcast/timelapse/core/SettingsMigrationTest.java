@@ -30,11 +30,11 @@ public class SettingsMigrationTest {
     @Test
     public void valuesBetweenEntriesSnapToTheNearest() {
         MapSettingsStore store = new MapSettingsStore();
-        // 1.5 s sits between 1 and 2 (tie, lower); 120 shots -> 100 (nearer than 150); 3 h -> 60 min
-        Settings s = loadLegacy(2, 36, 26, store);
+        // 1.5 s sits between 1 and 2 (tie, lower); 120 shots -> 100 (nearer than 150); 2 h is in the table
+        Settings s = loadLegacy(2, 36, 17, store);
         assertEquals(1.0, s.interval, 0);
         assertEquals(100, s.shotCount);
-        assertEquals(60, s.delay);
+        assertEquals(120, s.delay);
     }
 
     @Test
@@ -46,37 +46,44 @@ public class SettingsMigrationTest {
 
         store = new MapSettingsStore();
         s = loadLegacy(LegacySliderMapping.INTERVAL_MAX, 0, LegacySliderMapping.DELAY_MAX, store);
-        assertEquals(300.0, s.interval, 0);
-        assertEquals(10, s.shotCount);
-        assertEquals(60, s.delay);
+        assertEquals(2400.0, s.interval, 0);
+        assertEquals(1, s.shotCount);
+        assertEquals(1440, s.delay);
     }
 
+    // Every old position lands on the nearest table entry, exact where the table has the value, never clamped.
     @Test
-    public void everyOldPositionLandsOnATableEntry() {
+    public void everyOldPositionLandsOnTheNearestEntry() {
         for (int p = 0; p <= LegacySliderMapping.INTERVAL_MAX; p++) {
             MapSettingsStore store = new MapSettingsStore();
             store.values.put("interval", p);
             Settings s = new Settings();
             s.load(store);
-            assertEquals(s.interval, StepTables.INTERVAL_MS.value(s.intervalIndex) / 1000.0, 0);
-            double old = LegacySliderMapping.progressToInterval(p);
-            if (old <= 300)
-                assertEquals("position " + p, old, s.interval, old <= 1.5 ? 0.5 : old * 0.34);
+            long old = Math.round(LegacySliderMapping.progressToInterval(p) * 1000);
+            assertNearest("interval " + p, StepTables.INTERVAL_MS, old, Math.round(s.interval * 1000));
         }
         for (int p = 0; p <= LegacySliderMapping.SHOTS_MAX; p++) {
             MapSettingsStore store = new MapSettingsStore();
             store.values.put("shotCount", p);
             Settings s = new Settings();
             s.load(store);
-            assertEquals(s.shotCount, StepTables.SHOTS.value(s.shotsIndex));
+            assertNearest("shots " + p, StepTables.SHOTS, LegacySliderMapping.progressToShotCount(p), s.shotCount);
         }
         for (int p = 0; p <= LegacySliderMapping.DELAY_MAX; p++) {
             MapSettingsStore store = new MapSettingsStore();
             store.values.put("delay", p);
             Settings s = new Settings();
             s.load(store);
-            assertEquals(s.delay, StepTables.DELAY_MIN.value(s.delayIndex));
+            assertNearest("delay " + p, StepTables.DELAY_MIN, LegacySliderMapping.progressToDelay(p), s.delay);
         }
+    }
+
+    private static void assertNearest(String what, StepTable table, long old, long migrated) {
+        long best = Long.MAX_VALUE;
+        for (int i = 0; i < table.size(); i++)
+            best = Math.min(best, Math.abs(table.value(i) - old));
+        assertEquals(what, best, Math.abs(migrated - old));
+        assertEquals(what, migrated, table.value(table.nearestIndex(migrated)));
     }
 
     @Test
@@ -143,9 +150,9 @@ public class SettingsMigrationTest {
     public void corruptOldPositionsClampBeforeSnapping() {
         MapSettingsStore store = new MapSettingsStore();
         Settings s = loadLegacy(500, -3, 99, store);
-        assertEquals(300.0, s.interval, 0);
-        assertEquals(10, s.shotCount);
-        assertEquals(60, s.delay);
+        assertEquals(2400.0, s.interval, 0);
+        assertEquals(1, s.shotCount);
+        assertEquals(1440, s.delay);
     }
 
     @Test

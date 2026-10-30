@@ -41,20 +41,13 @@ public class AdvancedSeekBar extends SeekBar {
         jump(value);
     }
 
-    // Held key: jump to the next multiple of 10, at most 3 times a second
+    // Held key: one step per repeat, at most 6 times a second. The first press is one step too (SeekBar's own).
     private void jump(int value) {
         long time = System.currentTimeMillis();
-        if (time - lastHoldActionTime < 300)
+        if (time - lastHoldActionTime < 160)
             return;
         lastHoldActionTime = time;
-
-        int current = getProgress();
-        int next;
-        if (value > 0)
-            next = (current / 10 + 1) * 10;
-        else
-            next = current == 0 ? 0 : ((current - 1) / 10) * 10;
-        setProgress(next);
+        setProgress(getProgress() + (value > 0 ? 1 : -1));
     }
 
     @Override

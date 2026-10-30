@@ -12,7 +12,8 @@ public class StepTableTest {
 
     @Test
     public void intervalTableIsTheSpecifiedOne() {
-        double[] seconds = {0, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 45, 60, 90, 120, 180, 300};
+        double[] seconds = {0, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 45, 60, 90, 120, 180, 300,
+                600, 900, 1200, 1800, 2400};
         assertEquals(seconds.length, INTERVAL.size());
         for (int i = 0; i < seconds.length; i++)
             assertEquals(seconds[i], INTERVAL.value(i) / 1000.0, 0);
@@ -20,16 +21,20 @@ public class StepTableTest {
 
     @Test
     public void shotsTableIsTheSpecifiedOne() {
-        assertEquals(10, SHOTS.value(0));
-        assertEquals(20, SHOTS.value(1));
+        assertEquals(1, SHOTS.value(0));
+        assertEquals(2, SHOTS.value(1));
+        assertEquals(3, SHOTS.value(2));
+        assertEquals(5, SHOTS.value(3));
+        assertEquals(10, SHOTS.value(4));
+        assertEquals(20, SHOTS.value(5));
         assertEquals(100, SHOTS.value(SHOTS.nearestIndex(100)));
         assertEquals(150, SHOTS.value(SHOTS.nearestIndex(100) + 1));
         assertEquals(1000, SHOTS.value(SHOTS.nearestIndex(1000)));
         assertEquals(1500, SHOTS.value(SHOTS.nearestIndex(1000) + 1));
         assertEquals(10000, SHOTS.value(SHOTS.maxIndex() - 1));
         assertEquals(Settings.SHOTS_INFINITE, SHOTS.value(SHOTS.maxIndex()));
-        assertEquals(10 + 18 + 18 + 1, SHOTS.size());
-        for (int i = 1; i < SHOTS.size() - 1; i++) {
+        assertEquals(4 + 10 + 18 + 18 + 1, SHOTS.size());
+        for (int i = 5; i < SHOTS.size() - 1; i++) {
             long step = SHOTS.value(i) - SHOTS.value(i - 1);
             long v = SHOTS.value(i - 1);
             assertEquals("after " + v, v < 100 ? 10 : v < 1000 ? 50 : 500, step);
@@ -38,7 +43,7 @@ public class StepTableTest {
 
     @Test
     public void delayTableIsTheSpecifiedOne() {
-        long[] minutes = {0, 1, 2, 3, 4, 5, 10, 15, 20, 30, 45, 60};
+        long[] minutes = {0, 1, 2, 3, 4, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, 1440};
         assertEquals(minutes.length, DELAY.size());
         for (int i = 0; i < minutes.length; i++)
             assertEquals(minutes[i], DELAY.value(i));
@@ -82,11 +87,12 @@ public class StepTableTest {
         assertEquals(INTERVAL.nearestIndex(500), INTERVAL.nearestIndex(600));
         assertEquals(8000, INTERVAL.value(INTERVAL.nearestIndex(7500)));
         assertEquals(0, INTERVAL.nearestIndex(100));
-        assertEquals(INTERVAL.maxIndex(), INTERVAL.nearestIndex(2280000));
-        assertEquals(10, SHOTS.value(SHOTS.nearestIndex(1)));
+        assertEquals(INTERVAL.maxIndex(), INTERVAL.nearestIndex(9999999));
+        assertEquals(1, SHOTS.value(SHOTS.nearestIndex(0)));
+        assertEquals(5, SHOTS.value(SHOTS.nearestIndex(6)));
         assertEquals(10000, SHOTS.value(SHOTS.nearestIndex(20000)));
         assertEquals(Settings.SHOTS_INFINITE, SHOTS.value(SHOTS.nearestIndex(Settings.SHOTS_INFINITE)));
-        assertEquals(60, DELAY.value(DELAY.nearestIndex(1440)));
+        assertEquals(1440, DELAY.value(DELAY.nearestIndex(5000)));
     }
 
     @Test

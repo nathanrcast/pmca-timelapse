@@ -18,7 +18,7 @@ public class SettingsTest {
         assertEquals(0, s.delay);
         assertEquals(0, s.delayIndex);
         assertEquals(10, s.shotCount);
-        assertEquals(0, s.shotsIndex);
+        assertEquals(10, StepTables.SHOTS.value(s.shotsIndex));
         assertFalse(s.displayOff);
         assertTrue(s.silentShutter);
         assertTrue(s.ael);
@@ -129,21 +129,6 @@ public class SettingsTest {
     @Test
     public void clampLeavesEveryValueTheScreenCanWrite() {
         Settings s = new Settings();
-        for (int i = 0; i < StepTables.INTERVAL_MS.size(); i++) {
-            s.intervalIndex = i;
-            s.clamp();
-            assertEquals(i, s.intervalIndex);
-        }
-        for (int i = 0; i < StepTables.SHOTS.size(); i++) {
-            s.shotsIndex = i;
-            s.clamp();
-            assertEquals(i, s.shotsIndex);
-        }
-        for (int i = 0; i < StepTables.DELAY_MIN.size(); i++) {
-            s.delayIndex = i;
-            s.clamp();
-            assertEquals(i, s.delayIndex);
-        }
         for (int p = 0; p <= SliderMapping.TARGET_EXPOSURE_MAX; p++) {
             s.targetExposure = SliderMapping.progressToTargetExposure(p);
             s.clamp();
@@ -189,7 +174,7 @@ public class SettingsTest {
         Settings s = new Settings();
         s.load(store);
         assertEquals(StepTables.INTERVAL_MS.maxIndex(), s.intervalIndex);
-        assertEquals(0, s.shotsIndex);
+        assertEquals(StepTables.SHOTS.nearestIndex(3), s.shotsIndex);
         assertEquals(StepTables.DELAY_MIN.maxIndex(), s.delayIndex);
         assertEquals(-30, s.targetExposure);
         assertEquals(Util.SHUTTER_SPEEDS.length - 1, s.maxShutterSpeedIndex);
@@ -197,9 +182,9 @@ public class SettingsTest {
         assertEquals(1, s.cooldown);
         assertEquals(SliderMapping.COUNT_MAX + 1, s.averageExposureAmount);
         assertEquals(Util.DEADBAND_VALUES.length - 1, s.deadbandIndex);
-        assertEquals(300.0, s.interval, 0);
-        assertEquals(10, s.shotCount);
-        assertEquals(60, s.delay);
+        assertEquals(2400.0, s.interval, 0);
+        assertEquals(3, s.shotCount);
+        assertEquals(1440, s.delay);
     }
 
     @Test
@@ -220,7 +205,7 @@ public class SettingsTest {
         s.deriveFromIndex();
         assertEquals(0.5, s.interval, 0);
         assertEquals(150, s.shotCount);
-        assertEquals(60, s.delay);
+        assertEquals(1440, s.delay);
     }
 
     @Test

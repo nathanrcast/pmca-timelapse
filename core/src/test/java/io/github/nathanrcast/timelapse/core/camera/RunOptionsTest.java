@@ -105,4 +105,17 @@ public class RunOptionsTest {
         RunOptions.mask(caps(core(), noValues()), s);
         assertTrue(RunOptions.mask(caps(core(), noValues()), s).masked().isEmpty());
     }
+
+    @Test
+    public void burstFallbackKeepsTheShotCountAndDelay() {
+        Settings s = new Settings();
+        s.interval = 0;
+        s.shotCount = 60;
+        s.delay = 30;
+        RunOptions run = RunOptions.mask(caps(all(), with(fullValues(), Query.DRIVE_MODES, list("single"))), s);
+        assertFalse(run.burst);
+        assertEquals(1.0, s.interval, 0);
+        assertEquals(60, s.shotCount);
+        assertEquals(30, s.delay);
+    }
 }

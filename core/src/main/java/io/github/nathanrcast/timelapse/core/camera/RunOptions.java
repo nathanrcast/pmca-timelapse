@@ -61,8 +61,9 @@ public final class RunOptions {
             masked.add(Feature.HOLY_GRAIL.name());
         }
         if (run.interval == 0 && !options.burst()) {
+            // Only the interval changes: the run's copy comes from the intent, whose indices are not the run's values.
             run.intervalIndex = StepTables.INTERVAL_MS.nearestIndex(FALLBACK_INTERVAL_MS);
-            run.deriveFromIndex();
+            run.interval = FALLBACK_INTERVAL_MS / 1000.0;
             masked.add(Feature.BURST.name() + " (interval " + run.interval + " s)");
         }
         return new RunOptions(run.interval == 0,

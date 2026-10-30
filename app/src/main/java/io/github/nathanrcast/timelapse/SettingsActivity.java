@@ -655,7 +655,7 @@ public class SettingsActivity extends BaseActivity
             if (next >= 0 && next < spinner.getCount())
                 spinner.setSelection(next);
         } else if (focused instanceof CheckBox) {
-            ((CheckBox) focused).setChecked(direction > 0);
+            ((CheckBox) focused).toggle();
         }
         return true;
     }

@@ -41,6 +41,15 @@ public final class ShotPlan {
         return framesPerInterval;
     }
 
+    /** Shots (intervals) in the run; in burst mode the burst length in seconds. */
+    public int shotCount() {
+        return shotCount;
+    }
+
+    public long intervalMs() {
+        return Math.round(intervalSeconds * 1000);
+    }
+
     public long totalFrames() {
         return (long) shotCount * framesPerInterval;
     }
@@ -74,31 +83,5 @@ public final class ShotPlan {
         if (isBurst())
             return startMs + shotCount * 1000L;
         return startMs + Math.round(intervalSeconds * shotCount * 1000);
-    }
-
-    /** Shots (intervals) still to take after {@code framesTaken} frames. -1 in burst mode. */
-    public long shotsRemaining(int framesTaken) {
-        if (isBurst())
-            return -1;
-        return shotCount - framesTaken / framesPerInterval;
-    }
-
-    /**
-     * Whole seconds left of the start delay, rounded up. 0 once a frame is taken, or while the run
-     * isn't armed yet ({@code startMs <= 0}).
-     */
-    public long delaySecondsRemaining(long startMs, long nowMs, int framesTaken) {
-        if (framesTaken != 0 || startMs <= 0)
-            return 0;
-        long ms = startMs - nowMs;
-        return ms > 0 ? (ms + 999) / 1000 : 0;
-    }
-
-    /** Seconds left in the run, including any start delay still to go. Negative once a burst has overrun. */
-    public long secondsRemaining(long startMs, long nowMs, int framesTaken) {
-        if (isBurst())
-            return Math.round((shotCount * 1000L - nowMs + startMs) / 1000.0);
-        return Math.round(shotsRemaining(framesTaken) * intervalSeconds)
-                + delaySecondsRemaining(startMs, nowMs, framesTaken);
     }
 }

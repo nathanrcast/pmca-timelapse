@@ -59,7 +59,7 @@ public final class Settings {
 
     public Settings() {
         intervalIndex = StepTables.INTERVAL_MS.nearestIndex(1000);
-        shotsIndex = 0;
+        shotsIndex = StepTables.SHOTS.nearestIndex(10);
         delayIndex = 0;
         deriveFromIndex();
         displayOff = false;
@@ -81,10 +81,7 @@ public final class Settings {
     }
 
     public void save(SettingsStore store) {
-        store.edit()
-                .putInt(KEY_INTERVAL_MS, (int) StepTables.INTERVAL_MS.value(intervalIndex))
-                .putInt(KEY_SHOTS, (int) StepTables.SHOTS.value(shotsIndex))
-                .putInt(KEY_DELAY_MIN, (int) StepTables.DELAY_MIN.value(delayIndex))
+        putSteps(store.edit())
                 .putBoolean(KEY_SILENT_SHUTTER, silentShutter)
                 .putBoolean(KEY_AEL, ael)
                 .putInt(KEY_FPS, fps)
@@ -162,11 +159,14 @@ public final class Settings {
     }
 
     private void saveSteps(SettingsStore store) {
-        store.edit()
+        putSteps(store.edit()).apply();
+    }
+
+    private SettingsStore.Editor putSteps(SettingsStore.Editor editor) {
+        return editor
                 .putInt(KEY_INTERVAL_MS, (int) StepTables.INTERVAL_MS.value(intervalIndex))
                 .putInt(KEY_SHOTS, (int) StepTables.SHOTS.value(shotsIndex))
-                .putInt(KEY_DELAY_MIN, (int) StepTables.DELAY_MIN.value(delayIndex))
-                .apply();
+                .putInt(KEY_DELAY_MIN, (int) StepTables.DELAY_MIN.value(delayIndex));
     }
 
     public void deriveFromIndex() {
@@ -175,12 +175,10 @@ public final class Settings {
         delay = (int) StepTables.DELAY_MIN.value(delayIndex);
     }
 
-    // Pulls persisted values into the ranges the sliders and step tables can show. Every value
-    // the settings screen writes is already in range, so this only changes corrupt stores.
+    // Pulls the persisted non-table values into the ranges their sliders and step tables can show. Every value
+    // the settings screen writes is already in range, so this only changes corrupt stores. The interval, shots and
+    // delay indices come from nearestIndex() and are always in range.
     public void clamp() {
-        intervalIndex = StepTables.INTERVAL_MS.clamp(intervalIndex);
-        shotsIndex = StepTables.SHOTS.clamp(shotsIndex);
-        delayIndex = StepTables.DELAY_MIN.clamp(delayIndex);
         int halfTarget = SliderMapping.TARGET_EXPOSURE_MAX / 2;
         targetExposure = SliderMapping.clamp(targetExposure, -halfTarget, halfTarget);
         maxShutterSpeedIndex = SliderMapping.clamp(maxShutterSpeedIndex, 0, Util.SHUTTER_SPEEDS.length - 1);
