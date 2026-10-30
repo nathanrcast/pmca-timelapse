@@ -4,6 +4,7 @@ import static io.github.nathanrcast.timelapse.core.camera.Probes.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -42,6 +43,37 @@ public class ProbedCapabilitiesTest {
         drive.clear();
         assertEquals(list("single", "burst", "bracket"), caps.values(Query.DRIVE_MODES));
         assertNull(caps.values(Query.ISO_SENSITIVITIES));
+    }
+
+    @Test
+    public void refreshedReplacesValuesAndKeepsMethodsAndProfile() {
+        ProbedCapabilities probed = caps(all(), fullValues(), EnumSet.of(Feature.AE_LOCK));
+        assertTrue(probed.supports(Feature.SILENT_SHUTTER));
+
+        // The body changed mode: silent shutter is off now and the drive-mode query failed this time.
+        Map<Query, List<String>> now = with(with(fullValues(), Query.SILENT_SHUTTER_SUPPORTED, list("false")),
+                Query.DRIVE_MODES, null);
+        ProbedCapabilities session = probed.refreshed(now, true);
+        assertFalse(session.supports(Feature.SILENT_SHUTTER));
+        assertNull(session.values(Query.DRIVE_MODES));
+        assertTrue(session.valuesRead());
+        assertTrue(session.has(SonyMethod.SET_SILENT_SHUTTER_MODE));
+        assertTrue(session.disabledByProfile(Feature.AE_LOCK));
+        assertEquals(probed.model(), session.model());
+        assertEquals(probed.profile(), session.profile());
+    }
+
+    @Test
+    public void refreshedKeepsTheOldValuesWhenTheReadFailed() {
+        ProbedCapabilities probed = caps(all(), fullValues());
+        assertSame(probed, probed.refreshed(noValues(), false));
+
+        ProbedCapabilities unread = new ProbedCapabilities("TEST", "default", all(), noValues(),
+                EnumSet.noneOf(Feature.class), EnumSet.of(Quirk.DIAL_UNRELIABLE), false);
+        ProbedCapabilities read = unread.refreshed(fullValues(), true);
+        assertTrue(read.valuesRead());
+        assertTrue(read.supports(Feature.SILENT_SHUTTER));
+        assertTrue(read.hasQuirk(Quirk.DIAL_UNRELIABLE));
     }
 
     @Test

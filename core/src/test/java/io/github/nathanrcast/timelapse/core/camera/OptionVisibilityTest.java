@@ -63,7 +63,7 @@ public class OptionVisibilityTest {
     @Test
     public void aFakeThatSupportsNothingHidesEverythingIncludingMf() {
         OptionVisibility v = OptionVisibility.of(NOTHING);
-        assertFalse(v.silentShutter() || v.aeLock() || v.bracket3() || v.holyGrail() || v.manualFocus());
+        assertFalse(v.silentShutter() || v.aeLock() || v.bracket3() || v.holyGrail() || v.manualFocus() || v.burst());
         assertEquals(FocusControl.NONE, v.focusControl());
     }
 
@@ -108,6 +108,15 @@ public class OptionVisibilityTest {
                 with(fullValues(), Query.BRACKET_PICTURE_COUNTS, list("5", "9")))).bracket3());
         // An unknown list doesn't veto: the method check decides.
         assertTrue(OptionVisibility.of(caps(all(), with(fullValues(), Query.DRIVE_MODES, null))).bracket3());
+    }
+
+    @Test
+    public void burstNeedsItsMethodsAndAListedDriveMode() {
+        assertTrue(OptionVisibility.of(caps(all(), fullValues())).burst());
+        assertTrue(OptionVisibility.of(caps(all(), noValues())).burst());
+        assertFalse(OptionVisibility.of(caps(core(), fullValues())).burst());
+        assertFalse(OptionVisibility.of(caps(all(), with(fullValues(), Query.DRIVE_MODES, list("single")))).burst());
+        assertFalse(OptionVisibility.of(caps(all(), with(fullValues(), Query.BURST_DRIVE_SPEEDS, list()))).burst());
     }
 
     @Test

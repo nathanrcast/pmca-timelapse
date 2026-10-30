@@ -68,6 +68,14 @@ public final class ProbedCapabilities implements Capabilities {
         return quirks.contains(quirk);
     }
 
+    // The same body with this session's values. Method presence, profile and quirks carry over; a read that succeeded
+    // replaces every value (a query that failed this time becomes unknown), and a failed read keeps the old values.
+    public ProbedCapabilities refreshed(Map<Query, List<String>> fresh, boolean read) {
+        if (!read)
+            return this;
+        return new ProbedCapabilities(model, profile, present, fresh, disabled, quirks, true);
+    }
+
     public boolean disabledByProfile(Feature feature) {
         return disabled.contains(feature);
     }
