@@ -10,8 +10,8 @@ android {
         applicationId 'io.github.nathanrcast.timelapse'
         minSdk 10
         targetSdk 10
-        versionCode 7
-        versionName '1.4.0'
+        versionCode 8
+        versionName '2.0.0'
     }
 
     buildTypes {
