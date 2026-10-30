@@ -252,6 +252,18 @@ public class SettingsActivity extends BaseActivity
 
         cbDOFF.setChecked(settings.displayOff);
         cbDOFF.setOnCheckedChangeListener(cbDOFFOnCheckListener);
+
+        Spinner spnReview = (Spinner) findViewById(R.id.spnReview);
+        spnReview.setSelection(settings.reviewSeconds);
+        spnReview.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                settings.reviewSeconds = i;
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {}
+        });
     }
 
     @Override
