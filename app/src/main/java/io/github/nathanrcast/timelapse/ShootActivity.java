@@ -21,6 +21,7 @@ import com.github.ma1co.pmcademo.app.BaseActivity;
 import com.sony.scalar.hardware.CameraEx;
 
 import io.github.nathanrcast.timelapse.core.Clock;
+import io.github.nathanrcast.timelapse.core.Progress;
 import io.github.nathanrcast.timelapse.core.Scheduler;
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
@@ -89,11 +90,12 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             Scheduler.Decision decision = scheduler.onTimer();
             if (decision.action == Scheduler.Action.FIRE) {
                 takeFrame();
-                if (burstShooting)
+                if (burstShooting) {
+                    handler.removeCallbacks(burstPollRunnable);
                     handler.postDelayed(burstPollRunnable, BURST_POLL_MS);
+                }
             }
-            if (decision.action != Scheduler.Action.WAIT)
-                log(decision.toString());
+            logDecision(decision);
             if (scheduler.isDone())
                 finishRun();
             else
@@ -101,18 +103,18 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     };
 
-    // The next frame of a bracket set, right after the previous one is captured.
-    private final Runnable frameRunnable = new Runnable() {
+    // onShutter's scheduler work, moved onto the main looper so every Scheduler call runs there.
+    private final Runnable shutterRunnable = new Runnable() {
         @Override
         public void run() {
-            takeFrame();
+            frameCaptured();
         }
     };
 
     private final Runnable stopReviewRunnable = new Runnable() {
         @Override
         public void run() {
-            stopReview();
+            stopReview(true);
         }
     };
 
@@ -134,11 +136,14 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     };
 
-    // Burst drive doesn't call onShutter per frame, so poll it while the burst runs.
+    // Burst drive doesn't call onShutter per frame: while the burst runs, refresh the screen and
+    // feed the scheduler a stand-in onShutter. The burst's end comes from its own timer.
     private final Runnable burstPollRunnable = new Runnable() {
         @Override
         public void run() {
-            onShutter(0, cameraEx);
+            updateScreen();
+            frameCaptured();
+            handler.postDelayed(this, BURST_POLL_MS);
         }
     };
 
@@ -371,16 +376,17 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private long delaySecondsRemaining() {
-        return plan.delaySecondsRemaining(scheduler.t0Ms(), clock.nowMs(), shotCount);
+        return Progress.delaySecondsRemaining(scheduler, clock.nowMs());
     }
 
     private void updateScreen(){
-        long delaySeconds = delaySecondsRemaining();
+        long now = clock.nowMs();
+        long delaySeconds = Progress.delaySecondsRemaining(scheduler, now);
         if (delaySeconds > 0)
             tvCount.setText("Delay: " + Util.formatTime(delaySeconds));
         else
-            tvCount.setText(Integer.toString(shotCount)+"/"+Long.toString(plan.totalFrames()));
-        tvRemaining.setText(getRemainingTime());
+            tvCount.setText(Progress.count(scheduler, now));
+        tvRemaining.setText(Progress.remaining(scheduler, now));
         tvBattery.setText(getBatteryPercentage());
 
         //Holy Grail
@@ -429,7 +435,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         handler.removeCallbacksAndMessages(null);
         if (scheduler != null)
             scheduler.pause();
-        reviewShowing = false;
+        stopReview(false);
         finishing = false;
 
         // Restore the focus mode the camera had before MF was forced
@@ -580,42 +586,33 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     }
 
-    // The camera calls this when a frame is captured; in burst mode burstPollRunnable does.
+    // The camera calls this when a frame is captured, possibly off the main looper.
     @Override
     public void onShutter(int i, CameraEx cameraEx) {
-        if(burstShooting) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    updateScreen();
-                }
-            });
-
-            scheduler.onFrameCaptured();
-            if (scheduler.isDone()) {
-                finishRun();
-            }
-            else {
-                handler.removeCallbacks(burstPollRunnable);
-                handler.postDelayed(burstPollRunnable, BURST_POLL_MS);
-            }
-        }
-        else {
+        if(!burstShooting) {
             this.cameraEx.cancelTakePicture();
 
             //camera.startPreview();
-
-            Scheduler.Decision decision = scheduler.onFrameCaptured();
-            if (decision.action == Scheduler.Action.FIRE) {
-                handler.post(frameRunnable);
-            } else if (decision.action == Scheduler.Action.SLOT_DONE) {
-                log(decision.toString());
-                if (scheduler.isDone())
-                    finishRun();
-                else
-                    showReview();
-            }
         }
+        handler.post(shutterRunnable);
+    }
+
+    private void frameCaptured() {
+        Scheduler.Decision decision = scheduler.onFrameCaptured();
+        if (decision.action == Scheduler.Action.FIRE) {
+            takeFrame();
+        } else if (decision.action == Scheduler.Action.SLOT_DONE) {
+            if (scheduler.isDone())
+                finishRun();
+            else
+                showReview();
+        }
+        logDecision(decision);
+    }
+
+    private void logDecision(Scheduler.Decision decision) {
+        if (decision.action != Scheduler.Action.WAIT)
+            log(decision.toString());
     }
 
     private void armTimer() {
@@ -626,7 +623,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private void takeFrame() {
-        stopReview();
+        stopReview(true);
         shoot();
         if (!burstShooting)
             display.on();
@@ -642,7 +639,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         handler.postAtTime(stopReviewRunnable, until);
     }
 
-    private void stopReview() {
+    // displayOff: apply DOFF afterwards; not on pause, where the display must stay on.
+    private void stopReview(boolean displayOff) {
         handler.removeCallbacks(stopReviewRunnable);
         if (!reviewShowing)
             return;
@@ -650,7 +648,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (camera != null)
             camera.stopPreview();
         reviewSurfaceView.setVisibility(View.GONE);
-        if (settings.displayOff)
+        if (displayOff && settings.displayOff)
             display.off();
     }
 
@@ -688,10 +686,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             s = "c ";
 
         return s + (int)(level / (float)scale * 100) + "%";
-    }
-
-    private String getRemainingTime() {
-        return Util.formatTime(plan.secondsRemaining(scheduler.t0Ms(), clock.nowMs(), shotCount));
     }
 
     @Override
