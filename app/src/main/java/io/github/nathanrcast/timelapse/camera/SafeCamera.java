@@ -14,21 +14,23 @@ import io.github.nathanrcast.timelapse.Logger;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.Feature;
 import io.github.nathanrcast.timelapse.core.camera.OptionVisibility.FocusControl;
-import io.github.nathanrcast.timelapse.core.camera.OptionVisibility;
 import io.github.nathanrcast.timelapse.core.camera.ProbedCapabilities;
 import io.github.nathanrcast.timelapse.core.camera.Query;
+import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
 
 import java.lang.reflect.Method;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 // The only class outside CapsDump that calls CameraEx or ParametersModifier (with its bridges in this package).
-// Every optional call is guarded by the session's probe: on a firmware without the method it is never made, so it
-// can't throw NoSuchMethodError. Every call also catches Throwable and returns a Result, and each failure is written
-// to LOG.TXT once per session, not once per shot.
+// Method presence is resolved once per process; the supported values are read again at every open(), so a run is
+// masked against the mode the body is in now. Every optional call is guarded: by caps.has() here, or for
+// configure() by the RunOptions mask its caller applied. Every call also catches Throwable and returns a Result,
+// and each failure is written to LOG.TXT once per session, not once per shot.
 public final class SafeCamera {
     public interface ShutterCallback {
         void onShutter(int status);
@@ -39,19 +41,11 @@ public final class SafeCamera {
         void onEvRange(int ev);
     }
 
-    // What ShootActivity asks for. Options the body lacks are skipped and logged.
-    public static final class Setup {
-        public boolean burst;
-        public boolean silentShutter;
-        public boolean aeLock;
-        public boolean bracket3;
-        public boolean manualFocus;
-    }
-
     private static final String FOCUS_MODE_AUTO = "auto";
 
     private static Map<SonyMethod, Method> methods;
-    private static ProbedCapabilities cached;
+    // The latest capabilities with values: from the settings-screen probe or the last open().
+    private static ProbedCapabilities latest;
 
     private final CameraEx cameraEx;
     private final Camera normal;
@@ -68,12 +62,10 @@ public final class SafeCamera {
         this.caps = caps;
     }
 
-    // The session's capabilities. The first call resolves every SonyMethod, then opens the camera to read the
-    // supported values and releases it; the result is kept for the rest of the process. If the camera can't be
-    // opened the values stay unknown (value-gated options hidden) and the next probe() or open() tries again.
+    // The settings-screen probe: opens the camera, reads the values and releases it. Kept once the values are read.
     public static synchronized Capabilities probe() {
-        if (cached != null)
-            return cached;
+        if (latest != null && latest.valuesRead())
+            return latest;
         Map<SonyMethod, Method> m = methods();
         CameraEx cam = null;
         if (m.containsKey(OPEN) && m.containsKey(RELEASE)) {
@@ -84,7 +76,7 @@ public final class SafeCamera {
             }
         }
         try {
-            return probeWith(m, cam);
+            return readSession(m, cam);
         } finally {
             if (cam != null) {
                 try {
@@ -96,7 +88,8 @@ public final class SafeCamera {
         }
     }
 
-    // Opens the camera for a shooting session. Fails (without throwing) if a core method is missing or open fails.
+    // Opens the camera for a shooting session and reads this session's values. Fails (without throwing) if a core
+    // method is missing or open fails.
     public static synchronized Result<SafeCamera> open(ShutterCallback callback) {
         Map<SonyMethod, Method> m = methods();
         for (SonyMethod c : SonyMethod.values())
@@ -117,7 +110,7 @@ public final class SafeCamera {
             Camera normal = cam.getNormalCamera();
             if (normal == null)
                 throw new IllegalStateException("getNormalCamera() returned null");
-            camera = new SafeCamera(cam, normal, cached != null ? cached : probeWith(m, cam));
+            camera = new SafeCamera(cam, normal, readSession(m, cam));
             cam.setShutterListener(new ShutterBridge(callback));
         } catch (Throwable t) {
             try {
@@ -136,7 +129,8 @@ public final class SafeCamera {
         return methods;
     }
 
-    private static ProbedCapabilities probeWith(Map<SonyMethod, Method> m, CameraEx cam) {
+    // This session's capabilities: cached method presence and profile, with the values read from cam now.
+    private static ProbedCapabilities readSession(Map<SonyMethod, Method> m, CameraEx cam) {
         Object modifier = null;
         List<String> focusModes = null;
         boolean read = false;
@@ -150,16 +144,19 @@ public final class SafeCamera {
                 modifier = cam.createParametersModifier(params);
                 read = true;
             } catch (Throwable t) {
-                Logger.error("SafeCamera: probe: " + Result.failed("getParameters", t));
+                Logger.error("SafeCamera: read values: " + Result.failed("getParameters", t));
             }
         }
-        ProbedCapabilities probed = ReflectiveCapabilities.build(model(), m.keySet(),
-                ReflectiveCapabilities.readValues(m, modifier, focusModes), read);
-        if (read)
-            cached = probed;
-        for (String line : probed.describe())
+        Map<Query, List<String>> values = ReflectiveCapabilities.readValues(m, modifier, focusModes);
+        ProbedCapabilities base = latest != null ? latest
+                : ReflectiveCapabilities.build(model(), m.keySet(), new EnumMap<Query, List<String>>(Query.class),
+                        false);
+        ProbedCapabilities session = base.refreshed(values, read);
+        if (latest == null || read)
+            latest = session;
+        for (String line : session.describe())
             Logger.info("Capabilities: " + line);
-        return probed;
+        return session;
     }
 
     private static String model() {
@@ -179,6 +176,7 @@ public final class SafeCamera {
 
     // ---- session ----
 
+    // The values read when this session opened.
     public Capabilities capabilities() {
         return caps;
     }
@@ -187,15 +185,11 @@ public final class SafeCamera {
         return normal;
     }
 
-    // Applies drive mode, silent shutter, AEL, bracketing and focus in one setParameters, as ShootActivity did.
-    // Returns setParameters' result; options the body lacks are skipped and logged once.
-    public Result<Void> configure(Setup setup) {
+    // Applies drive mode, silent shutter, AEL, bracketing and focus in one setParameters, exactly as the run asks:
+    // the caller masked it with RunOptions.mask against capabilities(). Returns setParameters' result.
+    public Result<Void> configure(RunOptions run) {
         if (released)
             return closed("configure");
-        FocusControl focus = setup.manualFocus ? OptionVisibility.of(caps).focusControl() : FocusControl.NONE;
-        if (setup.manualFocus && focus == FocusControl.NONE)
-            unsupported("manual focus");
-
         Camera.Parameters params;
         ParametersModifier modifier;
         try {
@@ -205,69 +199,53 @@ public final class SafeCamera {
             return failed("getParameters", t);
         }
 
-        if (focus == FocusControl.FOCUS_MODE) {
+        if (run.focus == FocusControl.FOCUS_MODE) {
             savedFocusMode = params.getFocusMode();
             params.setFocusMode(ParametersModifier.FOCUS_MODE_MANUAL);
-        } else if (!setup.manualFocus && Feature.allows(caps, Query.FOCUS_MODES, FOCUS_MODE_AUTO)) {
+        } else if (run.focus == FocusControl.NONE && Feature.allows(caps, Query.FOCUS_MODES, FOCUS_MODE_AUTO)) {
             params.setFocusMode(FOCUS_MODE_AUTO);
         }
 
-        if (setup.burst)
+        if (run.burst)
             configureBurst(modifier);
         else
             setDriveMode(modifier, ParametersModifier.DRIVE_MODE_SINGLE);
 
-        // Set either way when supported, so an earlier run's silent shutter doesn't stick.
-        if (caps.supports(Feature.SILENT_SHUTTER)) {
+        if (run.silentShutter != null) {
             try {
-                modifier.setSilentShutterMode(setup.silentShutter);
+                modifier.setSilentShutterMode(run.silentShutter.booleanValue());
             } catch (Throwable t) {
                 failed(SET_SILENT_SHUTTER_MODE.key(), t);
             }
-        } else if (setup.silentShutter) {
-            unsupported(Feature.SILENT_SHUTTER.name());
         }
 
-        if (setup.aeLock) {
-            if (!caps.supports(Feature.AE_LOCK)) {
-                unsupported(Feature.AE_LOCK.name());
-            } else {
-                try {
-                    modifier.setAutoExposureLock(ParametersModifier.AE_LOCK_ON);
-                } catch (Throwable t) {
-                    failed(SET_AUTO_EXPOSURE_LOCK.key(), t);
-                }
+        if (run.aeLock) {
+            try {
+                modifier.setAutoExposureLock(ParametersModifier.AE_LOCK_ON);
+            } catch (Throwable t) {
+                failed(SET_AUTO_EXPOSURE_LOCK.key(), t);
             }
         }
 
-        if (setup.bracket3) {
-            if (!caps.supports(Feature.BRACKET_3)) {
-                unsupported(Feature.BRACKET_3.name());
-            } else {
-                try {
-                    modifier.setDriveMode(ParametersModifier.DRIVE_MODE_BRACKET);
-                    modifier.setBracketMode(ParametersModifier.BRACKET_MODE_EXPOSURE);
-                    modifier.setExposureBracketMode(ParametersModifier.EXPOSURE_BRACKET_MODE_SINGLE);
-                    modifier.setExposureBracketPeriod(30);
-                    modifier.setNumOfBracketPicture(3);
-                } catch (Throwable t) {
-                    failed("bracket", t);
-                }
+        if (run.bracket3) {
+            try {
+                modifier.setDriveMode(ParametersModifier.DRIVE_MODE_BRACKET);
+                modifier.setBracketMode(ParametersModifier.BRACKET_MODE_EXPOSURE);
+                modifier.setExposureBracketMode(ParametersModifier.EXPOSURE_BRACKET_MODE_SINGLE);
+                modifier.setExposureBracketPeriod(30);
+                modifier.setNumOfBracketPicture(3);
+            } catch (Throwable t) {
+                failed("bracket", t);
             }
         }
 
         Result<Void> applied = apply(params);
-        if (focus == FocusControl.TOGGLE)
+        if (run.focus == FocusControl.TOGGLE)
             engageToggleFocus();
         return applied;
     }
 
     private void configureBurst(ParametersModifier modifier) {
-        if (!caps.supports(Feature.BURST)) {
-            unsupported(Feature.BURST.name());
-            setDriveMode(modifier, ParametersModifier.DRIVE_MODE_SINGLE);
-            return;
-        }
         try {
             modifier.setDriveMode(ParametersModifier.DRIVE_MODE_BURST);
             List<?> speeds = modifier.getSupportedBurstDriveSpeeds();
@@ -339,7 +317,7 @@ public final class SafeCamera {
     }
 
     // Undoes what configure() did to focus: releases the toggle it engaged, or restores the saved focus mode.
-    public void restoreFocus() {
+    private void restoreFocus() {
         if (released)
             return;
         if (toggleEngaged) {

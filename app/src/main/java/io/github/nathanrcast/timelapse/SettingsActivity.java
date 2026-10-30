@@ -83,8 +83,7 @@ public class SettingsActivity extends BaseActivity
     private CheckBox cbMF;
     private CheckBox cbDOFF;
 
-
-
+    private boolean burstUnavailable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -248,22 +247,30 @@ public class SettingsActivity extends BaseActivity
         applyCapabilities(SafeCamera.probe());
     }
 
-    // Hides the options this body can't do (core.camera.OptionVisibility). Unchecking first runs each listener, so
-    // the setting goes off too; HG's listener also hides its section.
+    // Shows only the options this body supports (core.camera.OptionVisibility). Visual only: a hidden option keeps
+    // its saved value, and ShootActivity masks it off for the run.
     private void applyCapabilities(Capabilities caps) {
         OptionVisibility options = OptionVisibility.of(caps);
-        hideUnless(cbSilentShutter, options.silentShutter());
-        hideUnless(cbMF, options.manualFocus());
-        hideUnless(cbAEL, options.aeLock());
-        hideUnless(cbBRS, options.bracket3());
-        hideUnless(cbHolyGrail, options.holyGrail());
+        showIf(cbSilentShutter, options.silentShutter());
+        showIf(cbMF, options.manualFocus());
+        showIf(cbAEL, options.aeLock());
+        showIf(cbBRS, options.bracket3());
+        showIf(cbHolyGrail, options.holyGrail());
+        laHolyGrailSection.setVisibility(options.holyGrail() && cbHolyGrail.isChecked() ? View.VISIBLE : View.GONE);
+        burstUnavailable = !options.burst();
+        showIntervalText();
     }
 
-    private static void hideUnless(CheckBox option, boolean supported) {
-        if (supported)
-            return;
-        option.setChecked(false);
-        option.setVisibility(View.GONE);
+    private static void showIf(View option, boolean supported) {
+        option.setVisibility(supported ? View.VISIBLE : View.GONE);
+    }
+
+    // The burst position stays on the slider; on a body without burst it reads "n/a" and runs at the shortest
+    // interval (core.camera.RunOptions).
+    private void showIntervalText() {
+        boolean noBurst = settings.interval == 0 && burstUnavailable;
+        tvIntervalValue.setText(noBurst ? "n/a" : SliderMapping.intervalText(settings.interval));
+        tvIntervalUnit.setText(noBurst ? "" : SliderMapping.intervalUnit(settings.interval));
     }
 
     View.OnClickListener bnStartOnClickListener = new View.OnClickListener() {
@@ -388,8 +395,7 @@ public class SettingsActivity extends BaseActivity
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
             settings.rawInterval = i;
             settings.interval = SliderMapping.progressToInterval(i);
-            tvIntervalValue.setText(SliderMapping.intervalText(settings.interval));
-            tvIntervalUnit.setText(SliderMapping.intervalUnit(settings.interval));
+            showIntervalText();
 
             if(settings.interval == 0)
                 lblShots.setText("Dur. (s)");

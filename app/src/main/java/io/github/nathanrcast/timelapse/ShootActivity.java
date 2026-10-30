@@ -21,7 +21,7 @@ import com.github.ma1co.pmcademo.app.BaseActivity;
 import io.github.nathanrcast.timelapse.camera.Result;
 import io.github.nathanrcast.timelapse.camera.SafeCamera;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
-import io.github.nathanrcast.timelapse.core.camera.OptionVisibility;
+import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 
 import io.github.nathanrcast.timelapse.core.Clock;
 import io.github.nathanrcast.timelapse.core.Settings;
@@ -225,16 +225,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             return;
         }
         safeCamera = opened.get();
-        applyCapabilities(safeCamera.capabilities());
+        RunOptions run = applyCapabilities(safeCamera.capabilities());
         cameraSurfaceHolder.addCallback(this);
-
-        SafeCamera.Setup setup = new SafeCamera.Setup();
-        setup.burst = burstShooting;
-        setup.silentShutter = settings.silentShutter;
-        setup.aeLock = settings.ael;
-        setup.bracket3 = settings.brs;
-        setup.manualFocus = settings.mf;
-        safeCamera.configure(setup);
+        safeCamera.configure(run);
 
         pictureReviewTime = 2;
         //log(Integer.toString(pictureReviewTime));
@@ -267,21 +260,20 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         updateScreen();
     }
 
-    // Options this body lacks are forced off for the run, as SettingsActivity hides them.
-    private void applyCapabilities(Capabilities caps) {
-        OptionVisibility options = OptionVisibility.of(caps);
-        settings.silentShutter &= options.silentShutter();
-        settings.ael &= options.aeLock();
-        settings.brs &= options.bracket3();
-        settings.mf &= options.manualFocus();
-        if (settings.holyGrail && !options.holyGrail()) {
-            settings.holyGrail = false;
+    // Masks this run's settings (the intent's copy; the saved ones are untouched) against the values the camera
+    // reported on open. Frames per interval follow BRC3 and burst follows the interval, so the plan is rebuilt.
+    private RunOptions applyCapabilities(Capabilities caps) {
+        RunOptions run = RunOptions.mask(caps, settings);
+        if (!run.masked().isEmpty())
+            log("not on this body, off for this run: " + run.masked());
+        if (!settings.holyGrail) {
             findViewById(R.id.divider2).setVisibility(View.GONE);
             findViewById(R.id.textView4).setVisibility(View.GONE);
             findViewById(R.id.tlHolyGrail).setVisibility(View.GONE);
         }
-        // Frames per interval follow BRC3, so the plan is rebuilt from the masked settings.
         plan = ShotPlan.of(settings);
+        burstShooting = plan.isBurst();
+        return run;
     }
 
     // Holy-grail exposure metering
