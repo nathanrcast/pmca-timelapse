@@ -13,6 +13,7 @@ import com.sony.scalar.hardware.CameraEx;
 import com.sony.scalar.hardware.CameraEx.ParametersModifier;
 
 import io.github.nathanrcast.timelapse.Logger;
+import io.github.nathanrcast.timelapse.core.LenrGuard;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.Feature;
 import io.github.nathanrcast.timelapse.core.camera.OptionVisibility.FocusControl;
@@ -48,6 +49,9 @@ public final class SafeCamera {
     // Set while the app holds the AF/MF toggle, so a run that never reached close() (crash, reboot, kill) can be
     // released by the next open().
     private static final String KEY_TOGGLE_ENGAGED = "toggleFocusEngagedByApp";
+    // Set while the app holds long-exposure NR off for a run, so a run that never reached close() can be undone by
+    // the next open(). Only ever set when LENR was on, so "set" means "turn it back on".
+    private static final String KEY_LENR_OFF_BY_APP = "lenrOffByApp";
     // The settings-screen probe tries twice at most: once, then once more on the next onResume.
     private static final int PROBE_ATTEMPTS = 2;
 
@@ -63,6 +67,7 @@ public final class SafeCamera {
     private final Set<String> reported = new HashSet<String>();
     private CameraEx.AutoPictureReviewControl reviewControl;
     private boolean toggleEngaged;
+    private boolean lenrDisabled;
     private String savedFocusMode;
     private boolean released;
 
@@ -146,6 +151,7 @@ public final class SafeCamera {
             return logged(Result.<SafeCamera>failed("SafeCamera.open", t));
         }
         camera.releaseStaleToggle();
+        camera.restoreStaleLenr();
         camera.enableAutoReview();
         return Result.ok(camera);
     }
@@ -398,6 +404,86 @@ public final class SafeCamera {
         }
     }
 
+    // ---- long-exposure NR ----
+
+    // Whether long-exposure NR is on now, read fresh from the camera. Fails if the body has no getter.
+    public Result<Boolean> longExposureNr() {
+        if (released)
+            return closed(GET_LONG_EXPOSURE_NR.key());
+        if (!caps.has(GET_LONG_EXPOSURE_NR))
+            return unsupported(GET_LONG_EXPOSURE_NR.key());
+        try {
+            return Result.ok(cameraEx.createParametersModifier(normal.getParameters()).getLongExposureNR());
+        } catch (Throwable t) {
+            return failed(GET_LONG_EXPOSURE_NR.key(), t);
+        }
+    }
+
+    // True if this body can switch long-exposure NR (Feature.SET_LENR).
+    public boolean canSetLongExposureNr() {
+        return caps.supports(Feature.SET_LENR);
+    }
+
+    // Turns long-exposure NR off for the run. The caller read it as on first. A flag in the preferences stays set
+    // until close() turns it back on, so a crash or kill is undone by the next open().
+    public Result<Void> disableLongExposureNr() {
+        if (released)
+            return closed(SET_LONG_EXPOSURE_NR.key());
+        if (!canSetLongExposureNr())
+            return unsupported(SET_LONG_EXPOSURE_NR.key());
+        setLenrFlag(true);
+        Result<Void> set = setLongExposureNr(false);
+        if (set.isOk())
+            lenrDisabled = true;
+        else
+            setLenrFlag(false);
+        return set;
+    }
+
+    private Result<Void> setLongExposureNr(boolean on) {
+        try {
+            Camera.Parameters params = normal.getParameters();
+            cameraEx.createParametersModifier(params).setLongExposureNR(on);
+            normal.setParameters(params);
+            return Result.ok(null);
+        } catch (Throwable t) {
+            return failed(SET_LONG_EXPOSURE_NR.key(), t);
+        }
+    }
+
+    private void restoreLenr() {
+        if (!lenrDisabled)
+            return;
+        lenrDisabled = false;
+        if (setLongExposureNr(true).isOk())
+            setLenrFlag(false);
+    }
+
+    // A run that turned LENR off and never reached close() left the flag set. The flag stays set if the restore
+    // fails, so the next open() tries again.
+    private void restoreStaleLenr() {
+        if (!prefs.getBoolean(KEY_LENR_OFF_BY_APP, false))
+            return;
+        if (!canSetLongExposureNr()) {
+            setLenrFlag(false);
+            return;
+        }
+        Result<Boolean> now = longExposureNr();
+        Boolean current = now.isOk() ? now.get() : null;
+        if (LenrGuard.shouldRestore(true, current) && !setLongExposureNr(true).isOk())
+            return;
+        setLenrFlag(false);
+        Logger.info("SafeCamera: long-exposure NR restored after an earlier run");
+    }
+
+    private void setLenrFlag(boolean set) {
+        try {
+            prefs.edit().putBoolean(KEY_LENR_OFF_BY_APP, set).commit();
+        } catch (Throwable t) {
+            failed("save " + KEY_LENR_OFF_BY_APP, t);
+        }
+    }
+
     private void enableAutoReview() {
         if (!caps.has(SET_AUTO_PICTURE_REVIEW_CONTROL)) {
             unsupported(SET_AUTO_PICTURE_REVIEW_CONTROL.key());
@@ -549,6 +635,7 @@ public final class SafeCamera {
         if (released)
             return;
         restoreFocus();
+        restoreLenr();
         if (reviewControl != null) {
             reviewControl = null;
             try {
