@@ -63,6 +63,7 @@ public class Display {
         displayManager.switchDisplayOutputTo(DisplayManager.DEVICE_ID_PANEL);
 
         if(autoOff && autoOffDelay > 0) {
+            turnOffRunnableHandler.removeCallbacks(turnOffRunnable);
             turnOffRunnableHandler.postDelayed(turnOffRunnable, autoOffDelay);
         }
     }

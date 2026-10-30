@@ -8,4 +8,9 @@
         <item>100</item>
         <item>120</item>
     </string-array>
+    <string-array name="start_modes">
+        <item>Now</item>
+        <item>Delay</item>
+        <item>At time</item>
+    </string-array>
 </resources>
