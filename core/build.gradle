@@ -1,0 +1,42 @@
+plugins {
+    id 'java-library'
+    id 'jacoco'
+}
+
+// Dalvik 2.3 only loads Java <= 8 bytecode; --release also limits the JDK API to Java 8.
+tasks.withType(JavaCompile).configureEach {
+    options.release = 8
+    options.compilerArgs << '-Xlint:-options'
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}
+
+tasks.named('test') {
+    finalizedBy 'jacocoTestReport'
+}
+
+tasks.named('jacocoTestReport') {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+    violationRules {
+        rule {
+            element = 'CLASS'
+            includes = ['io.github.nathanrcast.timelapse.core.ShotPlan']
+            limit {
+                counter = 'LINE'
+                minimum = 0.90
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn 'jacocoTestCoverageVerification'
+}

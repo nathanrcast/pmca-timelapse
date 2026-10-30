@@ -1,9 +1,9 @@
 package io.github.nathanrcast.timelapse;
 
-import static io.github.nathanrcast.timelapse.Util.DEADBAND_VALUES;
-import static io.github.nathanrcast.timelapse.Util.ISO_VALUES;
-import static io.github.nathanrcast.timelapse.Util.SHUTTER_SPEEDS;
-import static io.github.nathanrcast.timelapse.Util.formatShutterSpeedIndex;
+import static io.github.nathanrcast.timelapse.core.Util.DEADBAND_VALUES;
+import static io.github.nathanrcast.timelapse.core.Util.ISO_VALUES;
+import static io.github.nathanrcast.timelapse.core.Util.SHUTTER_SPEEDS;
+import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeedIndex;
 
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -23,6 +23,11 @@ import io.github.nathanrcast.timelapse.camera.SafeCamera;
 import io.github.nathanrcast.timelapse.camera.model.Capabilities;
 import io.github.nathanrcast.timelapse.camera.model.OptionVisibility;
 
+import io.github.nathanrcast.timelapse.core.Clock;
+import io.github.nathanrcast.timelapse.core.Settings;
+import io.github.nathanrcast.timelapse.core.ShotPlan;
+import io.github.nathanrcast.timelapse.core.Util;
+
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -33,6 +38,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ShootActivity extends BaseActivity implements SurfaceHolder.Callback, SafeCamera.ShutterCallback
 {
     private Settings settings;
+    private ShotPlan plan;
+    private final Clock clock = Clocks.WALL;
 
     private int shotCount;
 
@@ -74,13 +81,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private Display display;
 
-    int getcnt(){
-        if(settings.brs){
-            return 3;
-        }
-        return 1;
-    }
-
     private Handler shootRunnableHandler = new Handler();
     private final Runnable shootRunnable = new Runnable()
     {
@@ -98,8 +98,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             if(burstShooting) {
                 shoot();
             }
-            else if(shotCount < (long) settings.shotCount * getcnt()) {
-                long remainingTime = Math.round(shootTime + settings.interval * 1000 - System.currentTimeMillis());
+            else if(shotCount < plan.totalFrames()) {
+                long remainingTime = Math.round(shootTime + settings.interval * 1000 - clock.nowMs());
                 if(brck.get()>0){
                     remainingTime = -1;
                 }
@@ -154,11 +154,12 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         setContentView(R.layout.activity_shoot);
 
         Intent intent = getIntent();
-        settings = Settings.getFromIntent(intent);
+        settings = SettingsIntent.get(intent);
+        plan = ShotPlan.of(settings);
 
         shotCount = 0;
         takingPicture = false;
-        burstShooting = settings.interval == 0;
+        burstShooting = plan.isBurst();
 
         tvCount = (TextView) findViewById(R.id.tvCount);
         tvBattery = (TextView) findViewById(R.id.tvBattery);
@@ -240,8 +241,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
 
         shotCount = 0;
-        shootRunnableHandler.postDelayed(shootRunnable, (long) settings.delay * 1000 * 60);
-        shootStartTime = System.currentTimeMillis() + settings.delay * 1000 * 60;
+        shootRunnableHandler.postDelayed(shootRunnable, plan.delayMs());
+        shootStartTime = clock.nowMs() + plan.delayMs();
 
         if (settings.delay > 0) {
             shootRunnableHandler.post(delayCountdownRunnable);
@@ -279,6 +280,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             findViewById(R.id.textView4).setVisibility(View.GONE);
             findViewById(R.id.tlHolyGrail).setVisibility(View.GONE);
         }
+        // Frames per interval follow BRC3, so the plan is rebuilt from the masked settings.
+        plan = ShotPlan.of(settings);
     }
 
     // Holy-grail exposure metering
@@ -327,10 +330,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private long delaySecondsRemaining() {
-        if (shotCount != 0 || shootStartTime <= 0)
-            return 0;
-        long ms = shootStartTime - System.currentTimeMillis();
-        return ms > 0 ? (ms + 999) / 1000 : 0;
+        return plan.delaySecondsRemaining(shootStartTime, clock.nowMs(), shotCount);
     }
 
     private void updateScreen(){
@@ -338,7 +338,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (delaySeconds > 0)
             tvCount.setText("Delay: " + Util.formatTime(delaySeconds));
         else
-            tvCount.setText(Integer.toString(shotCount)+"/"+Long.toString((long) settings.shotCount * getcnt()));
+            tvCount.setText(Integer.toString(shotCount)+"/"+Long.toString(plan.totalFrames()));
         tvRemaining.setText(getRemainingTime());
         tvBattery.setText(getBatteryPercentage());
 
@@ -435,7 +435,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             holyGrailPrePhotoEvent();
         }
 
-        shootTime = System.currentTimeMillis();
+        shootTime = clock.nowMs();
         safeCamera.takePicture();
 
         shotCount++;
@@ -538,7 +538,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         if(brck.get()<0){
             brck = new AtomicInteger(0);
-            if(getcnt()>1) {
+            if(plan.framesPerInterval()>1) {
                 brck = new AtomicInteger(2);
             }
         }
@@ -552,7 +552,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             });
 
             // just keep shooting until we have all shots
-            if (System.currentTimeMillis() >= shootStartTime + (long) settings.shotCount * 1000) {
+            if (clock.nowMs() >= plan.endMs(shootStartTime)) {
                 safeCamera.cancelTakePicture();
                 stopPicturePreview = true;
                 display.on();
@@ -573,10 +573,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
             //camera.startPreview();
 
-            if (shotCount < (long) settings.shotCount * getcnt()) {
+            if (shotCount < plan.totalFrames()) {
 
                 // remaining time to the next shot
-                double remainingTime = shootTime + settings.interval * 1000 - System.currentTimeMillis();
+                double remainingTime = shootTime + settings.interval * 1000 - clock.nowMs();
                 if (brck.get() > 0) {
                     remainingTime = -1;
                 }
@@ -626,15 +626,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private String getRemainingTime() {
-        long seconds;
-        if(burstShooting)
-            seconds = Math.round(((long) settings.shotCount * 1000 - System.currentTimeMillis() + shootStartTime) / 1000.0);
-        else {
-            // bracketed frames are taken back to back within one interval
-            long intervalsLeft = settings.shotCount - shotCount / getcnt();
-            seconds = Math.round(intervalsLeft * settings.interval) + delaySecondsRemaining();
-        }
-        return Util.formatTime(seconds);
+        return Util.formatTime(plan.secondsRemaining(shootStartTime, clock.nowMs(), shotCount));
     }
 
     @Override
