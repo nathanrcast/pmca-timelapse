@@ -40,7 +40,7 @@ python3 tools/analyze_log.py <LOG.CSV>                                          
 - **Upstream issue numbers ≠ ours.** In issues, PRs and commit messages, write upstream refs as `` `up#41` `` inside backticks. A bare `#41` links to *our* issue 41. A `jonasjuffinger/TimeLapse#41` or upstream issue URL posts a backlink on the dormant upstream repo. Link to upstream issues only from files under `docs/`.
 - Don't `@`-mention upstream authors in issues/PRs. Credits live in README.
 - Long-exposure NR makes the camera shoot a dark frame after each exposure, which shows up as "skipped every other shot" (upstream issues 26/50). Rule it out before blaming the scheduler.
-- The Frosbe fork is merged with its history (T03): `git log --follow` on a moved file runs through `com/frosbe/holygrail/` back to `com/jonasjuffinger/timelapse/`. Holy grail defaults to off, and its Sony calls run only when it is on. Its `com.jjoe64:graphview:3.1.4` dependency is LGPL and is instantiated but never added to a layout.
+- The Frosbe fork is merged with its history (T03): `git log --follow` on a moved file runs through `com/frosbe/holygrail/` back to `com/jonasjuffinger/timelapse/`. Holy grail defaults to off, and its Sony calls run only when it is on. Its `com.jjoe64:graphview:3.1.4` dependency (LGPL, never shown) was removed.
 - `local.properties` is machine-specific and untracked.
 - Release minify is off on purpose; re-enabling it (R8) needs an on-camera Dalvik 2.3 test.
 

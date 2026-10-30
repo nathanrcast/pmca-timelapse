@@ -7,7 +7,6 @@ import static io.github.nathanrcast.timelapse.Util.formatShutterSpeedIndex;
 
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.graphics.Color;
 import android.hardware.Camera;
 import android.os.BatteryManager;
 import android.os.Bundle;
@@ -16,14 +15,10 @@ import android.util.Pair;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
 
-import com.jjoe64.graphview.GraphView;
-import com.jjoe64.graphview.GraphViewSeries;
-import com.jjoe64.graphview.LineGraphView;
 import com.sony.scalar.hardware.CameraEx;
 
 import java.io.IOException;
@@ -77,12 +72,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private float targetExposureLevel = 0.0f;
 
     private Display display;
-
-    GraphViewSeries exposureLevelSeries = new GraphViewSeries(new GraphView.GraphViewData[]{}); // init data
-    //GraphViewSeries targetExposureLevelSeries = new GraphViewSeries(new GraphView.GraphViewData[]{}); // init data
-    //GraphViewSeries shutterSpeedSeries = new GraphViewSeries(new GraphView.GraphViewData[]{}); // init data
-    //GraphViewSeries ISOSeries = new GraphViewSeries(new GraphView.GraphViewData[]{}); // init data
-
 
     int getcnt(){
         if(settings.brs){
@@ -208,22 +197,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         reviewSurfaceView.setZOrderOnTop(false);
         cameraSurfaceHolder = reviewSurfaceView.getHolder();
         cameraSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-
-        GraphView graphView = new LineGraphView(
-                this // context
-                , "ExposureLevel" // heading
-        );
-
-
-
-        exposureLevelSeries.getStyle().color = Color.RED;
-        graphView.addSeries(exposureLevelSeries); // data
-        //graphView.addSeries(targetExposureLevelSeries); // data
-        //graphView.addSeries(shutterSpeedSeries); // data
-        //graphView.addSeries(ISOSeries); // data
-
-        LinearLayout layout = (LinearLayout) findViewById(R.id.graphLayout);
-        //layout.addView(graphView);
     }
 
 
@@ -249,11 +222,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
         catch(Exception ignored)
         {}
-
-        /*log("reset graph data");
-        exposureLevelSeries.resetData(new GraphView.GraphViewData[]{});
-        targetExposureLevelSeries.resetData(new GraphView.GraphViewData[]{});
-        shutterSpeedSeries.resetData(new GraphView.GraphViewData[]{});*/
 
         final CameraEx.ParametersModifier modifier = cameraEx.createParametersModifier(params);
 
@@ -502,7 +470,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             return;
 
         if (settings.holyGrail){
-            addPointsToGraph();
+            log("holyGrail shot " + shotCount + ", exposureLevel: " + exposureLevel + ", target:" + targetExposureLevel);
             holyGrailPrePhotoEvent();
         }
 
@@ -520,13 +488,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 updateScreen();
             }
         });
-    }
-
-    private void addPointsToGraph(){
-        log("addPointsToGraph" + shotCount + ", exposureLevel: " + exposureLevel + ", target:" + targetExposureLevel);
-        exposureLevelSeries.appendData(new GraphView.GraphViewData(shotCount, exposureLevel+10), false);
-        //targetExposureLevelSeries.appendData(new GraphView.GraphViewData(shotCount, targetExposureLevel), false);
-        //shutterSpeedSeries.appendData(new GraphView.GraphViewData(shotCount, shutterSpeedValue), false);
     }
 
     private void holyGrailPrePhotoEvent(){

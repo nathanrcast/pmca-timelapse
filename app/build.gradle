@@ -43,5 +43,4 @@ android {
 dependencies {
     compileOnly files('libs/openmemories-stubs-f8df350.jar')
     implementation files('libs/openmemories-framework-f8df350.jar')
-    implementation 'com.jjoe64:graphview:3.1.4'
 }
