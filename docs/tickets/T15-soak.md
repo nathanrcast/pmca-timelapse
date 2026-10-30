@@ -22,3 +22,6 @@ Multi-hour and multi-day runs complete unattended and leave the camera responsiv
 ## Acceptance
 - [ ] **HW:** a6500 runs 8 h @ 10 s and NEX-5T runs 4 h @ 10 s. `analyze_log.py` shows max drift < 100 ms and 0 unexplained skips, and the camera responds afterwards (pending maintainer).
 - [ ] meminfo shows no monotonic heap growth across the run (log excerpt attached).
+
+## Inherited from T06
+`SafeCamera.takePicture()` returns a `Result`. Before this ticket the Scheduler only learned about an immediate failure at the capture timeout (at least 120 s). `Scheduler.captureFailed()` now closes the in-flight slot as `SKIP(LOST)` at once, and `ShootActivity` calls it when `takePicture()` is not ok. It is a no-op with no frame in flight and in burst mode, where the timer ends the burst and a retry would spin.

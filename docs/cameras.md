@@ -142,3 +142,12 @@ Each of these is answerable by one on-camera session with the probe extension be
 4. The same with NR on: confirm every other slot is a dark frame and the slot formula holds.
 5. Stop mid-exposure (back out of the run): the camera returns to a usable state with no stuck shutter, and the next launch starts clean.
 Pass when steps 2 and 3 hold on the a6500; the NEX-5T follows only if its probe shows a bulb step.
+
+## Soak results (T15)
+
+Fill in after the hardware soak (`docs/hw_test_checklist.md` § Soak). Drift and skips come from `tools/analyze_log.py`, heap growth from `tools/meminfo_trend.py`.
+
+| Body | Firmware | Date | Run | Max drift (ms) | Unexplained skips | Native heap growth (kB) | Dalvik heap growth (kB) | Responsive afterwards | Notes |
+|---|---|---|---|---|---|---|---|---|---|
+| ILCE-6500 | | | 8 h @ 10 s, DOFF on | | | | | | |
+| NEX-5T | | | 4 h @ 10 s, DOFF on | | | | | | |

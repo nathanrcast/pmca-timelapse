@@ -37,6 +37,7 @@ python3 -I tools/frames_for_run.py <dir> --log LOG.CSV --run <run_id> [--window-
   - for any Sony interface it implements, a small class of its own in `camera/` that is only loaded once the probe has found the method.
 
   `CapsDumpActivity` and `CapsFormat` are exempt: they are the probe tool, and they catch `Throwable` per call. Check: `grep -rn "CameraEx\|ParametersModifier" app/src/main/java | grep -v /camera/ | grep -v CapsDump | grep -v CapsFormat` must print nothing.
+- **`DisplayManager` calls outside `BaseActivity` are `Display`'s alone** (DOFF switch and restore). They are `SonyMethod` entries, and `Display` guards each with `ReflectiveCapabilities.has` because `restoreIfLeftOff` runs before any probe. Every restore path targets the panel.
 - `applicationId` and the release signing key are permanent. Installers pin the certificate on first install, so changing either forces every user to uninstall.
 - Pure logic (scheduling, exposure ramp, shot-plan math) belongs in `:core` with JVM unit tests, not in Activities.
 - **Lint's API-10 check does not cover `:core`.** `--release 8` limits it to the Java 8 API, but Android lint runs NewApi only on the app module, not on JVM modules. Keep core code to what API 10 has: no `java.util.function`, streams, `java.time` or `java.nio.file`, and plain anonymous classes rather than lambdas (D8 desugars lambdas, but anonymous classes read clearer against Dalvik). After changing `:core`, check the APK with `dexdump -d` for `invoke-custom`/`invoke-polymorphic` (there must be none).
