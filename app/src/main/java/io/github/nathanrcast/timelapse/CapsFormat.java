@@ -241,24 +241,21 @@ final class CapsFormat {
         return list;
     }
 
-    // One line per call: "name = value" or "name !! <exception>". Never throws.
-    static String probe(Object target, Method m) {
+    // " = value" or " !! <exception>" for one call; the caller writes the method name first. Never throws.
+    static String result(Object target, Method m) {
         try {
             try {
                 m.setAccessible(true);
             } catch (Throwable ignored) {
             }
-            return m.getName() + " = " + value(m.invoke(target));
+            return " = " + value(m.invoke(target));
         } catch (Throwable t) {
-            return m.getName() + " !! " + failure(t);
+            return " !! " + failure(t);
         }
     }
 
-    static List<String> probeGetters(Object target) {
-        List<String> lines = new ArrayList<String>();
-        for (Method m : getters(target.getClass()))
-            lines.add(probe(target, m));
-        return lines;
+    static String probe(Object target, Method m) {
+        return m.getName() + result(target, m);
     }
 
     // "NAME = value" for each public static final primitive or String field, sorted by name.

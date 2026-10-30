@@ -129,7 +129,7 @@ public class CapsFormatTest {
     }
 
     @Test
-    public void probeCatchesWhatTheGetterThrows() {
+    public void probeCatchesWhatTheGetterThrows() throws Exception {
         assertEquals(Arrays.asList(
                 "getSupportedDriveModes = [\"single\", \"burst\"]",
                 "isSupportedSilentShutterMode !! java.lang.NoSuchMethodError: isSupportedSilentShutterMode",
@@ -137,7 +137,16 @@ public class CapsFormatTest {
                 "getRGBMatrix = [1, 2]",
                 "getShutterSpeed = (1, 250)",
                 "isSilentShutterMode = false"),
-                CapsFormat.probeGetters(new FakeModifier()));
+                probeAll(new FakeModifier()));
+        Method m = FakeModifier.class.getMethod("getShutterSpeed");
+        assertEquals(" = (1, 250)", CapsFormat.result(new FakeModifier(), m));
+    }
+
+    private static List<String> probeAll(Object target) {
+        List<String> out = new ArrayList<String>();
+        for (Method m : CapsFormat.getters(target.getClass()))
+            out.add(CapsFormat.probe(target, m));
+        return out;
     }
 
     @Test

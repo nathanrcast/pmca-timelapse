@@ -6,8 +6,9 @@ import android.graphics.Typeface;
 import android.hardware.Camera;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.KeyEvent;
 import android.widget.LinearLayout;
@@ -36,15 +37,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-// T08 diagnostics: dumps what the body's Sony API offers to TIMELPS/CAPS-<model>.txt, then logs every key event.
-// Every probe catches Throwable on its own, so a method missing on this firmware can't crash the camera.
+// T08 diagnostics: probes what the body's Sony API offers into TIMELPS/CAPS-<model>.txt, then logs every key event.
+// Every probe catches Throwable on its own, so a method missing on this firmware can't crash the camera. The file is
+// written as the probe goes, and each call's name is flushed before the call, so a native crash leaves a file whose
+// last line names the call that killed it.
 public class CapsDumpActivity extends BaseActivity {
     private static final long MENU_HOLD_MS = 2000;
     private static final int SCREEN_LINES = 15;
-    private static final String HINT = "Turn every dial and press every button; hold MENU 2 s to exit";
+    private static final String EXIT = "Hold MENU 2 s to exit.";
+    private static final String HINT = "Turn every dial and press every button.\n" + EXIT;
 
     private static final String CAMERA_EX = "com.sony.scalar.hardware.CameraEx";
     private static final String SCALAR_INPUT = "com.sony.scalar.sysutil.ScalarInput";
@@ -113,27 +115,24 @@ public class CapsDumpActivity extends BaseActivity {
 
     private static final String[] CAMERA_EX_GETTERS = {"hasSupportedParameters", "getInhibitionInfo", "getLensInfo"};
 
-    private final Handler handler = new Handler();
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private final Handler ui = new Handler();
     private final LinkedList<String> screenLines = new LinkedList<String>();
     private final long startedAt = SystemClock.uptimeMillis();
 
     private Map<Integer, String> keyNames = Collections.emptyMap();
     private TextView tvStatus, tvKeys;
-    private boolean dumped;
+    private HandlerThread workerThread;
+    private Handler worker;
+    private boolean probeStarted;
     private long menuDownAt = -1;
-    private File capsFile;
 
-    private final Runnable dumpRunnable = new Runnable() {
+    // Owned by the worker thread: the one CAPS writer, kept open for the key log until onDestroy.
+    private CapsWriter caps;
+
+    private final Runnable probeRunnable = new Runnable() {
         @Override
         public void run() {
-            dumped = true;
-            try {
-                dump();
-            } catch (Throwable t) {
-                Logger.error("CapsDump: " + CapsFormat.failure(t));
-                tvStatus.setText("Probe failed: " + CapsFormat.failure(t) + "\n" + HINT);
-            }
+            probe();
         }
     };
 
@@ -155,7 +154,7 @@ public class CapsDumpActivity extends BaseActivity {
         tvStatus = new TextView(this);
         tvStatus.setTextColor(Color.WHITE);
         tvStatus.setTextSize(16);
-        tvStatus.setText("Camera info: probing...");
+        tvStatus.setText("Camera info: starting...");
         tvKeys = new TextView(this);
         tvKeys.setTextColor(Color.LTGRAY);
         tvKeys.setTextSize(12);
@@ -169,20 +168,26 @@ public class CapsDumpActivity extends BaseActivity {
         } catch (Throwable t) {
             Logger.error("CapsDump: ScalarInput constants: " + CapsFormat.failure(t));
         }
+
+        // A Looper thread, so any Handler the Sony classes create while the probe runs has a queue to bind to.
+        workerThread = new HandlerThread("CapsDump");
+        workerThread.start();
+        worker = new Handler(workerThread.getLooper());
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         setAutoPowerOffMode(false);
-        if (!dumped)
-            handler.post(dumpRunnable);
+        if (!probeStarted) {
+            probeStarted = true;
+            worker.post(probeRunnable);
+        }
     }
 
     @Override
     protected void onPause() {
-        handler.removeCallbacks(dumpRunnable);
-        handler.removeCallbacks(menuHeldRunnable);
+        ui.removeCallbacks(menuHeldRunnable);
         menuDownAt = -1;
         setAutoPowerOffMode(true);
         super.onPause();
@@ -190,11 +195,20 @@ public class CapsDumpActivity extends BaseActivity {
 
     @Override
     protected void onDestroy() {
-        io.shutdown();
+        // Queued behind the probe and any pending key lines; the probe releases the camera itself.
+        worker.post(new Runnable() {
+            @Override
+            public void run() {
+                if (caps != null)
+                    caps.close();
+                caps = null;
+                Looper.myLooper().quit();
+            }
+        });
         super.onDestroy();
     }
 
-    // Above BaseActivity's onKeyDown/onKeyUp switch, so every key, wheel and dial event is logged and none is acted on.
+    // Above BaseActivity's onKeyDown/onKeyUp switch, so every key, wheel and dial event is logged. Only the exit acts.
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         try {
@@ -207,20 +221,22 @@ public class CapsDumpActivity extends BaseActivity {
 
     private void logKey(KeyEvent event) {
         int scan = event.getScanCode();
-        String extra = event.getAction() == KeyEvent.ACTION_DOWN ? dialStatus(scan) : null;
+        int code = event.getKeyCode();
+        int action = event.getAction();
+        String extra = action == KeyEvent.ACTION_DOWN ? dialStatus(scan) : null;
         record(CapsFormat.keyLine(event.getEventTime() - startedAt,
-                CapsFormat.actionName(event.getAction(), event.getRepeatCount()),
-                event.getKeyCode(), scan, CapsFormat.keyName(keyNames, scan), extra));
+                CapsFormat.actionName(action, event.getRepeatCount()),
+                code, scan, CapsFormat.keyName(keyNames, scan), extra));
 
-        if (scan == ScalarInput.ISV_KEY_MENU || scan == ScalarInput.ISV_KEY_SK1 || event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+        // Finish on key-up, so the release can't reach SettingsActivity (whose MENU key-up closes the app).
+        if (scan == ScalarInput.ISV_KEY_MENU || scan == ScalarInput.ISV_KEY_SK1 || code == KeyEvent.KEYCODE_MENU) {
+            if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                 menuDownAt = event.getEventTime();
-                handler.postDelayed(menuHeldRunnable, MENU_HOLD_MS);
-            } else if (event.getAction() == KeyEvent.ACTION_UP) {
-                handler.removeCallbacks(menuHeldRunnable);
+                ui.postDelayed(menuHeldRunnable, MENU_HOLD_MS);
+            } else if (action == KeyEvent.ACTION_UP) {
+                ui.removeCallbacks(menuHeldRunnable);
                 boolean held = menuDownAt >= 0 && event.getEventTime() - menuDownAt >= MENU_HOLD_MS;
                 menuDownAt = -1;
-                // Finish on release, so the MENU key-up can't reach SettingsActivity and close the app.
                 if (held)
                     finish();
             }
@@ -267,7 +283,7 @@ public class CapsDumpActivity extends BaseActivity {
         }
     }
 
-    private void record(String line) {
+    private void record(final String line) {
         screenLines.add(line);
         while (screenLines.size() > SCREEN_LINES)
             screenLines.removeFirst();
@@ -276,60 +292,167 @@ public class CapsDumpActivity extends BaseActivity {
             sb.append(l).append('\n');
         tvKeys.setText(sb.toString());
 
-        final String text = line + "\n";
-        io.execute(new Runnable() {
+        worker.post(new Runnable() {
             @Override
             public void run() {
-                if (capsFile == null)
-                    return;
-                try {
-                    write(capsFile, text, true);
-                } catch (IOException ignored) {
+                if (caps != null) {
+                    caps.line(line);
+                    caps.flush();
                 }
             }
         });
     }
 
-    private static void write(File f, String text, boolean append) throws IOException {
-        File dir = f.getParentFile();
-        if (dir != null)
-            dir.mkdirs();
-        Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f, append), "UTF-8"));
-        try {
-            w.write(text);
-        } finally {
-            w.close();
-        }
+    private void status(final String text) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                tvStatus.setText(text);
+            }
+        });
     }
 
-    private static final class Out {
-        final StringBuilder sb = new StringBuilder();
+    // Never throws: an IOException is kept in `error` and further writes are skipped.
+    private static final class CapsWriter {
+        final File file;
+        private final FileOutputStream fos;
+        private final Writer w;
         int lines;
+        String error;
+
+        CapsWriter(File file) throws IOException {
+            this.file = file;
+            fos = new FileOutputStream(file, false);
+            w = new BufferedWriter(new OutputStreamWriter(fos, "UTF-8"));
+        }
+
+        private void write(String s) {
+            if (error != null)
+                return;
+            try {
+                w.write(s);
+            } catch (IOException e) {
+                error = CapsFormat.failure(e);
+            }
+        }
 
         void line(String s) {
-            sb.append(s).append('\n');
+            write(s);
+            write("\n");
             lines++;
         }
 
-        void lines(List<String> list) {
-            for (String s : list)
-                line(s);
+        // Writes and flushes the call's name before the call; end() completes the line with the result.
+        void begin(String label) {
+            write(label);
+            flush();
         }
 
-        void section(String title) {
-            line("");
-            line("## " + title);
+        void end(String result) {
+            line(result);
         }
 
-        void fail(String what, Throwable t) {
-            line(what + " !! " + CapsFormat.failure(t));
+        void flush() {
+            if (error != null)
+                return;
+            try {
+                w.flush();
+            } catch (IOException e) {
+                error = CapsFormat.failure(e);
+            }
+        }
+
+        // Flush and fsync at the end of each probe group, so a camera reboot still keeps the groups that finished.
+        void sync() {
+            flush();
+            if (error != null)
+                return;
+            try {
+                fos.getFD().sync();
+            } catch (IOException e) {
+                error = CapsFormat.failure(e);
+            }
+        }
+
+        void close() {
+            sync();
+            try {
+                w.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 
-    private void dump() {
-        Out out = new Out();
-        String model = null;
+    // Worker thread from here on.
 
+    private void probe() {
+        String model = null;
+        try {
+            model = DeviceInfo.getInstance().getModel();
+        } catch (Throwable ignored) {
+        }
+        if (model == null || model.length() == 0)
+            model = Build.MODEL;
+
+        String openError = openCaps(CapsFormat.fileSafe(model));
+        if (caps == null) {
+            Logger.error("CapsDump: " + openError);
+            status("Could not write " + openError + "\nKey log NOT being saved.\n" + EXIT);
+            return;
+        }
+
+        String aborted = null;
+        try {
+            dump(caps);
+        } catch (Throwable t) {
+            aborted = CapsFormat.failure(t);
+            caps.line("!! probe aborted: " + aborted);
+        }
+        caps.line("");
+        caps.line("## Key log: seconds since start, action, keyCode, scanCode, ScalarInput name, dial status");
+        caps.sync();
+
+        String path = caps.file.getPath();
+        if (caps.error != null) {
+            Logger.error("CapsDump: " + path + ": " + caps.error);
+            status("Write failed: " + path + ": " + caps.error + "\nKey log NOT being saved.\n" + EXIT);
+        } else if (aborted != null) {
+            Logger.error("CapsDump: probe aborted: " + aborted);
+            status("Probe aborted: " + aborted + "\nKey log is being saved to " + path + "\n" + HINT);
+        } else {
+            Logger.info("CapsDump: wrote " + path + " (" + caps.lines + " lines)");
+            status("Wrote " + path + " (" + caps.lines + " lines)\n" + HINT);
+        }
+    }
+
+    private String openCaps(String model) {
+        File dir = Logger.getFile().getParentFile();
+        dir.mkdirs();
+        File primary = new File(dir, "CAPS-" + model + ".txt");
+        try {
+            caps = new CapsWriter(primary);
+            return null;
+        } catch (IOException e) {
+            String error = primary.getPath() + ": " + CapsFormat.failure(e);
+            // Fall back to an 8.3 name in case the card's filesystem rejects the long one.
+            File fallback = new File(dir, "CAPS.TXT");
+            try {
+                caps = new CapsWriter(fallback);
+                return null;
+            } catch (IOException e2) {
+                return error + "; " + fallback.getPath() + ": " + CapsFormat.failure(e2);
+            }
+        }
+    }
+
+    private void section(CapsWriter out, String title) {
+        out.line("");
+        out.line("## " + title);
+        out.flush();
+        status("Probing: " + title + "\nWriting " + out.file.getPath());
+    }
+
+    private void dump(CapsWriter out) {
         String version;
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
@@ -339,20 +462,25 @@ public class CapsDumpActivity extends BaseActivity {
         }
         out.line("# TimeLapse+ CapsDump " + version);
         out.line("# written " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
+        out.line("# A line with a call name but no ' = ' or ' !! ' is the call that crashed the probe.");
 
-        out.section("Device (serial number omitted)");
+        section(out, "Device (serial number omitted)");
+        DeviceInfo info = null;
+        out.begin("DeviceInfo.getInstance");
         try {
-            DeviceInfo info = DeviceInfo.getInstance();
+            info = DeviceInfo.getInstance();
+            out.end(" = ok");
+        } catch (Throwable t) {
+            out.end(" !! " + CapsFormat.failure(t));
+        }
+        if (info != null)
             for (String name : DEVICE_INFO_GETTERS)
                 probeByName(out, "DeviceInfo.", info, name);
-            model = info.getModel();
-        } catch (Throwable t) {
-            out.fail("DeviceInfo", t);
-        }
+        out.begin("ScalarProperties.version.platform");
         try {
-            out.line("ScalarProperties.version.platform = " + CapsFormat.value(ScalarProperties.getString("version.platform")));
+            out.end(" = " + CapsFormat.value(ScalarProperties.getString("version.platform")));
         } catch (Throwable t) {
-            out.fail("ScalarProperties.version.platform", t);
+            out.end(" !! " + CapsFormat.failure(t));
         }
         out.line("Build.MODEL = " + CapsFormat.value(Build.MODEL));
         out.line("Build.DEVICE = " + CapsFormat.value(Build.DEVICE));
@@ -362,13 +490,14 @@ public class CapsDumpActivity extends BaseActivity {
         out.line("Build.VERSION.SDK_INT = " + Build.VERSION.SDK_INT);
         out.line("Build.VERSION.INCREMENTAL = " + CapsFormat.value(Build.VERSION.INCREMENTAL));
         out.line("Build.FINGERPRINT = " + CapsFormat.value(Build.FINGERPRINT));
-        if (model == null || model.length() == 0)
-            model = Build.MODEL;
+        out.sync();
 
+        // Listing methods needs no initialization, so classes load with initialize=false; reading constants does
+        // initialize, which is why constants are read only from CameraEx and ParametersModifier, after CameraEx.open.
+        section(out, "Classes");
         Map<String, Class<?>> classes = new TreeMap<String, Class<?>>();
-        Out classLines = new Out();
         for (String name : PROBED_CLASSES)
-            loadClass(classLines, classes, name);
+            loadClass(out, classes, name);
         Class<?> cameraExClass = classes.get(CAMERA_EX);
         if (cameraExClass != null) {
             try {
@@ -378,12 +507,12 @@ public class CapsDumpActivity extends BaseActivity {
                     if (c.isInterface())
                         classes.put(c.getName(), c);
                 }
-                classLines.line("");
-                classLines.line("CameraEx nested classes: " + nested.size());
+                out.line("");
+                out.line("CameraEx nested classes: " + nested.size());
                 for (String n : nested)
-                    classLines.line(n);
+                    out.line(n);
             } catch (Throwable t) {
-                classLines.fail("CameraEx.getClasses", t);
+                out.line("CameraEx.getClasses !! " + CapsFormat.failure(t));
             }
         }
 
@@ -392,61 +521,49 @@ public class CapsDumpActivity extends BaseActivity {
             try {
                 present.addAll(CapsFormat.methodKeys(c));
             } catch (Throwable t) {
-                classLines.fail(c.getName() + ".getMethods", t);
+                out.line(c.getName() + ".getMethods !! " + CapsFormat.failure(t));
             }
         }
-        out.section("Used methods (app calls today) vs this firmware");
-        out.lines(CapsFormat.usedReport(USED_METHODS, present));
+        section(out, "Used methods (app calls today) vs this firmware");
+        for (String l : CapsFormat.usedReport(USED_METHODS, present))
+            out.line(l);
 
-        out.section("Classes");
-        out.sb.append(classLines.sb);
-        out.lines += classLines.lines;
-
-        try {
-            Class<?> si = classes.get(SCALAR_INPUT);
-            if (si != null) {
-                Map<Integer, String> isv = CapsFormat.constantNames(si, "ISV_");
-                out.section("ScalarInput ISV_* constants (" + isv.size() + ")");
-                for (Map.Entry<Integer, String> e : isv.entrySet())
-                    out.line(e.getKey() + " " + e.getValue());
-            }
-        } catch (Throwable t) {
-            out.fail("ScalarInput constants", t);
-        }
+        section(out, "ScalarInput ISV_* constants (" + keyNames.size() + ")");
+        for (Map.Entry<Integer, String> e : keyNames.entrySet())
+            out.line(e.getKey() + " " + e.getValue());
+        out.sync();
 
         dumpValues(out);
 
         for (Map.Entry<String, Class<?>> e : classes.entrySet()) {
             try {
                 List<Method> methods = CapsFormat.methods(e.getValue());
-                out.section("Methods " + e.getKey() + " (" + methods.size() + ")");
+                section(out, "Methods " + e.getKey() + " (" + methods.size() + ")");
                 for (Method m : methods)
                     out.line(CapsFormat.signature(m));
             } catch (Throwable t) {
-                out.fail("Methods " + e.getKey(), t);
+                out.line("Methods " + e.getKey() + " !! " + CapsFormat.failure(t));
             }
         }
+        out.sync();
 
         for (String name : CONSTANT_CLASSES) {
             Class<?> c = classes.get(name);
             if (c == null)
                 continue;
+            section(out, "Constants " + name);
             try {
-                List<String> constants = CapsFormat.constants(c);
-                out.section("Constants " + name + " (" + constants.size() + ")");
-                out.lines(constants);
+                for (String l : CapsFormat.constants(c))
+                    out.line(l);
             } catch (Throwable t) {
-                out.fail("Constants " + name, t);
+                out.line("constants !! " + CapsFormat.failure(t));
             }
+            out.sync();
         }
-
-        out.section("Key log: seconds since start, action, keyCode, scanCode, ScalarInput name, dial status");
-        writeDump(out.sb.toString(), out.lines, CapsFormat.fileSafe(model));
     }
 
-    private static void loadClass(Out out, Map<String, Class<?>> classes, String name) {
+    private static void loadClass(CapsWriter out, Map<String, Class<?>> classes, String name) {
         try {
-            // initialize=false: enumerate without running the class's static initializer.
             classes.put(name, Class.forName(name, false, CapsDumpActivity.class.getClassLoader()));
             out.line("present  " + name);
         } catch (Throwable t) {
@@ -454,117 +571,117 @@ public class CapsDumpActivity extends BaseActivity {
         }
     }
 
-    private static void probeByName(Out out, String prefix, Object target, String name) {
+    private static void probeByName(CapsWriter out, String prefix, Object target, String name) {
+        Method m;
         try {
-            out.line(prefix + CapsFormat.probe(target, target.getClass().getMethod(name)));
+            m = target.getClass().getMethod(name);
         } catch (Throwable t) {
-            out.fail(prefix + name, t);
+            out.line(prefix + name + " !! " + CapsFormat.failure(t));
+            return;
+        }
+        out.begin(prefix + name);
+        out.end(CapsFormat.result(target, m));
+    }
+
+    private static void probeGetters(CapsWriter out, Object target) {
+        List<Method> getters;
+        try {
+            getters = CapsFormat.getters(target.getClass());
+        } catch (Throwable t) {
+            out.line("getters !! " + CapsFormat.failure(t));
+            return;
+        }
+        for (Method m : getters) {
+            out.begin(m.getName());
+            out.end(CapsFormat.result(target, m));
         }
     }
 
-    // Opens and releases CameraEx the way ShootActivity does, and only reads values: no set*, no setParameters.
-    private void dumpValues(Out out) {
+    private static void flatten(CapsWriter out, Camera.Parameters params) {
+        out.begin("flatten");
+        List<String> lines;
+        try {
+            lines = CapsFormat.sortedLines(params.flatten());
+            out.end(" = " + lines.size() + " keys");
+        } catch (Throwable t) {
+            out.end(" !! " + CapsFormat.failure(t));
+            return;
+        }
+        for (String l : lines)
+            out.line(l);
+    }
+
+    // Opens and releases CameraEx as ShootActivity does, and only reads: no set*, no setParameters, nothing with arguments.
+    private void dumpValues(CapsWriter out) {
+        section(out, "Values CameraEx");
         CameraEx cameraEx;
+        out.begin("CameraEx.open(0, null)");
         try {
             cameraEx = CameraEx.open(0, null);
+            out.end(cameraEx == null ? " = null" : " = ok");
         } catch (Throwable t) {
-            out.section("Values");
-            out.fail("CameraEx.open", t);
+            out.end(" !! " + CapsFormat.failure(t));
             return;
         }
-        if (cameraEx == null) {
-            out.section("Values");
-            out.line("CameraEx.open returned null");
+        if (cameraEx == null)
             return;
-        }
         try {
-            out.section("Values CameraEx");
             for (String name : CAMERA_EX_GETTERS)
                 probeByName(out, "", cameraEx, name);
+            out.sync();
 
             Camera.Parameters params = null;
+            out.begin("getNormalCamera().getParameters()");
             try {
                 params = cameraEx.getNormalCamera().getParameters();
+                out.end(" = ok");
             } catch (Throwable t) {
-                out.fail("getNormalCamera().getParameters", t);
+                out.end(" !! " + CapsFormat.failure(t));
             }
             if (params != null) {
-                out.section("Values CameraEx$ParametersModifier on getNormalCamera().getParameters()");
+                section(out, "Values CameraEx$ParametersModifier on getNormalCamera().getParameters()");
+                Object modifier = null;
+                out.begin("createParametersModifier");
                 try {
-                    out.lines(CapsFormat.probeGetters(cameraEx.createParametersModifier(params)));
+                    modifier = cameraEx.createParametersModifier(params);
+                    out.end(" = ok");
                 } catch (Throwable t) {
-                    out.fail("createParametersModifier", t);
+                    out.end(" !! " + CapsFormat.failure(t));
                 }
-                out.section("Values Camera$Parameters");
-                try {
-                    out.lines(CapsFormat.probeGetters(params));
-                } catch (Throwable t) {
-                    out.fail("Camera$Parameters getters", t);
-                }
-                out.section("Camera$Parameters.flatten() of getNormalCamera().getParameters()");
-                try {
-                    out.lines(CapsFormat.sortedLines(params.flatten()));
-                } catch (Throwable t) {
-                    out.fail("flatten", t);
-                }
+                if (modifier != null)
+                    probeGetters(out, modifier);
+                out.sync();
+
+                section(out, "Values Camera$Parameters");
+                probeGetters(out, params);
+                out.sync();
+
+                section(out, "Camera$Parameters.flatten() of getNormalCamera().getParameters()");
+                flatten(out, params);
+                out.sync();
             }
 
-            out.section("Camera$Parameters.flatten() of CameraEx.getSupportedParameters()");
+            section(out, "Camera$Parameters.flatten() of CameraEx.getSupportedParameters()");
+            Object supported = null;
+            out.begin("getSupportedParameters");
             try {
-                Object supported = cameraEx.getClass().getMethod("getSupportedParameters").invoke(cameraEx);
-                if (supported instanceof Camera.Parameters)
-                    out.lines(CapsFormat.sortedLines(((Camera.Parameters) supported).flatten()));
-                else
-                    out.line("getSupportedParameters = " + CapsFormat.value(supported));
+                supported = cameraEx.getClass().getMethod("getSupportedParameters").invoke(cameraEx);
+                out.end(supported instanceof Camera.Parameters ? " = ok" : " = " + CapsFormat.value(supported));
             } catch (Throwable t) {
-                out.fail("getSupportedParameters", t);
+                out.end(" !! " + CapsFormat.failure(t));
             }
+            if (supported instanceof Camera.Parameters)
+                flatten(out, (Camera.Parameters) supported);
+            out.sync();
         } finally {
+            out.begin("CameraEx.release()");
             try {
                 cameraEx.release();
+                out.end(" = ok");
             } catch (Throwable t) {
-                out.fail("CameraEx.release", t);
+                out.end(" !! " + CapsFormat.failure(t));
             }
+            out.sync();
         }
-    }
-
-    private void writeDump(final String text, final int lines, String model) {
-        final File dir = new File(Environment.getExternalStorageDirectory(), "TIMELPS");
-        final File primary = new File(dir, "CAPS-" + model + ".txt");
-        io.execute(new Runnable() {
-            @Override
-            public void run() {
-                File written = null;
-                String error = null;
-                try {
-                    write(primary, text, false);
-                    written = primary;
-                } catch (IOException e) {
-                    error = primary.getPath() + ": " + CapsFormat.failure(e);
-                    // Fall back to an 8.3 name in case the card's filesystem rejects the long one.
-                    File fallback = new File(dir, "CAPS.TXT");
-                    try {
-                        write(fallback, text, false);
-                        written = fallback;
-                    } catch (IOException e2) {
-                        error += "; " + fallback.getPath() + ": " + CapsFormat.failure(e2);
-                    }
-                }
-                capsFile = written;
-                if (written != null)
-                    Logger.info("CapsDump: wrote " + written.getPath() + " (" + lines + " lines)");
-                else
-                    Logger.error("CapsDump: " + error);
-                final String status = written != null
-                        ? "Wrote " + written.getPath() + " (" + lines + " lines)\n" + HINT
-                        : "Could not write " + error + "\n" + HINT;
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        tvStatus.setText(status);
-                    }
-                });
-            }
-        });
     }
 }
