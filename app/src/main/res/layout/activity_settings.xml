@@ -648,6 +648,15 @@
                     android:text="Start"
                     android:textSize="20sp" />
 
+                <Button
+                    android:id="@+id/bnCameraInfo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentTop="true"
+                    android:layout_centerHorizontal="true"
+                    android:text="Camera info"
+                    android:textSize="16sp" />
+
             </RelativeLayout>
 
         </LinearLayout>
