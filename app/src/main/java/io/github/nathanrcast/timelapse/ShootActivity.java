@@ -125,8 +125,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             Scheduler.Decision decision = scheduler.onTimer();
             trackBracket(decision);
             if (decision.action == Scheduler.Action.FIRE) {
-                fire(decision);
-                if (burstShooting && !tornDown) {
+                boolean closed = fire(decision);
+                if (burstShooting && !closed && !tornDown) {
                     handler.removeCallbacks(burstPollRunnable);
                     handler.postDelayed(burstPollRunnable, BURST_POLL_MS);
                 }
@@ -263,8 +263,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         tornDown = false;
         stopping = false;
         display = new Display(getDisplayManager(), this);
-        if (awake.acquire(clock.nowMs()))
-            setAutoPowerOffMode(false);
 
         Result<SafeCamera> opened = SafeCamera.open(this, this);
         if (!opened.isOk()) {
@@ -274,6 +272,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             return;
         }
         safeCamera = opened.get();
+        // Held from here, before the run plan and the scheduler start: the delay/AT countdown, shots, review and
+        // DOFF all run inside it. A failed open above leaves the camera free to power off.
+        if (awake.acquire(clock.nowMs()))
+            setAutoPowerOffMode(false);
         // The run plan is final before configure: capabilities mask, then the LENR decision (which may raise the
         // interval), then configure and the bracket timing, both from that plan.
         RunOptions run = applyCapabilities(safeCamera.capabilities());
@@ -589,6 +591,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         if (awake.release())
             setAutoPowerOffMode(true);
+        // The camera's own power-off can kill the process right after this: get the queued log lines onto the card.
+        Logger.flush();
     }
 
     private void stopPreview() {
@@ -695,7 +699,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         Scheduler.Decision decision = scheduler.onFrameCaptured();
         trackBracket(decision);
         if (decision.action == Scheduler.Action.FIRE) {
-            fire(decision);
+            if (fire(decision))
+                afterSlotClosed();
             return;
         }
         if (decision.action == Scheduler.Action.SLOT_DONE) {
@@ -708,15 +713,23 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     // Takes the frame and logs its FIRE row; if the camera refuses it at once, closes the slot as LOST right away
-    // instead of at the capture timeout.
-    private void fire(Scheduler.Decision decision) {
+    // instead of at the capture timeout. Returns whether it closed the slot: the caller then finishes or re-arms.
+    private boolean fire(Scheduler.Decision decision) {
         boolean taken = takeFrame(decision);
         logDecision(decision);
         if (taken)
-            return;
+            return false;
         Scheduler.Decision failed = scheduler.captureFailed();
         trackBracket(failed);
         logDecision(failed);
+        // takeFrame lit the panel; under DOFF a refused frame must not leave it on (panelOff keeps the wake window).
+        if (settings.displayOff && !burstShooting)
+            panelOff();
+        return failed.action == Scheduler.Action.SKIP;
+    }
+
+    // After a slot closed outside the timer: end the run or arm the next deadline.
+    private void afterSlotClosed() {
         if (scheduler.isDone())
             finishRun();
         else
