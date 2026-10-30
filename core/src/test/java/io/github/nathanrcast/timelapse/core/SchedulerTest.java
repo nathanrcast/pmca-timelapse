@@ -62,6 +62,23 @@ public class SchedulerTest {
     }
 
     @Test
+    public void startAtSetsTheFirstDeadlineAndIgnoresTheDelay() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(5, 3, 2, 1), clock, CAPTURED);
+        s.start(START + 7200000L);
+        assertEquals(START + 7200000L, s.t0Ms());
+        assertEquals(START + 7200000L, s.nextWakeMs());
+        assertEquals(7200, Progress.delaySecondsRemaining(s, START));
+        clock.set(START + 7200000L);
+        assertEquals(FIRE, s.onTimer().action);
+        try {
+            s.start(START);
+            fail("second start");
+        } catch (IllegalStateException expected) {
+        }
+    }
+
+    @Test
     public void captureSlowerThanTheIntervalSkipsSlotsWithoutBursts() {
         SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 10, 0, 1), CAPTURED).captureMs(3000);
         rig.run();

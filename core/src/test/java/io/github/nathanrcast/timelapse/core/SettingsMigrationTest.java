@@ -3,6 +3,7 @@ package io.github.nathanrcast.timelapse.core;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -162,5 +163,65 @@ public class SettingsMigrationTest {
         assertEquals(0, store.applies);
         assertFalse(store.values.containsKey("intervalMs"));
         assertNull(store.values.get("shots"));
+    }
+
+    @Test
+    public void aSavedDelayWithoutAStartModeKeepsCountingDown() {
+        MapSettingsStore store = new MapSettingsStore();
+        store.values.put("delayMin", 5);
+        Settings s = new Settings();
+        s.load(store);
+        assertEquals(StartMode.DELAY, s.startMode);
+        assertEquals(5, s.delay);
+    }
+
+    @Test
+    public void noDelayAndNoStartModeStartsNow() {
+        Settings s = new Settings();
+        s.load(new MapSettingsStore());
+        assertEquals(StartMode.NOW, s.startMode);
+        assertEquals(0, s.atHour);
+        assertEquals(0, s.atMinute);
+        assertTrue(s.disableLenr);
+    }
+
+    @Test
+    public void startModeAtTimeAndLenrPersist() {
+        MapSettingsStore store = new MapSettingsStore();
+        Settings s = new Settings();
+        s.startMode = StartMode.AT;
+        s.atHour = 22;
+        s.atMinute = 45;
+        s.disableLenr = false;
+        s.save(store);
+        Settings loaded = new Settings();
+        loaded.load(store);
+        assertEquals(StartMode.AT, loaded.startMode);
+        assertEquals(22, loaded.atHour);
+        assertEquals(45, loaded.atMinute);
+        assertFalse(loaded.disableLenr);
+    }
+
+    @Test
+    public void anExplicitModeWinsOverASavedDelay() {
+        MapSettingsStore store = new MapSettingsStore();
+        store.values.put("delayMin", 5);
+        store.values.put("startMode", StartMode.NOW.ordinal());
+        Settings s = new Settings();
+        s.load(store);
+        assertEquals(StartMode.NOW, s.startMode);
+    }
+
+    @Test
+    public void corruptStartValuesAreClamped() {
+        MapSettingsStore store = new MapSettingsStore();
+        store.values.put("startMode", 9);
+        store.values.put("atHour", 99);
+        store.values.put("atMinute", -4);
+        Settings s = new Settings();
+        s.load(store);
+        assertEquals(StartMode.NOW, s.startMode);
+        assertEquals(23, s.atHour);
+        assertEquals(0, s.atMinute);
     }
 }

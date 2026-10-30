@@ -13,6 +13,10 @@ public final class Settings {
     static final String KEY_INTERVAL_MS = "intervalMs";
     static final String KEY_SHOTS = "shots";
     static final String KEY_DELAY_MIN = "delayMin";
+    static final String KEY_START_MODE = "startMode";
+    static final String KEY_AT_HOUR = "atHour";
+    static final String KEY_AT_MINUTE = "atMinute";
+    static final String KEY_DISABLE_LENR = "disableLenr";
     // Pre-T10 raw slider positions. Read once by load() to migrate, never written.
     static final String LEGACY_KEY_INTERVAL = "interval";
     static final String LEGACY_KEY_SHOT_COUNT = "shotCount";
@@ -40,6 +44,9 @@ public final class Settings {
     public int shotCount;       // burst: the burst length in seconds
     // Positions in StepTables.INTERVAL_MS / SHOTS / DELAY_MIN; call deriveFromIndex() after changing one.
     public int intervalIndex, shotsIndex, delayIndex;
+    public StartMode startMode;
+    public int atHour, atMinute;    // StartMode.AT: next occurrence of this wall-clock time
+    public boolean disableLenr;     // turn long-exposure NR off for the run (restored afterwards) where the body can
     public boolean displayOff;
     public boolean silentShutter;
     public boolean ael;
@@ -62,6 +69,10 @@ public final class Settings {
         shotsIndex = StepTables.SHOTS.nearestIndex(10);
         delayIndex = 0;
         deriveFromIndex();
+        startMode = StartMode.NOW;
+        atHour = 0;
+        atMinute = 0;
+        disableLenr = true;
         displayOff = false;
         silentShutter = true;
         ael = true;
@@ -82,6 +93,10 @@ public final class Settings {
 
     public void save(SettingsStore store) {
         putSteps(store.edit())
+                .putInt(KEY_START_MODE, startMode.ordinal())
+                .putInt(KEY_AT_HOUR, atHour)
+                .putInt(KEY_AT_MINUTE, atMinute)
+                .putBoolean(KEY_DISABLE_LENR, disableLenr)
                 .putBoolean(KEY_SILENT_SHUTTER, silentShutter)
                 .putBoolean(KEY_AEL, ael)
                 .putInt(KEY_FPS, fps)
@@ -104,6 +119,15 @@ public final class Settings {
     // Missing keys keep the current values.
     public void load(SettingsStore store) {
         boolean migrated = loadSteps(store);
+        // Installs from before the start mode had only the delay: a non-zero one keeps counting down.
+        int mode = store.getInt(KEY_START_MODE, ABSENT);
+        if (mode != ABSENT)
+            startMode = StartMode.fromOrdinal(mode, startMode);
+        else if (delayIndex > 0)
+            startMode = StartMode.DELAY;
+        atHour = store.getInt(KEY_AT_HOUR, atHour);
+        atMinute = store.getInt(KEY_AT_MINUTE, atMinute);
+        disableLenr = store.getBoolean(KEY_DISABLE_LENR, disableLenr);
         silentShutter = store.getBoolean(KEY_SILENT_SHUTTER, silentShutter);
         ael = store.getBoolean(KEY_AEL, ael);
         fps = store.getInt(KEY_FPS, fps);
@@ -179,6 +203,8 @@ public final class Settings {
     // the settings screen writes is already in range, so this only changes corrupt stores. The interval, shots and
     // delay indices come from nearestIndex() and are always in range.
     public void clamp() {
+        atHour = SliderMapping.clamp(atHour, 0, 23);
+        atMinute = SliderMapping.clamp(atMinute, 0, 59);
         int halfTarget = SliderMapping.TARGET_EXPOSURE_MAX / 2;
         targetExposure = SliderMapping.clamp(targetExposure, -halfTarget, halfTarget);
         maxShutterSpeedIndex = SliderMapping.clamp(maxShutterSpeedIndex, 0, Util.SHUTTER_SPEEDS.length - 1);

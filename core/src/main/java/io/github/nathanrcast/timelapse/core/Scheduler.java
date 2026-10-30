@@ -144,10 +144,15 @@ public final class Scheduler {
 
     /** Starts the run now; the first slot is due after the plan's delay. */
     public void start() {
+        start(clock.nowMs() + plan.delayMs());
+    }
+
+    /** Starts the run with the first slot due at {@code t0Ms} (the clock's time base), e.g. a scheduled start. */
+    public void start(long t0Ms) {
         if (started)
             throw new IllegalStateException("already started");
         started = true;
-        t0 = clock.nowMs() + plan.delayMs();
+        t0 = t0Ms;
     }
 
     /** When the caller's timer should next call {@link #onTimer()}; {@link #NEVER} if no timer is needed. */
