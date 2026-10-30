@@ -126,11 +126,11 @@ public class SchedulerTest {
         assertEquals(2, rig.only(FIRE).size());
 
         Scheduler s = rig.scheduler;
-        s.pause();
+        assertEquals(WAIT, s.pause().action);
         assertTrue(s.isPaused());
         assertEquals(NEVER, s.nextWakeMs());
         assertEquals(WAIT, s.onTimer().action);
-        s.pause();
+        assertEquals(WAIT, s.pause().action);
 
         rig.clock.advance(60000);
         s.resume();
@@ -170,7 +170,13 @@ public class SchedulerTest {
         Scheduler s = rig.scheduler;
         assertTrue(s.isCapturing());
 
-        s.pause();
+        Decision interrupted = s.pause();
+        assertEquals(SKIP, interrupted.action);
+        assertEquals(INTERRUPTED, interrupted.skipReason);
+        assertEquals(0, interrupted.slot);
+        assertEquals(0, interrupted.frame);
+        assertEquals(START, interrupted.scheduledMs);
+        assertEquals(START + 1000, interrupted.nowMs);
         assertFalse(s.isCapturing());
         assertEquals(1, s.skipped(INTERRUPTED));
         assertEquals(WAIT, s.onFrameCaptured().action);
@@ -189,7 +195,7 @@ public class SchedulerTest {
     public void pauseIsIgnoredBeforeStartAndAfterTheRunEnds() {
         FakeClock clock = new FakeClock(START);
         Scheduler s = new Scheduler(new ShotPlan(1, 1, 0, 1), clock, CAPTURED);
-        s.pause();
+        assertEquals(WAIT, s.pause().action);
         assertFalse(s.isPaused());
 
         s.start();
