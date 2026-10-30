@@ -13,14 +13,23 @@ final class SharedPreferencesSettingsStore implements SettingsStore {
         prefs = PreferenceManager.getDefaultSharedPreferences(context);
     }
 
+    // A key written with another type (an older or forked build) reads as unset instead of crashing.
     @Override
     public int getInt(String key, int defaultValue) {
-        return prefs.getInt(key, defaultValue);
+        try {
+            return prefs.getInt(key, defaultValue);
+        } catch (ClassCastException e) {
+            return defaultValue;
+        }
     }
 
     @Override
     public boolean getBoolean(String key, boolean defaultValue) {
-        return prefs.getBoolean(key, defaultValue);
+        try {
+            return prefs.getBoolean(key, defaultValue);
+        } catch (ClassCastException e) {
+            return defaultValue;
+        }
     }
 
     @Override
