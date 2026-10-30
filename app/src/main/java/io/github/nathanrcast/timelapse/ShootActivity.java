@@ -73,6 +73,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private Display display;
 
+    private String savedFocusMode;
+    private boolean usedToggleFocus;
+    private boolean focusStateSaved;
+
     int getcnt(){
         if(settings.brs){
             return 3;
@@ -226,14 +230,26 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         final Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
 
-        try {
-            if(settings.mf)
-                params.setFocusMode(CameraEx.ParametersModifier.FOCUS_MODE_MANUAL);
-            else
+        if (settings.mf) {
+            try {
+                if (isToggleFocusSupported(cameraEx)) {
+                    setToggleFocus(cameraEx, true);
+                    usedToggleFocus = true;
+                    focusStateSaved = true;
+                } else {
+                    savedFocusMode = params.getFocusMode();
+                    params.setFocusMode(CameraEx.ParametersModifier.FOCUS_MODE_MANUAL);
+                    usedToggleFocus = false;
+                    focusStateSaved = true;
+                }
+            } catch (Exception e) {
+                focusStateSaved = false;
+            }
+        } else {
+            try {
                 params.setFocusMode("auto");
+            } catch (Exception ignored) {}
         }
-        catch(Exception ignored)
-        {}
 
         final CameraEx.ParametersModifier modifier = cameraEx.createParametersModifier(params);
 
@@ -423,6 +439,20 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         shootRunnableHandler.removeCallbacks(shootRunnable);
         shootRunnableHandler.removeCallbacks(delayCountdownRunnable);
+
+        // Restore the focus mode the camera had before MF was forced (reflection: not in the stubs, absent on older bodies)
+        if (focusStateSaved && cameraEx != null) {
+            try {
+                if (usedToggleFocus && isToggleFocusSupported(cameraEx)) {
+                    setToggleFocus(cameraEx, false);
+                } else if (savedFocusMode != null) {
+                    Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
+                    params.setFocusMode(savedFocusMode);
+                    cameraEx.getNormalCamera().setParameters(params);
+                }
+            } catch (Exception ignored) {}
+            focusStateSaved = false;
+        }
 
         if(cameraSurfaceHolder == null)
             log("cameraSurfaceHolder == null");
@@ -728,4 +758,22 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
 
+
+    private static boolean isToggleFocusSupported(CameraEx cameraEx) {
+        try {
+            return (Boolean) cameraEx.getClass()
+                .getMethod("isSupportedToggleFocusMode")
+                .invoke(cameraEx);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void setToggleFocus(CameraEx cameraEx, boolean on) {
+        try {
+            cameraEx.getClass()
+                .getMethod("setToggleFocusMode", boolean.class)
+                .invoke(cameraEx, on);
+        } catch (Exception ignored) {}
+    }
 }
