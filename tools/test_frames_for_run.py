@@ -49,21 +49,27 @@ class Tree(unittest.TestCase):
         return path
 
     def run_main(self, *args):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             rc = frames_for_run.main(list(args))
+        self.last_err = err.getvalue()
         return rc, out.getvalue().split()
 
 
 class FramesForRun(Tree):
-    def test_matches_only_run_a_frames(self):
+    def test_span_selects_run_a_not_run_b(self):
         a0 = self.touch("DSC00001.JPG", 100.5)
-        a2 = self.touch("DSC00002.JPG", 120.4)
-        self.touch("DSC00003.JPG", 110.5)  # during the skipped slot
+        a1 = self.touch("DSC00002.JPG", 110.5)
+        a2 = self.touch("DSC00003.JPG", 120.4)
         self.touch("DSC00004.JPG", 1050.2)  # run B's time
         rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "A")
-        self.assertEqual(rc, 0)
-        self.assertEqual(lines, [a0, a2])
+        self.assertEqual((rc, lines), (0, [a0, a1, a2]))
+
+    def test_late_bracket_frames_are_kept(self):
+        a0 = self.touch("DSC00001.JPG", 100.5)
+        late = self.touch("DSC00002.JPG", 120.3 + 20)  # written well after the last callback
+        rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "A")
+        self.assertEqual(lines, [a0, late])
 
     def test_wall_conversion_is_per_run(self):
         self.touch("DSC00001.JPG", 100.5)
@@ -71,19 +77,44 @@ class FramesForRun(Tree):
         rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "B")
         self.assertEqual((rc, lines), (0, [b0]))
 
-    def test_window_edges(self):
-        inside = self.touch("DSC00001.JPG", 100.0 - 2.0)
-        self.touch("DSC00002.JPG", 100.0 - 2.5)
-        late = self.touch("DSC00003.JPG", 100.4 + 2.0)
-        self.touch("DSC00004.JPG", 100.4 + 2.5)
-        rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "A", "--window-s", "2")
+    def test_drift_slack_edges(self):
+        # span A is 100.0 .. 120.3 s, slack = 60 + 1 % of 20.3 s
+        slack = 60 + 0.01 * 20.3
+        inside = self.touch("DSC00001.JPG", 100.0 - slack + 0.5)
+        self.touch("DSC00002.JPG", 100.0 - slack - 0.5)
+        late = self.touch("DSC00003.JPG", 120.3 + slack - 0.5)
+        self.touch("DSC00004.JPG", 120.3 + slack + 0.5)
+        rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "A")
         self.assertEqual(lines, [inside, late])
 
     def test_offset(self):
         a0 = self.touch("DSC00001.JPG", 100.5 + 3600)
         self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A")[0], 3)
+        self.assertIn("--offset-s", self.last_err)
+        self.assertIn("cp -p", self.last_err)
         rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "A", "--offset-s", "3600")
         self.assertEqual((rc, lines), (0, [a0]))
+
+    def test_count_mismatch_warns_with_both_numbers(self):
+        self.touch("DSC00001.JPG", 100.5)
+        rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "A")
+        self.assertEqual(rc, 0)
+        self.assertIn("2 FIRE rows but 1 frames", self.last_err)
+
+    def test_matching_count_is_quiet(self):
+        self.touch("DSC00001.JPG", 100.5)
+        self.touch("DSC00002.JPG", 120.4)
+        self.run_main(self.tmp, "--log", self.log, "--run", "A")
+        self.assertEqual(self.last_err, "")
+
+    def test_rollover_across_folders_keeps_order(self):
+        other = os.path.join(self.tmp, "DCIM", "101MSDCF")
+        first = os.path.join(self.tmp, "DCIM", "100MSDCF")
+        os.makedirs(other)
+        p2 = self.touch("DSC09999.JPG", 100.5, first)
+        p1 = self.touch("DSC00001.JPG", 120.4, other)
+        rc, lines = self.run_main(os.path.join(self.tmp, "DCIM"), "--log", self.log, "--run", "A")
+        self.assertEqual(lines, [p2, p1])
 
     def test_no_match_exit_3(self):
         self.touch("DSC00001.JPG", 5000)
@@ -95,14 +126,15 @@ class FramesForRun(Tree):
     def test_list_runs(self):
         self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--list-runs"), (0, ["A", "B"]))
 
-    def test_without_run_lists_all_sorted_by_name_across_folders(self):
+    def test_without_run_lists_all_absolute_by_folder_then_name(self):
         other = os.path.join(self.tmp, "DCIM", "101MSDCF")
         os.makedirs(other)
         p2 = self.touch("DSC00002.JPG", 0)
         p1 = self.touch("DSC00001.jpeg", 0, other)
         open(os.path.join(self.dcim, "notes.txt"), "w").close()
         rc, lines = self.run_main(os.path.join(self.tmp, "DCIM"))
-        self.assertEqual((rc, lines), (0, [p1, p2]))
+        self.assertEqual((rc, lines), (0, [p2, p1]))
+        self.assertTrue(all(os.path.isabs(l) for l in lines))
 
     def test_missing_header_is_error(self):
         with open(self.log, "w") as f:
@@ -147,6 +179,29 @@ class AssembleScript(Tree):
         r = self.assemble(os.path.join(self.tmp, "DCIM"), "--dry-run", "--run", "A")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("frames: 2", r.stdout)
+
+    def test_log_two_levels_up_and_passthrough(self):
+        folder = os.path.join(self.tmp, "DCIM", "100MSDCF")
+        os.makedirs(os.path.join(self.tmp, "TIMELPS"))
+        shutil.copy(self.log, os.path.join(self.tmp, "TIMELPS", "LOG.CSV"))
+        self.touch("DSC00001.JPG", 100.5 + 3600)
+        self.assertEqual(self.assemble(folder, "--dry-run", "--run", "A").returncode, 1)
+        r = self.assemble(folder, "--dry-run", "--run", "A", "--offset-s", "3600")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("frames: 1", r.stdout)
+
+    def test_unreadable_log_without_run_continues(self):
+        with open(os.path.join(self.dcim, "LOG.CSV"), "w") as f:
+            f.write("run_id,slot\nA,1,2,3\n")
+        self.touch("DSC00001.JPG", 0)
+        r = self.assemble(self.dcim, "--dry-run")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("warning", r.stderr)
+
+    def test_help_mentions_timestamps(self):
+        r = self.assemble("--help")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("timestamps", r.stdout)
 
     def test_run_without_log_fails(self):
         r = self.assemble(FIXTURE_JPEGS, "--dry-run", "--run", "A")

@@ -64,7 +64,7 @@ The **Camera info** button (bottom bar, next to Start) writes `TIMELPS/CAPS-<mod
 
 The camera can't encode video (API 10 has no encoder), so assemble the frames on a computer.
 
-1. Power off, take the card out and copy it (or at least `DCIM/` and `TIMELPS/`) to a folder.
+1. Power off, take the card out and copy it (or at least `DCIM/` and `TIMELPS/`) to a folder. **Keep the file timestamps** (`cp -rp`, `rsync -rt`, or a drag-and-drop copy that preserves modified times); `--run` matches frames to the log by file time.
 2. Install [ffmpeg](https://ffmpeg.org/) and run:
 
    ```
@@ -72,7 +72,7 @@ The camera can't encode video (API 10 has no encoder), so assemble the frames on
    ```
 
    `<dir>` is the `DCIM` folder or a copy; every `.JPG` under it is used, sorted by name. The output is H.264, `yuv420p`, CRF 18. `--deflicker` adds ffmpeg's `deflicker` filter (useful with holy grail or aperture flicker), `--crop 16:9` crops the 3:2 frames centrally, and `--dry-run` prints the ffmpeg command and frame count without running anything.
-3. If the card holds several shoots, pass `--run <run_id>`. The script finds `LOG.CSV` in `<dir>` or `<dir>/../TIMELPS/` and keeps only the frames whose file time matches that run's shots (within 2 s, via the log's `uptime_to_wall_ms`). Run ids are listed in `LOG.CSV` (`# run_id=` lines). If the card clock and the computer's time zone disagree, call `tools/frames_for_run.py` directly with `--offset-s` to check the match.
+3. If the card holds several shoots, pass `--run <run_id>`. The script finds `LOG.CSV` in `<dir>`, `<dir>/TIMELPS` or a `TIMELPS/` next to `DCIM`, and keeps every frame whose file time falls inside that run's span (first shot to last shot, plus a minute of slack and 1 % of the run), converted with the log's `uptime_to_wall_ms`. It warns when the frame count differs from the number of shots in the log. If it finds nothing, the timestamps were probably not preserved or the card clock is in another time zone: copy again with timestamps, or pass `--offset-s <seconds>` (and `--window-s`) to shift the match. Run ids are the `# run_id=` lines in `LOG.CSV`.
 4. Check the shoot itself with `python3 -I tools/analyze_log.py TIMELPS/LOG.CSV`. It reports per run the drift against the schedule, skipped slots with their reasons, and battery use; it exits 1 on drift above `--max-drift-ms` (default 100) or on skips with no reason.
 
 ## Troubleshooting
