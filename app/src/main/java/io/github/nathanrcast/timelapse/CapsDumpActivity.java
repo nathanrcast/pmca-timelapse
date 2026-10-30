@@ -20,6 +20,8 @@ import com.sony.scalar.hardware.CameraEx;
 import com.sony.scalar.sysutil.ScalarInput;
 import com.sony.scalar.sysutil.ScalarProperties;
 
+import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -28,6 +30,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedList;
@@ -66,33 +69,9 @@ public class CapsDumpActivity extends BaseActivity {
 
     private static final String[] CONSTANT_CLASSES = {CAMERA_EX, CAMERA_EX + "$ParametersModifier"};
 
-    // Sony methods the app calls today (ShootActivity, BaseActivity, Display), in CapsFormat.methodKey form.
-    static final String[] USED_METHODS = {
-            "CameraEx.open(int, CameraEx$OpenOptions)",
-            "CameraEx.release()",
-            "CameraEx.getNormalCamera()",
-            "CameraEx.createParametersModifier(Camera$Parameters)",
-            "CameraEx.createEmptyParameters()",
-            "CameraEx.setShutterListener(CameraEx$ShutterListener)",
-            "CameraEx.setAutoPictureReviewControl(CameraEx$AutoPictureReviewControl)",
-            "CameraEx.setProgramLineRangeOverListener(CameraEx$ProgramLineRangeOverListener)",
-            "CameraEx.burstableTakePicture()",
-            "CameraEx.cancelTakePicture()",
-            "CameraEx.incrementShutterSpeed()",
-            "CameraEx.decrementShutterSpeed()",
-            "CameraEx$ParametersModifier.setDriveMode(String)",
-            "CameraEx$ParametersModifier.getSupportedBurstDriveSpeeds()",
-            "CameraEx$ParametersModifier.setBurstDriveSpeed(String)",
-            "CameraEx$ParametersModifier.setBurstDriveButtonReleaseBehave(String)",
-            "CameraEx$ParametersModifier.setSilentShutterMode(boolean)",
-            "CameraEx$ParametersModifier.setAutoExposureLock(String)",
-            "CameraEx$ParametersModifier.setBracketMode(String)",
-            "CameraEx$ParametersModifier.setExposureBracketMode(String)",
-            "CameraEx$ParametersModifier.setExposureBracketPeriod(int)",
-            "CameraEx$ParametersModifier.setNumOfBracketPicture(int)",
-            "CameraEx$ParametersModifier.getShutterSpeed()",
-            "CameraEx$ParametersModifier.getISOSensitivity()",
-            "CameraEx$ParametersModifier.setISOSensitivity(int)",
+    // Sony methods the app uses besides SafeCamera's SonyMethod list: the listener callbacks camera/ implements and the
+    // display and input calls from BaseActivity and Display.
+    private static final String[] OTHER_USED_METHODS = {
             "CameraEx$ShutterListener.onShutter(int, CameraEx)",
             "CameraEx$ProgramLineRangeOverListener.onAERange(boolean, boolean, boolean, CameraEx)",
             "CameraEx$ProgramLineRangeOverListener.onEVRange(int, CameraEx)",
@@ -106,6 +85,9 @@ public class CapsDumpActivity extends BaseActivity {
             "ScalarInput.getKeyStatus(int)",
             "Gpelibrary.changeFrameBufferPixel(Gpelibrary$GS_FRAMEBUFFER_TYPE)",
     };
+
+    // Every Sony method the app calls or implements, in CapsFormat.methodKey form.
+    static final String[] USED_METHODS = usedMethods();
 
     private static final String[] DEVICE_INFO_GETTERS = {
             "isCamera", "getBrand", "getModel", "getCategory", "getProductCode", "getFirmwareVersion",
@@ -567,6 +549,12 @@ public class CapsDumpActivity extends BaseActivity {
             }
             out.sync();
         }
+    }
+
+    private static String[] usedMethods() {
+        List<String> used = new ArrayList<String>(SonyMethod.keys());
+        Collections.addAll(used, OTHER_USED_METHODS);
+        return used.toArray(new String[used.size()]);
     }
 
     private static void loadClass(CapsWriter out, Map<String, Class<?>> classes, String name) {

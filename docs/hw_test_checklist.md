@@ -25,6 +25,7 @@ Run this at the end of every wave on **both** bodies, using the build from merge
 
 - Copy `TIMELPS/` off the card (LOG.TXT, plus LOG.CSV from T16 on and CAPS-*.txt from T08).
 - Once per body, and again after a firmware update: Settings → **Camera info**, turn every dial and press every button, hold MENU 2 s, then attach `TIMELPS/CAPS-<model>.txt` to the T08 issue (`docs/cameras.md`).
+- From T07 on, paste the `Capabilities:` lines and any `SafeCamera:` lines from `TIMELPS/LOG.TXT`. Note which of SS, MF, AEL, BRC3 and holy grail the settings screen shows.
 - From T16 on, run `python3 tools/analyze_log.py TIMELPS/LOG.CSV` and paste its summary.
 
 ## Soak (T15 / release only)

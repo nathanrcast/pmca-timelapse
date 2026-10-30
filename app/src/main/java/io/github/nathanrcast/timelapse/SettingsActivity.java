@@ -7,6 +7,8 @@ import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeed;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -20,7 +22,10 @@ import android.widget.TabHost;
 import android.widget.TextView;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
-import com.sony.scalar.hardware.CameraEx;
+
+import io.github.nathanrcast.timelapse.camera.SafeCamera;
+import io.github.nathanrcast.timelapse.core.camera.Capabilities;
+import io.github.nathanrcast.timelapse.core.camera.OptionVisibility;
 
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
@@ -33,7 +38,6 @@ public class SettingsActivity extends BaseActivity
 
     private Settings settings;
     private SharedPreferencesSettingsStore store;
-    private CameraEx cameraEx;
 
     private TabHost tabHost;
 
@@ -81,8 +85,12 @@ public class SettingsActivity extends BaseActivity
     private CheckBox cbMF;
     private CheckBox cbDOFF;
 
-
-
+    // The capability probe opens the camera, so it runs on its own Looper thread (as CapsDump does).
+    private HandlerThread probeThread;
+    private boolean probing;
+    // A Start or Camera info pressed while the probe holds the camera; launched when the probe finishes.
+    private Intent pendingLaunch;
+    private boolean burstUnavailable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -230,7 +238,6 @@ public class SettingsActivity extends BaseActivity
 
         cbSilentShutter.setChecked(settings.silentShutter);
         cbSilentShutter.setOnCheckedChangeListener(cbSilentShutterOnCheckListener);
-        //cbSilentShutter.setVisibility(View.INVISIBLE);
 
         cbAEL.setChecked(settings.ael);
         cbAEL.setOnCheckedChangeListener(cbAELOnCheckListener);
@@ -243,19 +250,87 @@ public class SettingsActivity extends BaseActivity
 
         cbDOFF.setChecked(settings.displayOff);
         cbDOFF.setOnCheckedChangeListener(cbDOFFOnCheckListener);
+    }
 
-        //try {
-            //CameraEx cameraEx = CameraEx.open(0, null);
-            //final CameraEx.ParametersModifier modifier = cameraEx.createParametersModifier(cameraEx.getNormalCamera().getParameters());
-            //if(modifier.isSupportedSilentShutterMode())
-            //    cbSilentShutter.setVisibility(View.VISIBLE);
-        /*}
-        catch(Exception ignored)
-        {}*/
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Capabilities known = SafeCamera.lastCapabilities();
+        if (known != null)
+            applyCapabilities(known);
+        if (!probing && SafeCamera.probeWanted())
+            startProbe();
+    }
 
+    @Override
+    protected void onDestroy() {
+        if (probeThread != null)
+            probeThread.quit();
+        super.onDestroy();
+    }
 
+    private void startProbe() {
+        if (probeThread == null) {
+            probeThread = new HandlerThread("CapabilityProbe");
+            probeThread.start();
+        }
+        probing = true;
+        new Handler(probeThread.getLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                final Capabilities caps = SafeCamera.probe();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        probing = false;
+                        if (isFinishing()) {
+                            pendingLaunch = null;
+                            return;
+                        }
+                        applyCapabilities(caps);
+                        if (pendingLaunch != null) {
+                            Intent launch = pendingLaunch;
+                            pendingLaunch = null;
+                            startActivity(launch);
+                        }
+                    }
+                });
+            }
+        });
+    }
 
+    // Shows only the options this body supports (core.camera.OptionVisibility). Visual only: a hidden option keeps
+    // its saved value, and ShootActivity masks it off for the run.
+    private void applyCapabilities(Capabilities caps) {
+        OptionVisibility options = OptionVisibility.of(caps);
+        showIf(cbSilentShutter, options.silentShutter());
+        showIf(cbMF, options.manualFocus());
+        showIf(cbAEL, options.aeLock());
+        showIf(cbBRS, options.bracket3());
+        showIf(cbHolyGrail, options.holyGrail());
+        laHolyGrailSection.setVisibility(options.holyGrail() && cbHolyGrail.isChecked() ? View.VISIBLE : View.GONE);
+        burstUnavailable = !options.burst();
+        showIntervalText();
+    }
 
+    private static void showIf(View option, boolean supported) {
+        option.setVisibility(supported ? View.VISIBLE : View.GONE);
+    }
+
+    // The burst position stays on the slider; on a body without burst it reads "n/a" and runs at the shortest
+    // interval (core.camera.RunOptions).
+    private void showIntervalText() {
+        boolean noBurst = settings.interval == 0 && burstUnavailable;
+        tvIntervalValue.setText(noBurst ? "n/a" : SliderMapping.intervalText(settings.interval));
+        tvIntervalUnit.setText(noBurst ? "" : SliderMapping.intervalUnit(settings.interval));
+    }
+
+    // Waits for a running probe, so the next activity's camera open doesn't collide with it.
+    private void launch(Intent intent) {
+        if (probing)
+            pendingLaunch = intent;
+        else
+            startActivity(intent);
     }
 
     View.OnClickListener bnStartOnClickListener = new View.OnClickListener() {
@@ -264,7 +339,7 @@ public class SettingsActivity extends BaseActivity
             settings.save(store);
             Intent intent = new Intent(that, ShootActivity.class);
             SettingsIntent.put(intent, settings);
-            startActivity(intent);
+            launch(intent);
         }
     },
     bnCloseOnClickListener = new View.OnClickListener() {
@@ -278,7 +353,7 @@ public class SettingsActivity extends BaseActivity
     View.OnClickListener bnCameraInfoOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            startActivity(new Intent(that, CapsDumpActivity.class));
+            launch(new Intent(that, CapsDumpActivity.class));
         }
     };
 
@@ -380,8 +455,7 @@ public class SettingsActivity extends BaseActivity
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
             settings.rawInterval = i;
             settings.interval = SliderMapping.progressToInterval(i);
-            tvIntervalValue.setText(SliderMapping.intervalText(settings.interval));
-            tvIntervalUnit.setText(SliderMapping.intervalUnit(settings.interval));
+            showIntervalText();
 
             if(settings.interval == 0)
                 lblShots.setText("Dur. (s)");
