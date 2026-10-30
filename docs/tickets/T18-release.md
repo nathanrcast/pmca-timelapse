@@ -1,5 +1,7 @@
 # T18: Release 2.0.0
 
+**Status:** release prep merged (version, CHANGELOG, `pmca-source.yaml`, `scripts/make-keystore.sh`, `docs/release.md`); publish steps pending the maintainer after the camera session.
+
 **Labels:** type:infra area:build size:S hw:required · **Milestone:** Wave 4 · **Depends on:** T15, T17
 
 ## Tasks
