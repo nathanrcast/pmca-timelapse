@@ -7,6 +7,8 @@ import android.os.StatFs;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Locale;
 
 import io.github.nathanrcast.timelapse.core.HudModel;
@@ -17,7 +19,7 @@ import io.github.nathanrcast.timelapse.core.HudModel;
  */
 final class CardSpace {
     private static final long MIN_GAP_MS = 15000;
-    private static final int NEWEST_FILES = 30;
+    private static final int NEWEST_FILES = 60;
 
     private volatile long freeBytes = HudModel.UNKNOWN;
     private volatile long avgBytes = HudModel.UNKNOWN;
@@ -26,7 +28,7 @@ final class CardSpace {
     private final HandlerThread thread;
     private final Handler handler;
     private long lastMs;
-    private boolean queued;
+    private volatile boolean queued;
     private boolean stopped;
 
     CardSpace(long runStartWallMs) {
@@ -70,36 +72,67 @@ final class CardSpace {
         thread.getLooper().quit();
     }
 
+    // Never lets an exception out: this runs on its own thread, and a pulled card must not kill the run.
     private void sample() {
-        File root = Environment.getExternalStorageDirectory();
         try {
-            StatFs fs = new StatFs(root.getPath());
-            freeBytes = (long) fs.getAvailableBlocks() * fs.getBlockSize();
-        } catch (RuntimeException e) {
-            freeBytes = HudModel.UNKNOWN;
-        }
-        long total = 0;
-        int n = 0;
-        File[] dirs = new File(root, "DCIM").listFiles();
-        if (dirs != null) {
-            for (File dir : dirs) {
-                String[] names = dir.list();
-                if (names == null)
-                    continue;
-                Arrays.sort(names);
-                for (int i = names.length - 1, seen = 0; i >= 0 && seen < NEWEST_FILES; i--, seen++) {
-                    String lower = names[i].toLowerCase(Locale.US);
-                    if (!(lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".arw")))
-                        continue;
-                    File f = new File(dir, names[i]);
-                    if (f.lastModified() >= runStartWallMs) {
-                        total += f.length();
-                        n++;
-                    }
-                }
+            File root = Environment.getExternalStorageDirectory();
+            try {
+                StatFs fs = new StatFs(root.getPath());
+                freeBytes = (long) fs.getAvailableBlocks() * fs.getBlockSize();
+            } catch (RuntimeException e) {
+                freeBytes = HudModel.UNKNOWN;
             }
+            double avg = averageFrameBytes(newestFolder(new File(root, "DCIM")));
+            if (avg > 0)
+                avgBytes = (long) avg;
+        } catch (Throwable t) {
+            Logger.error("CardSpace: " + t);
+        } finally {
+            queued = false;
         }
-        if (n > 0)
-            avgBytes = total / n;
+    }
+
+    // Camera folders are numbered (100MSDCF, 101MSDCF...): this run's pictures are in the highest one.
+    private static File newestFolder(File dcim) {
+        String[] names = dcim.list();
+        if (names == null)
+            return null;
+        Arrays.sort(names);
+        for (int i = names.length - 1; i >= 0; i--) {
+            File dir = new File(dcim, names[i]);
+            if (dir.isDirectory())
+                return dir;
+        }
+        return null;
+    }
+
+    // Bytes per frame: a RAW+JPEG frame is two files with one basename, so files are grouped by stem.
+    private double averageFrameBytes(File dir) {
+        if (dir == null)
+            return -1;
+        String[] names = dir.list();
+        if (names == null)
+            return -1;
+        Arrays.sort(names);
+        Map<String, Long> frames = new HashMap<String, Long>();
+        int files = 0;
+        for (int i = names.length - 1; i >= 0 && files < NEWEST_FILES; i--) {
+            String lower = names[i].toLowerCase(Locale.US);
+            if (!(lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".arw")))
+                continue;
+            files++;
+            File f = new File(dir, names[i]);
+            if (f.lastModified() < runStartWallMs)
+                continue;
+            String stem = names[i].substring(0, names[i].lastIndexOf('.'));
+            Long sum = frames.get(stem);
+            frames.put(stem, (sum == null ? 0 : sum) + f.length());
+        }
+        if (frames.isEmpty())
+            return -1;
+        long total = 0;
+        for (long b : frames.values())
+            total += b;
+        return (double) total / frames.size();
     }
 }
