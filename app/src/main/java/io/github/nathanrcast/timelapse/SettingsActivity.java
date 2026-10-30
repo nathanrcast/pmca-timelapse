@@ -579,6 +579,15 @@ public class SettingsActivity extends BaseActivity
         }
     };
 
+    private String formatTime(long seconds) {
+        if (seconds < 0) return "";
+        if (seconds < 60) return seconds + "s";
+        long h = seconds / 3600;
+        long m = (seconds / 60) % 60;
+        if (h > 0) return h + "h " + m + "m";
+        return m + "m " + (seconds % 60) + "s";
+    }
+
     void updateTimes() {
         if(settings.shotCount == Integer.MAX_VALUE)
         {
@@ -600,14 +609,8 @@ public class SettingsActivity extends BaseActivity
             videoTime = settings.shotCount / fps;
         }
 
-        if(duration < 60) {
-            tvDurationValue.setText("" + duration);
-            tvDurationUnit.setText("s");
-        }
-        else {
-            tvDurationValue.setText("" + (duration / 60));
-            tvDurationUnit.setText("min");
-        }
+        tvDurationValue.setText(formatTime(duration));
+        tvDurationUnit.setText("");
 
         if(videoTime == -1) {
             tvVideoTimeValue.setText("");
