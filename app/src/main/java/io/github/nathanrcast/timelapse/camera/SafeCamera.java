@@ -69,7 +69,10 @@ public final class SafeCamera {
     private CameraEx.AutoPictureReviewControl reviewControl;
     private boolean toggleEngaged;
     private String savedFocusMode;
-    private boolean released;
+    private volatile boolean released;
+    // close() and cancelTakePicture() share it: onShutter calls cancel from the camera thread while close() runs
+    // on the main looper, and cancel must never reach a half-released CameraEx.
+    private final Object lifecycle = new Object();
 
     private SafeCamera(CameraEx cameraEx, Camera normal, ProbedCapabilities caps, SharedPreferences prefs) {
         this.cameraEx = cameraEx;
@@ -484,13 +487,15 @@ public final class SafeCamera {
     }
 
     public Result<Void> cancelTakePicture() {
-        if (released)
-            return closed(CANCEL_TAKE_PICTURE.key());
-        try {
-            cameraEx.cancelTakePicture();
-            return Result.ok(null);
-        } catch (Throwable t) {
-            return failed(CANCEL_TAKE_PICTURE.key(), t);
+        synchronized (lifecycle) {
+            if (released)
+                return closed(CANCEL_TAKE_PICTURE.key());
+            try {
+                cameraEx.cancelTakePicture();
+                return Result.ok(null);
+            } catch (Throwable t) {
+                return failed(CANCEL_TAKE_PICTURE.key(), t);
+            }
         }
     }
 
@@ -606,6 +611,12 @@ public final class SafeCamera {
 
     // Restores focus, detaches the review control and releases the camera. Later calls return FAILED.
     public void close() {
+        synchronized (lifecycle) {
+            closeLocked();
+        }
+    }
+
+    private void closeLocked() {
         if (released)
             return;
         restoreFocus();

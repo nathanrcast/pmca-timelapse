@@ -68,6 +68,14 @@
             android:textSize="20sp"
             android:visibility="gone" />
 
+        <TextView
+            android:id="@+id/tvHud"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="10dp"
+            android:layout_marginBottom="5dp"
+            android:textSize="20sp" />
+
         <View
             android:id="@+id/divider2"
             android:layout_width="match_parent"

@@ -28,3 +28,11 @@ The Frosbe fork merge (#23) left these shoot-screen and stop differences from up
 - `stopPicturePreview = true` is commented out in the final-shot branch of `ShootActivity.onShutter`. The runnable no longer stops the last preview or applies DOFF; `onPause` tears the preview down as the activity exits.
 - The burst-mode HUD shows `1/N` in the big counter (the shot count stays at 1 and N is the duration in seconds) instead of the remaining seconds, and moves the remaining seconds to the second field.
 - The settings screen is one `ScrollView`. Start/Close follow the content instead of being pinned to the bottom of the screen.
+
+## Status
+Implemented (PR pending merge); the `hw:required` boxes wait for the camera session.
+- HUD: `HudModel` in `:core`; `CardSpace` samples free space and the average size of this run's JPEG/ARW files off the main looper.
+- Review: setting `reviewSeconds` 0-5, default 0 (none); with 0, DOFF applies right after each capture.
+- Stop: MENU stops at once, toasts the summary and returns to settings. Any other key only wakes the display (back to DOFF after 5 s). `ShootActivity.teardown()` is the single idempotent path for MENU, `onPause` (power switch) and `onDestroy`.
+- Inherited from T03: end summary screen (2 s or any key), final-shot preview stopped, burst counter already shows elapsed/length seconds via `Progress`, Start/Close/Camera info pinned in a bottom bar.
+- Upstream `testing` commit ("display battery save mode and switchDisplayOutput") not adopted: it calls `DisplayManager.setSavingBatteryMode` with no capability guard or `SonyMethod` entry (a missing method reboots the camera), adds a manual panel/finder toggle that can strand the output on a device the body lacks, and was an unfinished experiment (its own message says "Testing"). Our `Display` already uses `switchDisplayOutputTo` for DOFF. Revisit only with a probe-backed `SonyMethod` and an on-camera check of the saving gain.
