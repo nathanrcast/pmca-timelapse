@@ -10,7 +10,7 @@ A `CapsDumpActivity`, reached from the **Camera info** button at the bottom of t
 1. `DeviceInfo`: model, firmware version, PMCA API version, Android `Build.*`.
 2. A reflection probe of **every public method** on `CameraEx`, `CameraEx.ParametersModifier`, `CameraEx.ParametersModifier`'s supported-value getters and `CameraSequence` (if present): one line each, `present`/`absent`.
 3. For each supported-value getter that exists: the value list (shutter speeds, ISO, drive modes, focus modes, silent shutter, LENR / long-exposure NR, picture-review settings, bracket steps).
-4. **Key logger:** a full-screen live view of `ScalarInput` key codes. It appends each key-down/up/repeat with its code and scan name for every button, the control wheel and any dial, until MENU is held for 2 s.
+4. **Key logger:** a full-screen live view of `ScalarInput` key codes. It appends each key-down/up/repeat with its code and scan name for every button, the control wheel and any dial, until MENU is held for 2 s or DELETE (SK2, Back) is pressed.
 
 Don't touch any existing class beyond adding the entry point.
 
