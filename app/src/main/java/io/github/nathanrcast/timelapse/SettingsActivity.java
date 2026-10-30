@@ -97,6 +97,9 @@ public class SettingsActivity extends BaseActivity
         store = new SharedPreferencesSettingsStore(this);
         settings = new Settings();
         settings.load(store);
+        // The fps choices are a resource, so :core can't clamp the stored index.
+        int fpsCount = getResources().getStringArray(R.array.fps).length;
+        settings.fps = Math.max(0, Math.min(fpsCount - 1, settings.fps));
         fps = 24;
 
 
