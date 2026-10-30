@@ -125,6 +125,20 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     };
 
+    private final Runnable delayCountdownRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (shotCount == 0 && shootStartTime > 0) {
+                long delaySeconds = (shootStartTime - System.currentTimeMillis()) / 1000;
+                if (delaySeconds >= 0) {
+                    tvCount.setText("Delay: " + formatTime(delaySeconds));
+                    tvRemaining.setText(getRemainingTime());
+                    shootRunnableHandler.postDelayed(this, 1000);
+                }
+            }
+        }
+    };
+
     private Handler manualShutterCallbackCallRunnableHandler = new Handler();
     private final Runnable manualShutterCallbackCallRunnable = new Runnable() {
         @Override
@@ -276,6 +290,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         shootRunnableHandler.postDelayed(shootRunnable, (long) settings.delay * 1000 * 60);
         shootStartTime = System.currentTimeMillis() + settings.delay * 1000 * 60;
 
+        if (settings.delay > 0) {
+            shootRunnableHandler.post(delayCountdownRunnable);
+        }
+
         if(burstShooting) {
             manualShutterCallbackCallRunnableHandler.postDelayed(manualShutterCallbackCallRunnable, 500);
         }
@@ -404,6 +422,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("on pause");
 
         shootRunnableHandler.removeCallbacks(shootRunnable);
+        shootRunnableHandler.removeCallbacks(delayCountdownRunnable);
 
         if(cameraSurfaceHolder == null)
             log("cameraSurfaceHolder == null");
@@ -644,11 +663,27 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         return s + (int)(level / (float)scale * 100) + "%";
     }
 
+    private String formatTime(long seconds) {
+        if (seconds < 0) return "";
+        if (seconds < 60) return seconds + "s";
+        long h = seconds / 3600;
+        long m = (seconds / 60) % 60;
+        if (h > 0) return h + "h " + m + "m";
+        return m + "m " + (seconds % 60) + "s";
+    }
+
     private String getRemainingTime() {
+        long seconds;
         if(burstShooting)
-            return "" + Math.round(((long) settings.shotCount * 1000 - System.currentTimeMillis() + shootStartTime) / 1000) + "s";
-        else
-            return "" + Math.round(((long) settings.shotCount * getcnt() - shotCount) * settings.interval / 60) + "min";
+            seconds = Math.round(((long) settings.shotCount * 1000 - System.currentTimeMillis() + shootStartTime) / 1000.0);
+        else {
+            seconds = Math.round(((long) settings.shotCount * getcnt() - shotCount) * settings.interval);
+            if (shotCount == 0 && shootStartTime > 0) {
+                long delaySeconds = (shootStartTime - System.currentTimeMillis()) / 1000;
+                if (delaySeconds > 0) seconds += delaySeconds;
+            }
+        }
+        return formatTime(seconds);
     }
 
     @Override
