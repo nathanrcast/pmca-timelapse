@@ -22,11 +22,8 @@ jobs:
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
       - name: Build and lint
         run: ./gradlew :app:assembleDebug :app:assembleRelease :app:lint --stacktrace
-      - name: Core unit tests
-        run: |
-          if [ -d core ]; then
-            ./gradlew :core:test --stacktrace
-          fi
+      - name: Unit tests and ShotPlan coverage
+        run: ./gradlew :core:check :app:testDebugUnitTest --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk

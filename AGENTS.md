@@ -7,19 +7,21 @@ TimeLapse+: an in-camera intervalometer for Sony PlayMemories (PMCA) cameras, ha
 Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17–21 (Gradle 8.7 cannot run on 22+, and a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. CI: `.github/workflows/ci.yml` job `build`. Signing and publishing: `scripts/release.sh <version> [--local] [--dry-run]` (needs a gitignored `keystore.properties`, see `keystore.properties.example`).
 
 ```
-JAVA_HOME=<JDK 17–21> ./gradlew clean :app:assembleDebug :app:assembleRelease :app:lint   # full build
-JAVA_HOME=<JDK 17–21> ./gradlew :app:assembleDebug :app:lint                              # pre-push gate; + :core:test once T05 adds :core
-python3 tools/analyze_log.py <LOG.CSV>                                                  # once T16 lands (stdlib only)
+JAVA_HOME=<JDK 17–21> ./gradlew clean :core:check :app:assembleDebug :app:assembleRelease :app:lint :app:testDebugUnitTest   # full build = pre-push gate
+JAVA_HOME=<JDK 17–21> ./gradlew :core:test                                                                                 # JVM unit tests only
+python3 tools/analyze_log.py <LOG.CSV>                                                                                     # once T16 lands (stdlib only)
 ```
 
 - Outputs: `app/build/outputs/apk/debug/app-debug.apk` (debug-signed, v1+v2) and `app/build/outputs/apk/release/app-release-unsigned.apk` (unsigned until T18; T02 names release assets). Lint report: `app/build/reports/lint-results-debug.html`.
+- `:core:check` runs `:core:test` plus `jacocoTestCoverageVerification`, which fails below 90 % line coverage on `ShotPlan`. Every `:core:test` run writes the JaCoCo report to `core/build/reports/jacoco/test/` (HTML and `jacocoTestReport.xml`).
 - API-10 guard: NewApi and InlinedApi are fatal lint issues. `assembleRelease` enforces them through `lintVitalRelease`; `assembleDebug` runs no lint, which is why the gate includes `:app:lint`.
 - Check an APK: `$ANDROID_HOME/build-tools/34.0.0/aapt dump badging <apk> | head -3` must show package `io.github.nathanrcast.timelapse`, `sdkVersion:'10'` and `targetSdkVersion:'10'`. `unzip -p <apk> classes.dex | head -c 8 | od -c` must read `dex\n035`, the only dex version Dalvik 2.3 loads.
 - OpenMemories-Framework is vendored in `app/libs/` at commit `f8df350` (sha256s in `app/libs/README.md`); there is no jitpack dependency. `stubs` must stay `compileOnly`: the `com.sony.*` classes come from the camera firmware, and packaging the stubs would shadow them.
 
 ## Layout
 
-- `app/src/main/java/io/github/nathanrcast/timelapse/`: app sources; the Java namespace matches `applicationId`. `ShootActivity` holds the capture loop and the holy-grail ramp, `SettingsActivity` the setup UI, `Settings` the persisted options, and `Util` the shutter/ISO/deadband step tables.
+- `app/src/main/java/io/github/nathanrcast/timelapse/`: app sources; the Java namespace matches `applicationId`. `ShootActivity` holds the capture loop and the holy-grail ramp, `SettingsActivity` the setup UI. Android glue for `:core`: `SharedPreferencesSettingsStore` (persists `Settings`), `SettingsIntent` (hands them to `ShootActivity`) and `Clocks` (`Clock` implementations: `WALL`, which the capture loop uses, and `UPTIME`, Handler's time base).
+- `core/src/main/java/io/github/nathanrcast/timelapse/core/`: the `:core` module, a plain `java-library` (`--release 8`) that the app depends on. Its compile classpath has no Android or Sony jar, so any `android.*`/`com.sony.*` reference fails `:core:compileJava`. `Settings` holds the options, defaults, range clamping and persisted keys, behind the `SettingsStore` interface; `load()` derives interval, shot count and delay from the stored slider positions. `ShotPlan` does duration, clip length, end time and shots/time remaining (bracketing, burst, infinite). `Clock` is the time source, `Util` the formatters and the shutter/ISO/deadband step tables, and `SliderMapping` the seek-bar mappings (interval/shots/delay steps and their labels, and the HG sliders). Tests in `core/src/test/` include the `FakeClock` and `MapSettingsStore` fakes.
 - `app/src/main/java/com/github/ma1co/pmcademo/app/`: `BaseActivity` (Sony `ScalarInput` key handling) and `AppNotificationManager`, vendored from PMCADemo. They keep their own package and `LICENSE.txt`.
 
 ## Invariants
@@ -28,6 +30,7 @@ python3 tools/analyze_log.py <LOG.CSV>                                          
 - **Never call a Sony `CameraEx`/`ParametersModifier` method directly** once T07 lands. Go through the capability layer. A method missing on an older body throws `NoSuchMethodError` and reboots the camera (upstream issue 4).
 - `applicationId` and the release signing key are permanent. Installers pin the certificate on first install, so changing either forces every user to uninstall.
 - Pure logic (scheduling, exposure ramp, shot-plan math) belongs in `:core` with JVM unit tests, not in Activities.
+- **Lint's API-10 check does not cover `:core`.** `--release 8` limits it to the Java 8 API, but Android lint runs NewApi only on the app module, not on JVM modules. Keep core code to what API 10 has: no `java.util.function`, streams, `java.time` or `java.nio.file`, and plain anonymous classes rather than lambdas (D8 desugars lambdas, but anonymous classes read clearer against Dalvik). After changing `:core`, check the APK with `dexdump -d` for `invoke-custom`/`invoke-polymorphic` (there must be none).
 
 ## Settled decisions — do not re-litigate
 

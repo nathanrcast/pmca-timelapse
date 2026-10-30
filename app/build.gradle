@@ -43,5 +43,6 @@ android {
 dependencies {
     compileOnly files('libs/openmemories-stubs-f8df350.jar')
     implementation files('libs/openmemories-framework-f8df350.jar')
+    implementation project(':core')
     testImplementation 'junit:junit:4.13.2'
 }

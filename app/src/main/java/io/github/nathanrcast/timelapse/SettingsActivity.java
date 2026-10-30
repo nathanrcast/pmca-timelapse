@@ -1,9 +1,9 @@
 package io.github.nathanrcast.timelapse;
 
-import static io.github.nathanrcast.timelapse.Util.DEADBAND_VALUES;
-import static io.github.nathanrcast.timelapse.Util.ISO_VALUES;
-import static io.github.nathanrcast.timelapse.Util.SHUTTER_SPEEDS;
-import static io.github.nathanrcast.timelapse.Util.formatShutterSpeed;
+import static io.github.nathanrcast.timelapse.core.Util.DEADBAND_VALUES;
+import static io.github.nathanrcast.timelapse.core.Util.ISO_VALUES;
+import static io.github.nathanrcast.timelapse.core.Util.SHUTTER_SPEEDS;
+import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeed;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -22,11 +22,17 @@ import android.widget.TextView;
 import com.github.ma1co.pmcademo.app.BaseActivity;
 import com.sony.scalar.hardware.CameraEx;
 
+import io.github.nathanrcast.timelapse.core.Settings;
+import io.github.nathanrcast.timelapse.core.ShotPlan;
+import io.github.nathanrcast.timelapse.core.SliderMapping;
+import io.github.nathanrcast.timelapse.core.Util;
+
 public class SettingsActivity extends BaseActivity
 {
     private SettingsActivity that = this;
 
     private Settings settings;
+    private SharedPreferencesSettingsStore store;
     private CameraEx cameraEx;
 
     private TabHost tabHost;
@@ -88,8 +94,12 @@ public class SettingsActivity extends BaseActivity
 
         Logger.info("Hello World");
 
+        store = new SharedPreferencesSettingsStore(this);
         settings = new Settings();
-        settings.load(this);
+        settings.load(store);
+        // The fps choices are a resource, so :core can't clamp the stored index.
+        int fpsCount = getResources().getStringArray(R.array.fps).length;
+        settings.fps = Math.max(0, Math.min(fpsCount - 1, settings.fps));
         fps = 24;
 
 
@@ -200,17 +210,17 @@ public class SettingsActivity extends BaseActivity
         cbMF   = (CheckBox) findViewById(R.id.cbMF);
         cbDOFF = (CheckBox) findViewById(R.id.cbDOFF);
 
-        sbInterval.setMax(119);
+        sbInterval.setMax(SliderMapping.INTERVAL_MAX);
         sbInterval.setOnSeekBarChangeListener(sbIntervalOnSeekBarChangeListener);
         sbInterval.setProgress(settings.rawInterval);
         sbIntervalOnSeekBarChangeListener.onProgressChanged(sbInterval, settings.rawInterval, false);
 
-        sbShots.setMax(130);
+        sbShots.setMax(SliderMapping.SHOTS_MAX);
         sbShots.setOnSeekBarChangeListener(sbShotsOnSeekBarChangeListener);
         sbShots.setProgress(settings.rawShotCount);
         sbShotsOnSeekBarChangeListener.onProgressChanged(sbShots, settings.rawShotCount, false);
 
-        sbDelay.setMax(39);
+        sbDelay.setMax(SliderMapping.DELAY_MAX);
         sbDelay.setOnSeekBarChangeListener(sbDelayOnSeekBarChangeListener);
         sbDelay.setProgress(settings.rawDelay);
         sbDelayOnSeekBarChangeListener.onProgressChanged(sbDelay, settings.rawDelay, false);
@@ -251,16 +261,16 @@ public class SettingsActivity extends BaseActivity
     View.OnClickListener bnStartOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            settings.save(that);
+            settings.save(store);
             Intent intent = new Intent(that, ShootActivity.class);
-            settings.putInIntent(intent);
+            SettingsIntent.put(intent, settings);
             startActivity(intent);
         }
     },
     bnCloseOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            settings.save(that);
+            settings.save(store);
             finish();
         }
     };
@@ -368,46 +378,10 @@ public class SettingsActivity extends BaseActivity
             = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            String intervalTextValue = "";
-            String intervalUnit = "";
-
             settings.rawInterval = i;
-
-            i++;
-
-            if (i == 1) {
-                settings.interval = 0;
-                intervalTextValue = "burst";
-                intervalUnit = "";
-            }
-            else if(i < 41) {
-                settings.interval = i * 0.5;
-                intervalTextValue = Double.toString(settings.interval);
-                intervalUnit = "s";
-
-            }
-            else if(i < 60) {
-                settings.interval = (i-40) + 20;
-                intervalTextValue = Double.toString(settings.interval);
-                intervalUnit = "s";
-            }
-            else if(i < 76) {
-                settings.interval = (i-60) * 5 + 40;
-                intervalTextValue = Double.toString(settings.interval);
-                intervalUnit = "s";
-            }
-            else if(i < 93) {
-                settings.interval = (i-76) * 30 + 120;
-                intervalTextValue = Double.toString((i-76) * 0.5 + 2);
-                intervalUnit = "min";
-            }
-            else {
-                settings.interval = (i-93) * 60 + 660;
-                intervalTextValue = Integer.toString(i-93+11);
-                intervalUnit = "min";
-            }
-            tvIntervalValue.setText(intervalTextValue);
-            tvIntervalUnit.setText(intervalUnit);
+            settings.interval = SliderMapping.progressToInterval(i);
+            tvIntervalValue.setText(SliderMapping.intervalText(settings.interval));
+            tvIntervalUnit.setText(SliderMapping.intervalUnit(settings.interval));
 
             if(settings.interval == 0)
                 lblShots.setText("Dur. (s)");
@@ -425,35 +399,9 @@ public class SettingsActivity extends BaseActivity
     sbShotsOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            String shotsText;
-
             settings.rawShotCount = i;
-
-            i++;
-
-            if(i <= 20)
-                settings.shotCount = i;
-
-            else if(i <= 36)
-                settings.shotCount = (i-20) * 5 + 20;
-
-            else if(i <= 81)
-                settings.shotCount = (i-36) * 20 + 100;
-
-            else if(i <= 100)
-                settings.shotCount = (i-81) * 50 + 1000;
-
-            else if(i <= 130)
-                settings.shotCount = (i-100) * 100 + 2000;
-
-            shotsText = Integer.toString(settings.shotCount);
-
-            if(i == 131) {
-                settings.shotCount = Integer.MAX_VALUE;
-                shotsText = "inf";
-            }
-
-            tvShotsValue.setText(shotsText);
+            settings.shotCount = SliderMapping.progressToShotCount(i);
+            tvShotsValue.setText(SliderMapping.shotCountText(settings.shotCount));
             updateTimes();
         }
 
@@ -465,29 +413,10 @@ public class SettingsActivity extends BaseActivity
     sbDelayOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
-            String delayTextValue = "";
-            String delayUnit = "";
-
             settings.rawDelay = i;
-
-            if(i < 6) {
-                settings.delay = i;
-                delayTextValue = Double.toString(settings.delay);
-                delayUnit = "min";
-
-            }
-            else if(i < 16) {
-                settings.delay = (i-5)*5 + 5;
-                delayTextValue = Double.toString(settings.delay);
-                delayUnit = "min";
-            }
-            else {
-                settings.delay = (i-15) * 60;
-                delayTextValue = Double.toString(i-15);
-                delayUnit = "h";
-            }
-            tvDelayValue.setText(delayTextValue);
-            tvDelayUnit.setText(delayUnit);
+            settings.delay = SliderMapping.progressToDelay(i);
+            tvDelayValue.setText(SliderMapping.delayText(settings.delay));
+            tvDelayUnit.setText(SliderMapping.delayUnit(settings.delay));
 
             updateTimes();
         }
@@ -589,7 +518,8 @@ public class SettingsActivity extends BaseActivity
     };
 
     void updateTimes() {
-        if(settings.shotCount == Integer.MAX_VALUE)
+        ShotPlan plan = ShotPlan.of(settings);
+        if(plan.isInfinite())
         {
             tvDurationValue.setText("inf");
             tvDurationUnit.setText("");
@@ -598,18 +528,9 @@ public class SettingsActivity extends BaseActivity
             return;
         }
 
-        int duration = 0;
-        int videoTime = 0;
-        if(settings.interval == 0) {
-            duration = settings.shotCount;
-            videoTime = -1;
-        }
-        else {
-            duration = (int) Math.round(settings.interval * settings.shotCount);
-            videoTime = settings.shotCount / fps;
-        }
+        long videoTime = plan.clipSeconds(fps);
 
-        tvDurationValue.setText(Util.formatTime(duration));
+        tvDurationValue.setText(Util.formatTime(plan.durationSeconds()));
         tvDurationUnit.setText("");
 
         if(videoTime == -1) {
