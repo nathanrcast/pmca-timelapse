@@ -1,4 +1,4 @@
-package io.github.nathanrcast.timelapse.camera.model;
+package io.github.nathanrcast.timelapse.core.camera;
 
 // A supported-value read the probe makes once per session. Each value is kept as a list of strings: a list query's
 // elements, or "true"/"false" for an isSupported* query. Capabilities.values() is null when the query is absent, threw

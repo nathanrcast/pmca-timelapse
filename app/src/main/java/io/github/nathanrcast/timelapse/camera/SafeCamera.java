@@ -1,6 +1,6 @@
 package io.github.nathanrcast.timelapse.camera;
 
-import static io.github.nathanrcast.timelapse.camera.model.SonyMethod.*;
+import static io.github.nathanrcast.timelapse.core.camera.SonyMethod.*;
 
 import android.hardware.Camera;
 import android.os.Build;
@@ -11,13 +11,13 @@ import com.sony.scalar.hardware.CameraEx;
 import com.sony.scalar.hardware.CameraEx.ParametersModifier;
 
 import io.github.nathanrcast.timelapse.Logger;
-import io.github.nathanrcast.timelapse.camera.model.Capabilities;
-import io.github.nathanrcast.timelapse.camera.model.Feature;
-import io.github.nathanrcast.timelapse.camera.model.OptionVisibility.FocusControl;
-import io.github.nathanrcast.timelapse.camera.model.OptionVisibility;
-import io.github.nathanrcast.timelapse.camera.model.ProbedCapabilities;
-import io.github.nathanrcast.timelapse.camera.model.Query;
-import io.github.nathanrcast.timelapse.camera.model.SonyMethod;
+import io.github.nathanrcast.timelapse.core.camera.Capabilities;
+import io.github.nathanrcast.timelapse.core.camera.Feature;
+import io.github.nathanrcast.timelapse.core.camera.OptionVisibility.FocusControl;
+import io.github.nathanrcast.timelapse.core.camera.OptionVisibility;
+import io.github.nathanrcast.timelapse.core.camera.ProbedCapabilities;
+import io.github.nathanrcast.timelapse.core.camera.Query;
+import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
 
 import java.lang.reflect.Method;
 import java.util.HashSet;

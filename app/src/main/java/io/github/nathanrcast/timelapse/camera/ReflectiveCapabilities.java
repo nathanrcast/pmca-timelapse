@@ -1,8 +1,8 @@
 package io.github.nathanrcast.timelapse.camera;
 
-import io.github.nathanrcast.timelapse.camera.model.ProbedCapabilities;
-import io.github.nathanrcast.timelapse.camera.model.Query;
-import io.github.nathanrcast.timelapse.camera.model.SonyMethod;
+import io.github.nathanrcast.timelapse.core.camera.ProbedCapabilities;
+import io.github.nathanrcast.timelapse.core.camera.Query;
+import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;

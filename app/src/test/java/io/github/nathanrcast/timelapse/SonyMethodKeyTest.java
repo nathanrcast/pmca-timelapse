@@ -3,7 +3,7 @@ package io.github.nathanrcast.timelapse;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import io.github.nathanrcast.timelapse.camera.model.SonyMethod;
+import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
 
 import org.junit.Test;
 

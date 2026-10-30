@@ -20,7 +20,7 @@ import com.sony.scalar.hardware.CameraEx;
 import com.sony.scalar.sysutil.ScalarInput;
 import com.sony.scalar.sysutil.ScalarProperties;
 
-import io.github.nathanrcast.timelapse.camera.model.SonyMethod;
+import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
 
 import java.io.BufferedWriter;
 import java.io.File;

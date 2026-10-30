@@ -1,9 +1,9 @@
-package io.github.nathanrcast.timelapse.camera.model;
+package io.github.nathanrcast.timelapse.core.camera;
 
 import java.util.List;
 
-// What this body's Sony API offers, built once per session by the probe (camera/ReflectiveCapabilities) and merged
-// with the body's camera/ModelProfile. Pure Java, so the UI decisions can be tested on a fake.
+// What this body's Sony API offers, built once per session by the app's probe (camera.ReflectiveCapabilities) and
+// merged with the body's camera.ModelProfile. Pure Java, so the UI decisions can be tested on a fake.
 public interface Capabilities {
     String model();
 

@@ -1,4 +1,4 @@
-package io.github.nathanrcast.timelapse.camera.model;
+package io.github.nathanrcast.timelapse.core.camera;
 
 // Which settings-screen options this body gets. An option that isn't visible is also forced off: SettingsActivity
 // unchecks and hides it, and ShootActivity masks the setting before the run.

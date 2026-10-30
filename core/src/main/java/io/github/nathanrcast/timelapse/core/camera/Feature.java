@@ -1,6 +1,6 @@
-package io.github.nathanrcast.timelapse.camera.model;
+package io.github.nathanrcast.timelapse.core.camera;
 
-import static io.github.nathanrcast.timelapse.camera.model.SonyMethod.*;
+import static io.github.nathanrcast.timelapse.core.camera.SonyMethod.*;
 
 import java.util.List;
 

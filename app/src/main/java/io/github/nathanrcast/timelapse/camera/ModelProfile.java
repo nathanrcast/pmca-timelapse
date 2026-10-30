@@ -1,7 +1,7 @@
 package io.github.nathanrcast.timelapse.camera;
 
-import io.github.nathanrcast.timelapse.camera.model.Feature;
-import io.github.nathanrcast.timelapse.camera.model.Quirk;
+import io.github.nathanrcast.timelapse.core.camera.Feature;
+import io.github.nathanrcast.timelapse.core.camera.Quirk;
 
 import java.util.Collections;
 import java.util.EnumSet;

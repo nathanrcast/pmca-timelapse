@@ -17,7 +17,7 @@ No Sony API call can crash or reboot an older camera, and the UI shows only the 
 - `camera/ModelProfile`: static overrides keyed on `DeviceInfo.getModel()` (`NEX-5T`, `ILCE-6500`, default). Use them for quirks reflection can't see, such as "method exists but no-ops" or "needs continuous drive".
 - `camera/SafeCamera`: the only class that touches `CameraEx` (`CapsDump` excepted, being the probe tool). Every call returns a result or a typed failure, and failures are logged once per run.
 - The UI binds option visibility to the capabilities.
-- Expose a pure-Java `Capabilities` interface so the logic can be tested with a fake. It lives in `camera/model` (no `android.*`/`com.sony.*` imports) and moves to `:core` once T05 lands.
+- Expose a pure-Java `Capabilities` interface in `:core` (`core.camera`) so the logic can be tested with a fake.
 
 ## Acceptance
 - [ ] `grep -rn "CameraEx\|ParametersModifier" app/src/main/java | grep -v /camera/ | grep -v CapsDump | grep -v CapsFormat` returns nothing.

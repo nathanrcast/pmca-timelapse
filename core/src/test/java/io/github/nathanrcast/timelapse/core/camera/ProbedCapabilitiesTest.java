@@ -1,6 +1,6 @@
-package io.github.nathanrcast.timelapse.camera.model;
+package io.github.nathanrcast.timelapse.core.camera;
 
-import static io.github.nathanrcast.timelapse.camera.model.Probes.*;
+import static io.github.nathanrcast.timelapse.core.camera.Probes.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;

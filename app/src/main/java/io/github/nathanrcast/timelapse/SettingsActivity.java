@@ -22,8 +22,8 @@ import android.widget.TextView;
 import com.github.ma1co.pmcademo.app.BaseActivity;
 
 import io.github.nathanrcast.timelapse.camera.SafeCamera;
-import io.github.nathanrcast.timelapse.camera.model.Capabilities;
-import io.github.nathanrcast.timelapse.camera.model.OptionVisibility;
+import io.github.nathanrcast.timelapse.core.camera.Capabilities;
+import io.github.nathanrcast.timelapse.core.camera.OptionVisibility;
 
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
@@ -248,7 +248,7 @@ public class SettingsActivity extends BaseActivity
         applyCapabilities(SafeCamera.probe());
     }
 
-    // Hides the options this body can't do (camera.model.OptionVisibility). Unchecking first runs each listener, so
+    // Hides the options this body can't do (core.camera.OptionVisibility). Unchecking first runs each listener, so
     // the setting goes off too; HG's listener also hides its section.
     private void applyCapabilities(Capabilities caps) {
         OptionVisibility options = OptionVisibility.of(caps);

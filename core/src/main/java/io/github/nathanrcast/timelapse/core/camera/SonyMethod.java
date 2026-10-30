@@ -1,11 +1,11 @@
-package io.github.nathanrcast.timelapse.camera.model;
+package io.github.nathanrcast.timelapse.core.camera;
 
 import java.util.ArrayList;
 import java.util.List;
 
 // Every Sony method SafeCamera calls or queries. Types are simple names (CapsFormat.typeName form) so this file names
-// no package; camera/ReflectiveCapabilities maps them back to classes. Core methods are the ones a shooting session
-// can't run without; every other one is optional and guarded by the probe before each call.
+// no package; the app's camera.ReflectiveCapabilities maps them back to classes. Core methods are the ones a shooting
+// session can't run without; every other one is optional and guarded by the probe before each call.
 public enum SonyMethod {
     OPEN(true, T.CAMERA_EX, "open", "int", T.CAMERA_EX + "$OpenOptions"),
     RELEASE(true, T.CAMERA_EX, "release"),

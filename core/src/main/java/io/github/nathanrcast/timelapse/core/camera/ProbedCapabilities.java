@@ -1,4 +1,4 @@
-package io.github.nathanrcast.timelapse.camera.model;
+package io.github.nathanrcast.timelapse.core.camera;
 
 import java.util.ArrayList;
 import java.util.Collection;

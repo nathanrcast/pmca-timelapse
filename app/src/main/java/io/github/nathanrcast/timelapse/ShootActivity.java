@@ -20,8 +20,8 @@ import com.github.ma1co.pmcademo.app.BaseActivity;
 
 import io.github.nathanrcast.timelapse.camera.Result;
 import io.github.nathanrcast.timelapse.camera.SafeCamera;
-import io.github.nathanrcast.timelapse.camera.model.Capabilities;
-import io.github.nathanrcast.timelapse.camera.model.OptionVisibility;
+import io.github.nathanrcast.timelapse.core.camera.Capabilities;
+import io.github.nathanrcast.timelapse.core.camera.OptionVisibility;
 
 import io.github.nathanrcast.timelapse.core.Clock;
 import io.github.nathanrcast.timelapse.core.Settings;

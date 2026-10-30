@@ -4,11 +4,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import io.github.nathanrcast.timelapse.camera.model.Feature;
-import io.github.nathanrcast.timelapse.camera.model.ProbedCapabilities;
-import io.github.nathanrcast.timelapse.camera.model.Query;
-import io.github.nathanrcast.timelapse.camera.model.Quirk;
-import io.github.nathanrcast.timelapse.camera.model.SonyMethod;
+import io.github.nathanrcast.timelapse.core.camera.Feature;
+import io.github.nathanrcast.timelapse.core.camera.ProbedCapabilities;
+import io.github.nathanrcast.timelapse.core.camera.Query;
+import io.github.nathanrcast.timelapse.core.camera.Quirk;
+import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
 
 import org.junit.Test;
 
