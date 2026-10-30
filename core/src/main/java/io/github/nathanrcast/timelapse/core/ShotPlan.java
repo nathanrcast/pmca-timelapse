@@ -58,12 +58,12 @@ public final class ShotPlan {
         return Math.round(intervalSeconds * shotCount);
     }
 
-    /** Clip length at {@code fps}, one frame per shot. -1 for burst or infinite runs. */
+    /** Clip length at {@code fps}, one frame per shot. -1 for burst or infinite runs, whatever the fps. */
     public long clipSeconds(int fps) {
-        if (fps <= 0)
-            throw new IllegalArgumentException("fps <= 0: " + fps);
         if (isInfinite() || isBurst())
             return -1;
+        if (fps <= 0)
+            throw new IllegalArgumentException("fps <= 0: " + fps);
         return shotCount / fps;
     }
 

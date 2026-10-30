@@ -67,6 +67,7 @@ public class ShotPlanTest {
         assertTrue(burst.isBurst());
         assertEquals(15, burst.durationSeconds());
         assertEquals(-1, burst.clipSeconds(24));
+        assertEquals(-1, burst.clipSeconds(0));
         assertEquals(-1, burst.shotsRemaining(4));
         assertEquals(1000 + 15000, burst.endMs(1000));
     }
@@ -77,6 +78,7 @@ public class ShotPlanTest {
         assertTrue(plan.isInfinite());
         assertEquals(-1, plan.durationSeconds());
         assertEquals(-1, plan.clipSeconds(24));
+        assertEquals(-1, plan.clipSeconds(0));
         assertEquals(Long.MAX_VALUE, plan.endMs(1000));
         assertEquals(3L * Integer.MAX_VALUE, plan.totalFrames());
         assertEquals(Integer.MAX_VALUE, plan.shotsRemaining(0));
