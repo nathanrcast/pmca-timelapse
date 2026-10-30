@@ -1,9 +1,9 @@
-package com.frosbe.holygrail;
+package io.github.nathanrcast.timelapse;
 
-import static com.frosbe.holygrail.Util.DEADBAND_VALUES;
-import static com.frosbe.holygrail.Util.ISO_VALUES;
-import static com.frosbe.holygrail.Util.SHUTTER_SPEEDS;
-import static com.frosbe.holygrail.Util.formatShutterSpeedIndex;
+import static io.github.nathanrcast.timelapse.Util.DEADBAND_VALUES;
+import static io.github.nathanrcast.timelapse.Util.ISO_VALUES;
+import static io.github.nathanrcast.timelapse.Util.SHUTTER_SPEEDS;
+import static io.github.nathanrcast.timelapse.Util.formatShutterSpeedIndex;
 
 import android.content.Intent;
 import android.content.IntentFilter;

@@ -1,4 +1,4 @@
-package com.frosbe.holygrail;
+package io.github.nathanrcast.timelapse;
 
 public class Util {
     public static String formatShutterSpeed(int n, int d)

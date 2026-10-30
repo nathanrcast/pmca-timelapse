@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace 'com.frosbe.holygrail'
+    namespace 'io.github.nathanrcast.timelapse'
     compileSdk 34
 
     defaultConfig {

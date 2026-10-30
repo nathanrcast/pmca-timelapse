@@ -1,4 +1,4 @@
-package com.frosbe.holygrail;
+package io.github.nathanrcast.timelapse;
 
 import android.content.Context;
 import android.content.Intent;
@@ -11,24 +11,24 @@ import static android.preference.PreferenceManager.getDefaultSharedPreferences;
  */
 
 class Settings {
-    private static final String EXTRA_INTERVAL = "com.frosbe.timelapse.INTERVAL";
-    private static final String EXTRA_SHOTCOUNT = "com.frosbe.timelapse.SHOTCOUNT";
-    private static final String EXTRA_DELAY = "com.frosbe.timelapse.DELAY";
-    private static final String EXTRA_DISPLAYOFF = "com.frosbe.timelapse.DISPLAYOFF";
-    private static final String EXTRA_SILENTSHUTTER = "com.frosbe.timelapse.SILENTSHUTTER";
-    private static final String EXTRA_AEL = "com.frosbe.timelapse.AEL";
-    private static final String EXTRA_BRS = "com.frosbe.timelapse.BRS";
-    private static final String EXTRA_MF = "com.frosbe.timelapse.MF";
-    private static final String EXTRA_HOLYGRAIL = "com.frosbe.timelapse.HOLYGRAIL";
-    private static final String EXTRA_USECURRENTEXPOSURE = "com.frosbe.timelapse.USECURRENTEXPOSURE";
-    private static final String EXTRA_TARGETEXPOSURE = "com.frosbe.timelapse.TARGETEXPOSURE";
-    private static final String EXTRA_MAXSHUTTERSPEEDINDEX = "com.frosbe.timelapse.MAXSHUTTERSPEEDINDEX";
-    private static final String EXTRA_MAXISOINDEX = "com.frosbe.timelapse.MAXISOINDEX";
-    private static final String EXTRA_COOLDOWN = "com.frosbe.timelapse.COOLDOWN";
-    private static final String EXTRA_AVERAGEEXPOSUREAMOUNT = "com.frosbe.timelapse.AVERAGEEXPOSUREAMOUNT";
-    private static final String EXTRA_DEADBANDINDEX = "com.frosbe.timelapse.DEADBANDINDEX";
-    private static final String EXTRA_HOLYGRAILALLOWEXPOSUREUP = "com.frosbe.timelapse.HOLYGRAILALLOWEXPOSUREUP";
-    private static final String EXTRA_HOLYGRAILALLOWEXPOSUREDOWN = "com.frosbe.timelapse.HOLYGRAILALLOWEXPOSUREDOWN";
+    private static final String EXTRA_INTERVAL = "io.github.nathanrcast.timelapse.INTERVAL";
+    private static final String EXTRA_SHOTCOUNT = "io.github.nathanrcast.timelapse.SHOTCOUNT";
+    private static final String EXTRA_DELAY = "io.github.nathanrcast.timelapse.DELAY";
+    private static final String EXTRA_DISPLAYOFF = "io.github.nathanrcast.timelapse.DISPLAYOFF";
+    private static final String EXTRA_SILENTSHUTTER = "io.github.nathanrcast.timelapse.SILENTSHUTTER";
+    private static final String EXTRA_AEL = "io.github.nathanrcast.timelapse.AEL";
+    private static final String EXTRA_BRS = "io.github.nathanrcast.timelapse.BRS";
+    private static final String EXTRA_MF = "io.github.nathanrcast.timelapse.MF";
+    private static final String EXTRA_HOLYGRAIL = "io.github.nathanrcast.timelapse.HOLYGRAIL";
+    private static final String EXTRA_USECURRENTEXPOSURE = "io.github.nathanrcast.timelapse.USECURRENTEXPOSURE";
+    private static final String EXTRA_TARGETEXPOSURE = "io.github.nathanrcast.timelapse.TARGETEXPOSURE";
+    private static final String EXTRA_MAXSHUTTERSPEEDINDEX = "io.github.nathanrcast.timelapse.MAXSHUTTERSPEEDINDEX";
+    private static final String EXTRA_MAXISOINDEX = "io.github.nathanrcast.timelapse.MAXISOINDEX";
+    private static final String EXTRA_COOLDOWN = "io.github.nathanrcast.timelapse.COOLDOWN";
+    private static final String EXTRA_AVERAGEEXPOSUREAMOUNT = "io.github.nathanrcast.timelapse.AVERAGEEXPOSUREAMOUNT";
+    private static final String EXTRA_DEADBANDINDEX = "io.github.nathanrcast.timelapse.DEADBANDINDEX";
+    private static final String EXTRA_HOLYGRAILALLOWEXPOSUREUP = "io.github.nathanrcast.timelapse.HOLYGRAILALLOWEXPOSUREUP";
+    private static final String EXTRA_HOLYGRAILALLOWEXPOSUREDOWN = "io.github.nathanrcast.timelapse.HOLYGRAILALLOWEXPOSUREDOWN";
 
 
     double interval;
