@@ -68,10 +68,11 @@ public final class ShotLogCsv {
 
     /**
      * The {@code #} lines that open a run, each ending in a newline. {@code uptimeToWallMs} is
-     * wall-clock ms minus uptime ms, so wall = uptime + offset.
+     * wall-clock ms minus uptime ms, so wall = uptime + offset. {@code lenr} is the long-exposure NR state
+     * the run found ({@link LenrGuard#headerValue}).
      */
     public static String runHeader(String runId, String model, String firmware, String appVersion,
-                                   long uptimeToWallMs, String settingsJson) {
+                                   long uptimeToWallMs, String settingsJson, String lenr) {
         return new StringBuilder()
                 .append("# run_id=").append(comment(runId)).append('\n')
                 .append("# model=").append(comment(model)).append('\n')
@@ -79,6 +80,7 @@ public final class ShotLogCsv {
                 .append("# app_version=").append(comment(appVersion)).append('\n')
                 .append("# uptime_to_wall_ms=").append(uptimeToWallMs).append('\n')
                 .append("# settings=").append(comment(settingsJson)).append('\n')
+                .append("# lenr=").append(comment(lenr)).append('\n')
                 .toString();
     }
 
@@ -96,6 +98,9 @@ public final class ShotLogCsv {
         sb.append(",\"intervalIndex\":").append(StepTables.INTERVAL_MS.nearestIndex(Math.round(s.interval * 1000)));
         sb.append(",\"shotsIndex\":").append(StepTables.SHOTS.nearestIndex(s.shotCount));
         sb.append(",\"delayIndex\":").append(StepTables.DELAY_MIN.nearestIndex(s.delay));
+        sb.append(",\"startMode\":\"").append(s.startMode).append('"');
+        sb.append(",\"at\":\"").append(StartTime.format(s.atHour, s.atMinute)).append('"');
+        sb.append(",\"disableLenr\":").append(s.disableLenr);
         sb.append(",\"displayOff\":").append(s.displayOff);
         sb.append(",\"silentShutter\":").append(s.silentShutter);
         sb.append(",\"ael\":").append(s.ael);
