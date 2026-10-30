@@ -1,8 +1,6 @@
 package io.github.nathanrcast.timelapse;
 
 import static io.github.nathanrcast.timelapse.core.Util.DEADBAND_VALUES;
-import static io.github.nathanrcast.timelapse.core.Util.ISO_VALUES;
-import static io.github.nathanrcast.timelapse.core.Util.SHUTTER_SPEEDS;
 import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeedIndex;
 
 import android.content.Intent;
@@ -24,6 +22,7 @@ import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 
 import io.github.nathanrcast.timelapse.core.Clock;
+import io.github.nathanrcast.timelapse.core.ExposureRamp;
 import io.github.nathanrcast.timelapse.core.Progress;
 import io.github.nathanrcast.timelapse.core.Scheduler;
 import io.github.nathanrcast.timelapse.core.Settings;
@@ -34,7 +33,6 @@ import io.github.nathanrcast.timelapse.core.Util;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -67,7 +65,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private TextView tvDeadband;
     //End Holy Grail
 
-    private List<Float> exposureLevelList = new ArrayList<Float>();
+    private final ExposureRamp ramp = new ExposureRamp();
+    private ExposureRamp.History history;
 
     private SurfaceView reviewSurfaceView;
     private SurfaceHolder cameraSurfaceHolder;
@@ -82,9 +81,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private boolean finishing;
 
     private float exposureLevel = 0;
-    private int ISOLevelIndex = 0;
-    private int shutterSpeedIndex = 0;
-    private int shotsSinceLastChange = 0;
+    private int isoIndex = ExposureRamp.UNKNOWN;
+    private int shutterSpeedIndex = ExposureRamp.UNKNOWN;
+    private int slotsSinceLastChange = 0;
+    private boolean isoUnknownLogged;
     private float targetExposureLevel = 0.0f;
 
     private Display display;
@@ -96,7 +96,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         public void run() {
             Scheduler.Decision decision = scheduler.onTimer();
             if (decision.action == Scheduler.Action.FIRE) {
-                takeFrame();
+                takeFrame(decision);
                 if (burstShooting) {
                     handler.removeCallbacks(burstPollRunnable);
                     handler.postDelayed(burstPollRunnable, BURST_POLL_MS);
@@ -195,22 +195,11 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (settings.useCurrentExposure){
             targetExposureLevel = exposureLevel;
         } else {
-            targetExposureLevel = settings.targetExposure;
+            targetExposureLevel = ExposureRamp.thirdsToEv(settings.targetExposure);
         }
+        history = new ExposureRamp.History(settings.averageExposureAmount);
 
         tvDeadband.setText(DEADBAND_VALUES[settings.deadbandIndex] + " EV");
-
-        if (settings.holyGrailAllowExposureUp && !settings.holyGrailAllowExposureDown){
-            ISOLevelIndex = 0;
-        }
-
-        if (settings.holyGrailAllowExposureDown && !settings.holyGrailAllowExposureUp){
-            ISOLevelIndex = ISO_VALUES.length - 1;
-        }
-
-        if (settings.holyGrailAllowExposureDown && settings.holyGrailAllowExposureUp){
-            ISOLevelIndex = ISO_VALUES.length / 2;
-        }
 
         reviewSurfaceView = (SurfaceView) findViewById(R.id.surfaceView);
         reviewSurfaceView.setZOrderOnTop(false);
@@ -292,7 +281,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final SafeCamera.ExposureCallback exposureCallback = new SafeCamera.ExposureCallback() {
         @Override
         public void onEvRange(int ev) {
-            exposureLevel = (float)ev / 3.0f;
+            exposureLevel = ExposureRamp.thirdsToEv(ev);
             if (settings.useCurrentExposure){
                 targetExposureLevel = exposureLevel;
                 settings.useCurrentExposure = false;
@@ -302,30 +291,20 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     };
 
+    // Unknown (BULB, off-table, unreadable) stays unknown: the ramp skips the shutter then.
     private void updateShutterSpeed(){
         Result<int[]> sp = safeCamera.shutterSpeed();
-        if (!sp.isOk())
-            return;
-
-        //find the shutterspeed in the list (list of int[][])
-        for(int i = 0; i < SHUTTER_SPEEDS.length; i++){
-            if(SHUTTER_SPEEDS[i][0] == sp.get()[0] && SHUTTER_SPEEDS[i][1] == sp.get()[1]){
-                shutterSpeedIndex = i;
-                break;
-            }
-        }
+        shutterSpeedIndex = sp.isOk()
+                ? ramp.tables().shutterIndex(sp.get()[0], sp.get()[1]) : ExposureRamp.UNKNOWN;
     }
 
+    // Nearest table ISO, else unknown (AUTO, off-table): the ramp then moves the shutter only.
     private void updateISOLevel(){
         Result<Integer> isoResult = safeCamera.isoSensitivity();
-        if (!isoResult.isOk())
-            return;
-        int iso = isoResult.get();
-        for(int i = 0; i < ISO_VALUES.length; i++){
-            if(ISO_VALUES[i] == iso){
-                ISOLevelIndex = i;
-                break;
-            }
+        isoIndex = isoResult.isOk() ? ramp.tables().isoIndex(isoResult.get()) : ExposureRamp.UNKNOWN;
+        if (isoIndex == ExposureRamp.UNKNOWN && !isoUnknownLogged) {
+            isoUnknownLogged = true;
+            log("HG: ISO " + (isoResult.isOk() ? isoResult.get() : "unreadable") + " not in table, ramping shutter only");
         }
     }
 
@@ -344,31 +323,24 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         tvBattery.setText(getBatteryPercentage());
 
         //Holy Grail
-        tvAverageExposure.setText(String.format("%.2f", (getAverageExposure(settings.averageExposureAmount))));
+        tvAverageExposure.setText(String.format("%.2f", history.average(settings.averageExposureAmount)));
         tvTargetExposureLevel.setText(String.format("%.2f", targetExposureLevel));
-        tvShutterspeed.setText(formatShutterSpeedIndex(shutterSpeedIndex));
-        tvMaxShutterspeed.setText(formatShutterSpeedIndex(settings.maxShutterSpeedIndex));
-        tvLastPictureISO.setText(Integer.toString(ISO_VALUES[ISOLevelIndex]));
-        tvMaxISO.setText(Integer.toString(ISO_VALUES[settings.maxISOIndex]));
-        tvShotsSinceLastChange.setText(Integer.toString(shotsSinceLastChange));
+        tvShutterspeed.setText(shutterText(shutterSpeedIndex));
+        tvMaxShutterspeed.setText(shutterText(ramp.tables().maxShutterIndex(settings.maxShutterSpeedIndex, settings.interval)));
+        tvLastPictureISO.setText(isoText(isoIndex));
+        tvMaxISO.setText(isoText(Math.min(settings.maxISOIndex, ramp.tables().isoCount() - 1)));
+        tvShotsSinceLastChange.setText(Integer.toString(slotsSinceLastChange));
         tvCooldown.setText(Integer.toString(settings.cooldown));
 
 
     }
 
-    private float getAverageExposure(int shotCount){
-        //get the average value of the last "shotCount" values in the exposureLevelList, or list.size() if list.size() < shotCount
-        float sum = 0;
-        int count = 0;
-        for(int i = exposureLevelList.size() - 1; i >= 0 && count < shotCount; i--){
-            sum += exposureLevelList.get(i);
-            count++;
-        }
-        if (count == 0){
-            return 0;
-        } else {
-            return sum / count;
-        }
+    private String shutterText(int index) {
+        return index < 0 || index >= ramp.tables().shutterCount() ? "?" : formatShutterSpeedIndex(index);
+    }
+
+    private String isoText(int index) {
+        return index < 0 || index >= ramp.tables().isoCount() ? "?" : Integer.toString(ramp.tables().isoAt(index));
     }
 
     @Override
@@ -437,18 +409,14 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         catch (IOException e) {}
     }
 
-    private void shoot() {
-        if (settings.holyGrail){
-            holyGrailPrePhotoEvent();
-        }
+    private void shoot(Scheduler.Decision decision) {
+        // One ramp per slot, before its first frame: later bracket frames keep the exposure of the set.
+        if (settings.holyGrail && decision.frame == 0)
+            holyGrailSlot(decision.slot);
 
         safeCamera.takePicture();
 
         shotCount++;
-        shotsSinceLastChange++;
-
-        if (settings.holyGrail)
-            exposureLevelList.add(exposureLevel);
 
         runOnUiThread(new Runnable() {
             @Override
@@ -458,64 +426,73 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         });
     }
 
-    private void holyGrailPrePhotoEvent(){
-        float usableExposureLevel = getAverageExposure(settings.averageExposureAmount);
-        int cooldown = settings.cooldown;
-        float deadbandSize = DEADBAND_VALUES[settings.deadbandIndex];
-
-
-        if (settings.holyGrail){
-
-            if (shotsSinceLastChange >= cooldown){
-
-                if (usableExposureLevel < targetExposureLevel - deadbandSize){
-
-                    if (settings.holyGrailAllowExposureUp) {
-                        if (shutterSpeedIndex < settings.maxShutterSpeedIndex){
-                            //make the shutter open longer
-                            safeCamera.decrementShutterSpeed();
-                            shotsSinceLastChange = 0;
-                        } else if (ISOLevelIndex < settings.maxISOIndex){
-                            //increase ISO
-                            incrementISO();
-                            shotsSinceLastChange = 0;
-                        }
-                    }
-                }
-
-                if (usableExposureLevel > targetExposureLevel + deadbandSize){
-
-                    if (settings.holyGrailAllowExposureDown) {
-                        if (ISOLevelIndex > 3){
-                            //decrease ISO
-                            decrementISO();
-                            shotsSinceLastChange = 0;
-                        } else if (shutterSpeedIndex > 0){
-                            //make the shutter open shorter
-                            safeCamera.incrementShutterSpeed();
-                            shotsSinceLastChange = 0;
-                        }
-                    }
-                }
-            }
-        }
+    private void holyGrailSlot(long slot) {
+        history.add(exposureLevel);
         updateShutterSpeed();
         updateISOLevel();
-        updateScreen();
+
+        ExposureRamp.Input in = new ExposureRamp.Input();
+        in.measuredEv = history.average(settings.averageExposureAmount);
+        in.targetEv = targetExposureLevel;
+        in.shutterIndex = shutterSpeedIndex;
+        in.isoIndex = isoIndex;
+        in.maxShutterIndex = settings.maxShutterSpeedIndex;
+        in.maxIsoIndex = settings.maxISOIndex;
+        in.intervalSec = settings.interval;
+        in.mode = ExposureRamp.Mode.of(settings.holyGrailAllowExposureUp, settings.holyGrailAllowExposureDown);
+        in.deadbandEv = DEADBAND_VALUES[settings.deadbandIndex];
+        in.cooldownSlots = settings.cooldown;
+        in.slotsSinceChange = slotsSinceLastChange;
+
+        ExposureRamp.Action action = ramp.decide(in);
+        if (!action.isNone()) {
+            log("HG slot " + slot + ": " + action);
+            if (applyRamp(action))
+                slotsSinceLastChange = 0;
+        }
+        slotsSinceLastChange++;
     }
 
-    private void incrementISO(){
-        ISOLevelIndex++;
-        if (ISOLevelIndex < ISO_VALUES.length){
-            safeCamera.setIsoSensitivity(ISO_VALUES[ISOLevelIndex]);
+    // Applies the steps through SafeCamera and moves the tracked index by what went through; the next slot re-reads.
+    private boolean applyRamp(ExposureRamp.Action action) {
+        int done = 0;
+        for (int i = 0; i < action.steps; i++) {
+            Result<Void> r;
+            switch (action.kind) {
+                case SHUTTER_LONGER:
+                    r = safeCamera.decrementShutterSpeed();
+                    break;
+                case SHUTTER_SHORTER:
+                    r = safeCamera.incrementShutterSpeed();
+                    break;
+                case ISO_UP:
+                    r = safeCamera.setIsoSensitivity(ramp.tables().isoAt(isoIndex + done + 1));
+                    break;
+                default:
+                    r = safeCamera.setIsoSensitivity(ramp.tables().isoAt(isoIndex - done - 1));
+                    break;
+            }
+            if (!r.isOk()) {
+                log("HG: " + action.kind + " failed after " + done + " steps: " + r);
+                break;
+            }
+            done++;
         }
-    }
-
-    private void decrementISO(){
-        ISOLevelIndex--;
-        if (ISOLevelIndex >= 0){
-            safeCamera.setIsoSensitivity(ISO_VALUES[ISOLevelIndex]);
+        switch (action.kind) {
+            case SHUTTER_LONGER:
+                shutterSpeedIndex += done;
+                break;
+            case SHUTTER_SHORTER:
+                shutterSpeedIndex -= done;
+                break;
+            case ISO_UP:
+                isoIndex += done;
+                break;
+            default:
+                isoIndex -= done;
+                break;
         }
+        return done > 0;
     }
 
     // The camera calls this when a frame is captured, possibly off the main looper.
@@ -532,7 +509,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private void frameCaptured() {
         Scheduler.Decision decision = scheduler.onFrameCaptured();
         if (decision.action == Scheduler.Action.FIRE) {
-            takeFrame();
+            takeFrame(decision);
         } else if (decision.action == Scheduler.Action.SLOT_DONE) {
             if (scheduler.isDone())
                 finishRun();
@@ -551,8 +528,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         String ss = "", iso = "", ev = "";
         boolean idle = decision.action == Scheduler.Action.SLOT_DONE;
         if (settings.holyGrail && (idle || decision.action == Scheduler.Action.FIRE)) {
-            ss = formatShutterSpeedIndex(shutterSpeedIndex);
-            iso = Integer.toString(ISO_VALUES[ISOLevelIndex]);
+            ss = shutterSpeedIndex < 0 ? "" : formatShutterSpeedIndex(shutterSpeedIndex);
+            iso = isoIndex < 0 ? "" : isoText(isoIndex);
             ev = String.format(Locale.US, "%.2f", exposureLevel);
         } else if (idle && !burstShooting && safeCamera != null) {
             // One read, once the camera is idle: never while a capture or a burst is in flight.
@@ -589,9 +566,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             handler.postAtTime(tickRunnable, wake);
     }
 
-    private void takeFrame() {
+    private void takeFrame(Scheduler.Decision decision) {
         stopReview(true);
-        shoot();
+        shoot(decision);
         if (!burstShooting)
             display.on();
     }

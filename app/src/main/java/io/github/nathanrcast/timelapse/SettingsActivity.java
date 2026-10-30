@@ -27,6 +27,7 @@ import io.github.nathanrcast.timelapse.camera.SafeCamera;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.OptionVisibility;
 
+import io.github.nathanrcast.timelapse.core.ExposureRamp;
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
 import io.github.nathanrcast.timelapse.core.SliderMapping;
@@ -157,6 +158,7 @@ public class SettingsActivity extends BaseActivity
         cbUseCurrentExposure = (CheckBox) findViewById(R.id.cbUseCurrentExposure);
         cbUseCurrentExposure.setChecked(settings.useCurrentExposure);
         cbUseCurrentExposure.setOnCheckedChangeListener(cbUseCurrentExposureOnCheckListener);
+        cbUseCurrentExposureOnCheckListener.onCheckedChanged(cbUseCurrentExposure, settings.useCurrentExposure);
 
         sbMaxShutterSpeed = (AdvancedSeekBar) findViewById(R.id.sbMaxShutterSpeed);
         tvMaxShutterSpeedValue = (TextView) findViewById(R.id.tvMaxShutterSpeedValue);
@@ -439,7 +441,7 @@ public class SettingsActivity extends BaseActivity
             //the seekbar is from 0 to 60, but we want -30 to 30
             settings.targetExposure = SliderMapping.progressToTargetExposure(i);
             //Float.toString(settings.targetExposure/3.0f) show only 2 decimals
-            tvTargetExposureValue.setText(String.format("%.2f", settings.targetExposure/3.0f));
+            tvTargetExposureValue.setText(String.format("%.2f", ExposureRamp.thirdsToEv(settings.targetExposure)));
             tvTargetExposureUnit.setText("EV");
         }
 
