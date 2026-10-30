@@ -125,6 +125,10 @@ public final class Util {
             102400
     };
 
+    // 1/30 s and ISO 3200; the ramp also clamps the shutter to half the interval.
+    public static final int DEFAULT_MAX_SHUTTER_INDEX = 24;
+    public static final int DEFAULT_MAX_ISO_INDEX = 18;
+
     public static final float[] DEADBAND_VALUES = new float[]{
             0.0f,
             0.1f,

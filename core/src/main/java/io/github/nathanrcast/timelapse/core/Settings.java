@@ -82,8 +82,8 @@ public final class Settings {
         holyGrail = false;
         useCurrentExposure = true;
         targetExposure = 0; //0
-        maxShutterSpeedIndex = 0;
-        maxISOIndex = 0;
+        maxShutterSpeedIndex = Util.DEFAULT_MAX_SHUTTER_INDEX;
+        maxISOIndex = Util.DEFAULT_MAX_ISO_INDEX;
         cooldown = 5;
         averageExposureAmount = 1;
         deadbandIndex = 0;
