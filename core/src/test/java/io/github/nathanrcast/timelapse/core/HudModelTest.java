@@ -35,7 +35,7 @@ public class HudModelTest {
         SchedulerRig rig = new SchedulerRig(new ShotPlan(10, 2, 1, 1), CAPTURED).captureMs(300);
         rig.run();
         HudModel done = HudModel.of(rig.scheduler, rig.clock.nowMs(), -1, false, -1, -1);
-        assertEquals("-", done.next);
+        assertEquals("\u2014", done.next);
         assertEquals("2/2", done.count);
         assertEquals("?", done.battery);
         assertEquals("?", done.cardLeft);
@@ -70,7 +70,28 @@ public class HudModelTest {
         SchedulerRig rig = new SchedulerRig(new ShotPlan(0, 5, 0, 1), CAPTURED);
         rig.runUntil(START + 2500);
         HudModel burst = HudModel.of(rig.scheduler, rig.clock.nowMs(), 50, false, 0, 1);
-        assertEquals("-", burst.next);
+        assertEquals("\u2014", burst.next);
         assertEquals("2/5", burst.count);
+    }
+
+    @Test
+    public void noNextOnceEverySlotIsClaimedEvenWhileCapturing() {
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(10, 2, 0, 1), CAPTURED).captureMs(5000);
+        rig.runUntil(START + 10000 + 1000);
+        assertEquals(true, rig.scheduler.isCapturing());
+        assertEquals("\u2014", HudModel.next(rig.scheduler, rig.clock.nowMs()));
+    }
+
+    @Test
+    public void elapsedKeepsPausedTime() {
+        FakeClock clock = new FakeClock(1000);
+        Scheduler s = new Scheduler(new ShotPlan(10, 4, 0, 1), clock, CAPTURED);
+        s.start();
+        clock.advance(30000);
+        s.pause();
+        clock.advance(600000);
+        s.resume();
+        clock.advance(10000);
+        assertEquals("10m 40s", HudModel.elapsed(s, clock.nowMs()));
     }
 }

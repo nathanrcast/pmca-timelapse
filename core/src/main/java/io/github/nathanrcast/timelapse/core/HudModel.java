@@ -12,7 +12,7 @@ public final class HudModel {
     public final String count;
     /** Skipped slots, e.g. "0". */
     public final String skips;
-    /** Time to the next shot: "12s", "now" or "-" when nothing is armed (burst, finished). */
+    /** Time to the next shot: "12s", "now" or "\u2014" when nothing is armed (burst, finished). */
     public final String next;
     /** Time since the first slot's start, "0s" before it. */
     public final String elapsed;
@@ -47,18 +47,21 @@ public final class HudModel {
                 cardLeft(freeBytes, avgShotBytes, s.plan().framesPerInterval()));
     }
 
+    /** Time to the next slot, "now" when overdue, "\u2014" when none is left to wait for (burst, all claimed, done). */
     public static String next(Scheduler s, long nowMs) {
-        long wake = s.nextWakeMs();
-        if (wake == Scheduler.NEVER || s.plan().isBurst() || s.isDone())
-            return "-";
-        long ms = wake - nowMs;
+        long due = s.nextSlotDueMs();
+        if (due == Scheduler.NEVER)
+            return "\u2014";
+        long ms = due - nowMs;
         return ms <= 0 ? "now" : Util.formatTime((ms + 999) / 1000);
     }
 
+    /** Wall time since the first slot was due, pauses included; "0s" before it. */
     public static String elapsed(Scheduler s, long nowMs) {
         if (!s.isStarted())
             return "0s";
-        return Util.formatTime(Math.max(0, (nowMs - s.t0Ms()) / 1000));
+        long sinceFirstSlot = nowMs - s.startedAtMs() - s.plan().delayMs();
+        return Util.formatTime(Math.max(0, sinceFirstSlot / 1000));
     }
 
     public static String battery(int pct, boolean charging) {
