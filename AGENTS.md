@@ -4,12 +4,18 @@ TimeLapse+: an in-camera intervalometer for Sony PlayMemories (PMCA) cameras, ha
 
 ## Commands
 
-The build is still upstream's AGP 3.5 / jcenter setup until T01 lands. T01 then owns this section, along with T02 for CI. After T01 the pre-push gate is:
+Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17+ (a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. T02 owns CI.
 
 ```
-./gradlew :app:assembleDebug :app:lint        # + :core:test once T05 adds :core
-python3 tools/analyze_log.py <LOG.CSV>        # once T16 lands (stdlib only)
+JAVA_HOME=<JDK 17+> ./gradlew clean :app:assembleDebug :app:assembleRelease :app:lint   # full build
+JAVA_HOME=<JDK 17+> ./gradlew :app:assembleDebug :app:lint                              # pre-push gate; + :core:test once T05 adds :core
+python3 tools/analyze_log.py <LOG.CSV>                                                  # once T16 lands (stdlib only)
 ```
+
+- Outputs: `app/build/outputs/apk/debug/TimeLapsePlus-debug-<versionName>.apk` (debug-signed, v1+v2) and `app/build/outputs/apk/release/TimeLapsePlus-release-<versionName>.apk` (unsigned until T18). Lint report: `app/build/reports/lint-results-debug.html`.
+- Check an APK: `$ANDROID_HOME/build-tools/34.0.0/aapt dump badging <apk> | head -3` must show package `io.github.nathanrcast.timelapse`, `sdkVersion:'10'` and `targetSdkVersion:'10'`. `unzip -p <apk> classes.dex | head -c 8 | od -c` must read `dex\n035`, the only dex version Dalvik 2.3 loads.
+- Release `minifyEnabled` is off on purpose, so debug and release go through the same D8 path. The R8 keep rules in `app/proguard-rules.pro` are kept ready for when it is turned back on.
+- OpenMemories-Framework is pinned to jitpack `f8df350`. `stubs` must stay `compileOnly`: the `com.sony.*` classes come from the camera firmware, and packaging the stubs would shadow them.
 
 ## Layout
 

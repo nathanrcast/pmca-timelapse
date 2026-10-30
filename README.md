@@ -42,7 +42,7 @@ Start the app, set the interval and the number of pictures. The screen shows how
 
 ## Building
 
-See [AGENTS.md](AGENTS.md) § Commands. The build is being modernized (ticket T01); until then it needs the legacy Android Gradle Plugin 3.5 toolchain.
+Needs a JDK 17+ and the Android SDK with platform 34 (`sdk.dir` in `local.properties`). `./gradlew :app:assembleDebug` writes `app/build/outputs/apk/debug/TimeLapsePlus-debug-<version>.apk`. Full commands: [AGENTS.md](AGENTS.md) § Commands.
 
 ## Credits
 
