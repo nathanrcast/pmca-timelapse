@@ -9,7 +9,7 @@ defaults: --keystore ~/keystores/pmca-timelapse-release.jks
           --cred     ~/keystores/pmca-timelapse-release.cred
           --props    <repo>/keystore.properties
           --alias    pmca-timelapse
-          --dname    CN=TimeLapse+
+          --dname    "CN=TimeLapse Plus"
 U
   exit 2
 }
@@ -19,7 +19,7 @@ ks="$HOME/keystores/pmca-timelapse-release.jks"
 cred="$HOME/keystores/pmca-timelapse-release.cred"
 props="$root/keystore.properties"
 alias_name="pmca-timelapse"
-dname="CN=TimeLapse+"
+dname="CN=TimeLapse Plus"
 dry=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -33,6 +33,9 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+abspath() { case "$1" in /*) printf '%s' "$1" ;; "~/"*) printf '%s' "$HOME/${1#\~/}" ;; *) printf '%s/%s' "$PWD" "$1" ;; esac; }
+ks="$(abspath "$ks")"; cred="$(abspath "$cred")"; props="$(abspath "$props")"
 
 keytool=""
 if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/keytool" ]; then keytool="$JAVA_HOME/bin/keytool"
@@ -51,6 +54,10 @@ if [ -e "$cred" ]; then
   echo "error: $cred already exists; refusing to overwrite" >&2
   exit 1
 fi
+if [ -e "$props" ]; then
+  echo "error: $props already exists; refusing to overwrite (move it aside first)" >&2
+  exit 1
+fi
 
 echo "keytool:  $keytool"
 echo "keystore: $ks"
@@ -59,7 +66,7 @@ echo "props:    $props"
 echo "alias:    $alias_name  dname: $dname  (RSA 2048, 30 years)"
 
 if [ "$dry" -eq 1 ]; then
-  echo "[dry-run] mkdir -p $(dirname "$ks") $(dirname "$cred") (mode 700)"
+  echo "[dry-run] mkdir -p $(dirname "$ks") $(dirname "$cred") $(dirname "$props"); chmod 700 on the keystore and cred directories"
   echo "[dry-run] generate random password, write it to $cred"
   echo "[dry-run] keytool -genkeypair -keystore $ks -alias $alias_name -keyalg RSA -keysize 2048 -validity 10950 -dname '$dname' (password via stdin)"
   echo "[dry-run] write $props"
@@ -68,17 +75,22 @@ if [ "$dry" -eq 1 ]; then
 fi
 
 umask 077
-mkdir -p "$(dirname "$ks")" "$(dirname "$cred")"
+mkdir -p "$(dirname "$ks")" "$(dirname "$cred")" "$(dirname "$props")"
+for d in "$(dirname "$ks")" "$(dirname "$cred")"; do
+  chmod 700 "$d" 2>/dev/null || echo "warning: could not chmod 700 $d; check its permissions" >&2
+done
 pw="$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32)"
 [ "${#pw}" -eq 32 ] || { echo "error: could not generate a password" >&2; exit 1; }
 printf '%s\n' "$pw" > "$cred"
 chmod 600 "$cred"
 
 # keytool reads the password from stdin when there is no console; it asks for it twice.
-if ! printf '%s\n%s\n' "$pw" "$pw" | "$keytool" -genkeypair -keystore "$ks" -alias "$alias_name" \
-     -keyalg RSA -keysize 2048 -validity 10950 -dname "$dname" >/dev/null 2>&1; then
+# Its stderr holds no secret (the password arrives on stdin); show it only on failure.
+if ! err="$(printf '%s\n%s\n' "$pw" "$pw" | "$keytool" -genkeypair -keystore "$ks" -alias "$alias_name" \
+     -keyalg RSA -keysize 2048 -validity 10950 -dname "$dname" 2>&1 >/dev/null)"; then
   rm -f "$ks" "$cred"
-  echo "error: keytool failed; removed partial files" >&2
+  printf '%s\n' "$err" >&2
+  echo "error: keytool failed (output above); removed partial files" >&2
   exit 1
 fi
 chmod 600 "$ks"

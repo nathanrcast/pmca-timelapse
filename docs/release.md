@@ -43,15 +43,15 @@ In the GitHub UI: Releases, open the `v2.0.0` draft, paste the 2.0.0 section of 
 
 ## 6. Test a fresh install from the source
 
-Add the repo as a PMCA-RE RELOADED source and install (camera connected over USB):
+Install through PMCA-RE RELOADED from the source, not from a local file, with the camera connected over USB:
 
 ```
 pmca-console sources add nathanrcast/pmca-timelapse
 pmca-console apps
-pmca-console install --apk TimeLapsePlus-2.0.0.apk
+pmca-console install --app io.github.nathanrcast.timelapse --source nathanrcast/pmca-timelapse
 ```
 
-The source file is `pmca-source.yaml` at the repo root. Confirm the app appears in `pmca-console apps` and launches on both bodies.
+`apps` must list TimeLapse+ with version 2.0.0. `install --app` resolves the newest release asset through `pmca-source.yaml`, so this fails if the file or the release is wrong. Confirm the app launches on both bodies. In the PMCA-RE RELOADED app the same flow is Settings, App and plugin sources, add the repository, then pick TimeLapse+ on the Apps page.
 
 ## 7. Optional: list it in the OpenMemories app list
 

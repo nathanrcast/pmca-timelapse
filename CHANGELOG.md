@@ -14,6 +14,8 @@ First TimeLapse+ release: a hard fork of jonasjuffinger/TimeLapse. New applicati
 - Camera info screen (CapsDump) that writes `TIMELPS/CAPS-<model>.txt` with the body's methods and supported values.
 - Per-shot `TIMELPS/LOG.CSV` and `tools/analyze_log.py`, which reports drift and unexplained skips.
 - Capability layer: options a body does not support are hidden instead of called.
+- Desktop assembly: `tools/assemble.sh` and `tools/frames_for_run.py` turn a run's frames into a clip; README rewritten for users; consolidated camera checklist.
+- Soak tooling for long unattended runs.
 - CI that builds unsigned APKs, and `scripts/release.sh` for local signing.
 - Bulb exposure spike (feasible, unverified); no bulb feature ships in this release.
 
@@ -27,14 +29,18 @@ First TimeLapse+ release: a hard fork of jonasjuffinger/TimeLapse. New applicati
 
 ### Fixed
 
-- Interval drift and catch-up bursts (upstream issue 5).
+- Failed captures are reported to the scheduler (`Scheduler.captureFailed`) instead of being lost.
+- Camera auto power-off during a run: the power-off hold is re-asserted.
+- Inconsistent intervals on large SDXC cards, from logging on the capture path; the logger is now asynchronous (upstream issue 46).
+- Black screen after a long run: display-off state is restored safely (upstream issue 52).
+- Interval drift and catch-up bursts, seen as bursts of up to 6 frames per second on NEX-5R-class bodies (upstream issue 5).
 - Every other shot missing when capture takes longer than the interval (upstream issues 26, 50).
 - Camera reboot from `NoSuchMethodError` on older bodies (upstream issue 4).
 - Bracketed runs counting 3 per frame and ignoring the EV step (upstream issue 41).
-- Inconsistent slider steps and missing wheel support (upstream issues 5, 8, 29).
+- Inconsistent interval slider steps (upstream issues 8, 29) and no wheel support on some bodies.
 - Start delay not honoured (upstream issue 36).
 - Long-exposure NR silently halving the shot count (upstream issues 26, 34).
-- Run not reliably stoppable, and no feedback while shooting (upstream issues 39, 49).
+- Run not reliably stoppable (upstream issue 49), and no picture feedback while shooting (upstream issue 39).
 - Shot-count integer overflow with infinite shots; holy-grail ramp bugs (target in EV, unknown ISO/shutter, slot-aware shutter clamp).
 
 ### Known limitations

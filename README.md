@@ -24,6 +24,7 @@ Or add this repo as a PMCA-RE RELOADED source and install from it (`pmca-source.
 ```
 pmca-console sources add nathanrcast/pmca-timelapse
 pmca-console apps
+pmca-console install --app io.github.nathanrcast.timelapse --source nathanrcast/pmca-timelapse
 ```
 
 The package id (`io.github.nathanrcast.timelapse`) differs from upstream's, so both can be installed side by side.
