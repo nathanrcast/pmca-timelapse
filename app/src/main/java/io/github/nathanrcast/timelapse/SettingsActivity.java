@@ -20,14 +20,16 @@ import android.widget.TabHost;
 import android.widget.TextView;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
-import com.sony.scalar.hardware.CameraEx;
+
+import io.github.nathanrcast.timelapse.camera.SafeCamera;
+import io.github.nathanrcast.timelapse.camera.model.Capabilities;
+import io.github.nathanrcast.timelapse.camera.model.OptionVisibility;
 
 public class SettingsActivity extends BaseActivity
 {
     private SettingsActivity that = this;
 
     private Settings settings;
-    private CameraEx cameraEx;
 
     private TabHost tabHost;
 
@@ -220,7 +222,6 @@ public class SettingsActivity extends BaseActivity
 
         cbSilentShutter.setChecked(settings.silentShutter);
         cbSilentShutter.setOnCheckedChangeListener(cbSilentShutterOnCheckListener);
-        //cbSilentShutter.setVisibility(View.INVISIBLE);
 
         cbAEL.setChecked(settings.ael);
         cbAEL.setOnCheckedChangeListener(cbAELOnCheckListener);
@@ -234,18 +235,25 @@ public class SettingsActivity extends BaseActivity
         cbDOFF.setChecked(settings.displayOff);
         cbDOFF.setOnCheckedChangeListener(cbDOFFOnCheckListener);
 
-        //try {
-            //CameraEx cameraEx = CameraEx.open(0, null);
-            //final CameraEx.ParametersModifier modifier = cameraEx.createParametersModifier(cameraEx.getNormalCamera().getParameters());
-            //if(modifier.isSupportedSilentShutterMode())
-            //    cbSilentShutter.setVisibility(View.VISIBLE);
-        /*}
-        catch(Exception ignored)
-        {}*/
+        applyCapabilities(SafeCamera.probe());
+    }
 
+    // Hides the options this body can't do (camera.model.OptionVisibility). Unchecking first runs each listener, so
+    // the setting goes off too; HG's listener also hides its section.
+    private void applyCapabilities(Capabilities caps) {
+        OptionVisibility options = OptionVisibility.of(caps);
+        hideUnless(cbSilentShutter, options.silentShutter());
+        hideUnless(cbMF, options.manualFocus());
+        hideUnless(cbAEL, options.aeLock());
+        hideUnless(cbBRS, options.bracket3());
+        hideUnless(cbHolyGrail, options.holyGrail());
+    }
 
-
-
+    private static void hideUnless(CheckBox option, boolean supported) {
+        if (supported)
+            return;
+        option.setChecked(false);
+        option.setVisibility(View.GONE);
     }
 
     View.OnClickListener bnStartOnClickListener = new View.OnClickListener() {
