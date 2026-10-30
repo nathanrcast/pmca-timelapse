@@ -92,6 +92,10 @@ public final class ShotLogCsv {
         sb.append("\"interval\":").append(s.interval);
         sb.append(",\"delay\":").append(s.delay);
         sb.append(",\"shotCount\":").append(s.shotCount == Settings.SHOTS_INFINITE ? "\"infinite\"" : String.valueOf(s.shotCount));
+        // The run's settings arrive as values (the intent carries no indices), so the table positions come from them.
+        sb.append(",\"intervalIndex\":").append(StepTables.INTERVAL_MS.nearestIndex(Math.round(s.interval * 1000)));
+        sb.append(",\"shotsIndex\":").append(StepTables.SHOTS.nearestIndex(s.shotCount));
+        sb.append(",\"delayIndex\":").append(StepTables.DELAY_MIN.nearestIndex(s.delay));
         sb.append(",\"displayOff\":").append(s.displayOff);
         sb.append(",\"silentShutter\":").append(s.silentShutter);
         sb.append(",\"ael\":").append(s.ael);

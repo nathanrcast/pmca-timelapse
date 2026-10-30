@@ -8,7 +8,6 @@ import static org.junit.Assert.assertTrue;
 
 import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
-import io.github.nathanrcast.timelapse.core.SliderMapping;
 import io.github.nathanrcast.timelapse.core.camera.OptionVisibility.FocusControl;
 
 import org.junit.Test;
@@ -24,8 +23,8 @@ public class RunOptionsTest {
         s.brs = true;
         s.mf = true;
         s.holyGrail = true;
-        s.rawInterval = burst ? 0 : 5;
-        s.interval = SliderMapping.progressToInterval(s.rawInterval);
+        s.intervalIndex = burst ? 0 : 5;
+        s.deriveFromIndex();
         return s;
     }
 
@@ -59,8 +58,7 @@ public class RunOptionsTest {
         Settings s = everythingOn(true);
         RunOptions run = RunOptions.mask(caps(all(), with(fullValues(), Query.DRIVE_MODES, list("single"))), s);
         assertFalse(run.burst);
-        assertEquals(1, s.rawInterval);
-        assertEquals(SliderMapping.progressToInterval(1), s.interval, 0);
+        assertEquals(1.0, s.interval, 0);
         assertTrue(s.interval > 0);
         assertFalse(ShotPlan.of(s).isBurst());
     }
@@ -96,8 +94,8 @@ public class RunOptionsTest {
         s.brs = false;
         s.mf = false;
         s.holyGrail = false;
-        s.rawInterval = 5;
-        s.interval = SliderMapping.progressToInterval(5);
+        s.intervalIndex = 5;
+        s.deriveFromIndex();
         assertTrue(RunOptions.mask(caps(core(), noValues()), s).masked().isEmpty());
     }
 
@@ -106,5 +104,18 @@ public class RunOptionsTest {
         Settings s = everythingOn(true);
         RunOptions.mask(caps(core(), noValues()), s);
         assertTrue(RunOptions.mask(caps(core(), noValues()), s).masked().isEmpty());
+    }
+
+    @Test
+    public void burstFallbackKeepsTheShotCountAndDelay() {
+        Settings s = new Settings();
+        s.interval = 0;
+        s.shotCount = 60;
+        s.delay = 30;
+        RunOptions run = RunOptions.mask(caps(all(), with(fullValues(), Query.DRIVE_MODES, list("single"))), s);
+        assertFalse(run.burst);
+        assertEquals(1.0, s.interval, 0);
+        assertEquals(60, s.shotCount);
+        assertEquals(30, s.delay);
     }
 }
