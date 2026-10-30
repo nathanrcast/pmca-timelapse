@@ -1,9 +1,9 @@
 package io.github.nathanrcast.timelapse;
 
-import static io.github.nathanrcast.timelapse.Util.DEADBAND_VALUES;
-import static io.github.nathanrcast.timelapse.Util.ISO_VALUES;
-import static io.github.nathanrcast.timelapse.Util.SHUTTER_SPEEDS;
-import static io.github.nathanrcast.timelapse.Util.formatShutterSpeedIndex;
+import static io.github.nathanrcast.timelapse.core.Util.DEADBAND_VALUES;
+import static io.github.nathanrcast.timelapse.core.Util.ISO_VALUES;
+import static io.github.nathanrcast.timelapse.core.Util.SHUTTER_SPEEDS;
+import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeedIndex;
 
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -18,6 +18,8 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
+
+import io.github.nathanrcast.timelapse.core.Util;
 
 import com.sony.scalar.hardware.CameraEx;
 

@@ -1,9 +1,9 @@
 package io.github.nathanrcast.timelapse;
 
-import static io.github.nathanrcast.timelapse.Util.DEADBAND_VALUES;
-import static io.github.nathanrcast.timelapse.Util.ISO_VALUES;
-import static io.github.nathanrcast.timelapse.Util.SHUTTER_SPEEDS;
-import static io.github.nathanrcast.timelapse.Util.formatShutterSpeed;
+import static io.github.nathanrcast.timelapse.core.Util.DEADBAND_VALUES;
+import static io.github.nathanrcast.timelapse.core.Util.ISO_VALUES;
+import static io.github.nathanrcast.timelapse.core.Util.SHUTTER_SPEEDS;
+import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeed;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -21,6 +21,9 @@ import android.widget.TextView;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
 import com.sony.scalar.hardware.CameraEx;
+
+import io.github.nathanrcast.timelapse.core.SliderMapping;
+import io.github.nathanrcast.timelapse.core.Util;
 
 public class SettingsActivity extends BaseActivity
 {

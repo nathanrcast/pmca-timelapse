@@ -1,6 +1,8 @@
-package io.github.nathanrcast.timelapse;
+package io.github.nathanrcast.timelapse.core;
 
-public class Util {
+public final class Util {
+    private Util() {}
+
     public static String formatShutterSpeed(int n, int d)
     {
         if (n == 1 && d != 2 && d != 1)

@@ -1,4 +1,4 @@
-package io.github.nathanrcast.timelapse;
+package io.github.nathanrcast.timelapse.core;
 
 import static org.junit.Assert.assertEquals;
 
