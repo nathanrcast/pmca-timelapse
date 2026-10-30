@@ -11,7 +11,6 @@ import android.hardware.Camera;
 import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Pair;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -19,7 +18,10 @@ import android.widget.TextView;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
 
-import com.sony.scalar.hardware.CameraEx;
+import io.github.nathanrcast.timelapse.camera.Result;
+import io.github.nathanrcast.timelapse.camera.SafeCamera;
+import io.github.nathanrcast.timelapse.camera.model.Capabilities;
+import io.github.nathanrcast.timelapse.camera.model.OptionVisibility;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -28,7 +30,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ShootActivity extends BaseActivity implements SurfaceHolder.Callback, CameraEx.ShutterListener
+public class ShootActivity extends BaseActivity implements SurfaceHolder.Callback, SafeCamera.ShutterCallback
 {
     private Settings settings;
 
@@ -53,9 +55,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private SurfaceView reviewSurfaceView;
     private SurfaceHolder cameraSurfaceHolder;
-    private CameraEx cameraEx;
+    private SafeCamera safeCamera;
     private Camera camera;
-    private CameraEx.AutoPictureReviewControl autoReviewControl;
     private int pictureReviewTime;
 
     private boolean burstShooting;
@@ -72,8 +73,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private float targetExposureLevel = 0.0f;
 
     private Display display;
-
-    private String savedFocusMode;
 
     int getcnt(){
         if(settings.brs){
@@ -141,7 +140,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final Runnable manualShutterCallbackCallRunnable = new Runnable() {
         @Override
         public void run() {
-            onShutter(0, cameraEx);
+            onShutter(0);
         }
     };
 
@@ -215,74 +214,28 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("onResume");
 
         super.onResume();
-        cameraEx = CameraEx.open(0, null);
-        cameraEx.setShutterListener(this);
+        display = new Display(getDisplayManager());
+
+        Result<SafeCamera> opened = SafeCamera.open(this);
+        if (!opened.isOk()) {
+            log("camera unavailable: " + opened);
+            safeCamera = null;
+            tvCount.setText("Camera unavailable");
+            return;
+        }
+        safeCamera = opened.get();
+        applyCapabilities(safeCamera.capabilities());
         cameraSurfaceHolder.addCallback(this);
-        autoReviewControl = new CameraEx.AutoPictureReviewControl();
-        //autoReviewControl.setPictureReviewInfoHist(true);
-        cameraEx.setAutoPictureReviewControl(autoReviewControl);
 
-        final Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
+        SafeCamera.Setup setup = new SafeCamera.Setup();
+        setup.burst = burstShooting;
+        setup.silentShutter = settings.silentShutter;
+        setup.aeLock = settings.ael;
+        setup.bracket3 = settings.brs;
+        setup.manualFocus = settings.mf;
+        safeCamera.configure(setup);
 
-        try {
-            if(settings.mf) {
-                savedFocusMode = params.getFocusMode();
-                params.setFocusMode(CameraEx.ParametersModifier.FOCUS_MODE_MANUAL);
-            }
-            else
-                params.setFocusMode("auto");
-        }
-        catch(Exception ignored)
-        {}
-
-        final CameraEx.ParametersModifier modifier = cameraEx.createParametersModifier(params);
-
-        if(burstShooting) {
-            try {
-                modifier.setDriveMode(CameraEx.ParametersModifier.DRIVE_MODE_BURST);
-                List driveSpeeds = modifier.getSupportedBurstDriveSpeeds();
-                modifier.setBurstDriveSpeed(driveSpeeds.get(driveSpeeds.size() - 1).toString());
-                modifier.setBurstDriveButtonReleaseBehave(CameraEx.ParametersModifier.BURST_DRIVE_BUTTON_RELEASE_BEHAVE_CONTINUE);
-            } catch (Exception ignored) {
-            }
-        }
-        else {
-            modifier.setDriveMode(CameraEx.ParametersModifier.DRIVE_MODE_SINGLE);
-        }
-
-        // setSilentShutterMode doesn't exist on all cameras
-        try {
-            modifier.setSilentShutterMode(settings.silentShutter);
-        }
-        catch(NoSuchMethodError ignored)
-        {}
-
-        try{
-            //add also AEL if set
-            if(settings.ael) {
-                modifier.setAutoExposureLock(CameraEx.ParametersModifier.AE_LOCK_ON);
-            }
-        }
-        catch (Exception e){
-            //do nothing
-        }
-
-        if(settings.brs){
-            try{
-                modifier.setDriveMode(CameraEx.ParametersModifier.DRIVE_MODE_BRACKET);
-                modifier.setBracketMode(CameraEx.ParametersModifier.BRACKET_MODE_EXPOSURE);
-                modifier.setExposureBracketMode(CameraEx.ParametersModifier.EXPOSURE_BRACKET_MODE_SINGLE);
-                modifier.setExposureBracketPeriod(30);
-                modifier.setNumOfBracketPicture(3);
-            }
-            catch (Exception e){
-                //do nothing
-            }
-        }
-
-        cameraEx.getNormalCamera().setParameters(params);
-
-        pictureReviewTime = 2; //autoReviewControl.getPictureReviewTime();
+        pictureReviewTime = 2;
         //log(Integer.toString(pictureReviewTime));
 
 
@@ -298,60 +251,59 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             manualShutterCallbackCallRunnableHandler.postDelayed(manualShutterCallbackCallRunnable, 500);
         }
 
-        display = new Display(getDisplayManager());
-
         if(settings.displayOff) {
             display.turnAutoOff(5000);
         }
 
         setAutoPowerOffMode(false);
 
-        // HG-only Sony calls: older bodies may lack them, so HG off must not touch them.
+        // applyCapabilities turned HG off if this body lacks any of its methods.
         if (settings.holyGrail) {
-            // Exposure metering
-            cameraEx.setProgramLineRangeOverListener(new CameraEx.ProgramLineRangeOverListener()
-            {
-                @Override
-                public void onAERange(boolean b, boolean b1, boolean b2, CameraEx cameraEx)
-                {
-                    //log(String.format("onARRange b %b b1 %b b2 %b\n", Boolean.valueOf(b), Boolean.valueOf(b1), Boolean.valueOf(b2)));
-                }
-
-                @Override
-                public void onEVRange(int ev, CameraEx cameraEx)
-                {
-                    exposureLevel = (float)ev / 3.0f;
-                    if (settings.useCurrentExposure){
-                        targetExposureLevel = exposureLevel;
-                        settings.useCurrentExposure = false;
-                        updateScreen();
-                    }
-                    tvExposureLevel.setText(String.format("%.2f", exposureLevel));
-                    //log(String.format("onEVRange i %d %f\n", ev, (float)ev / 3.0f));
-                }
-
-                @Override
-                public void onMeteringRange(boolean b, CameraEx cameraEx)
-                {
-                    //log(String.format("onMeteringRange b %b\n", Boolean.valueOf(b)));
-                }
-            });
-
+            safeCamera.setExposureListener(exposureCallback);
             updateShutterSpeed();
             updateISOLevel();
         }
         updateScreen();
     }
 
+    // Options this body lacks are forced off for the run, as SettingsActivity hides them.
+    private void applyCapabilities(Capabilities caps) {
+        OptionVisibility options = OptionVisibility.of(caps);
+        settings.silentShutter &= options.silentShutter();
+        settings.ael &= options.aeLock();
+        settings.brs &= options.bracket3();
+        settings.mf &= options.manualFocus();
+        if (settings.holyGrail && !options.holyGrail()) {
+            settings.holyGrail = false;
+            findViewById(R.id.divider2).setVisibility(View.GONE);
+            findViewById(R.id.textView4).setVisibility(View.GONE);
+            findViewById(R.id.tlHolyGrail).setVisibility(View.GONE);
+        }
+    }
+
+    // Holy-grail exposure metering
+    private final SafeCamera.ExposureCallback exposureCallback = new SafeCamera.ExposureCallback() {
+        @Override
+        public void onEvRange(int ev) {
+            exposureLevel = (float)ev / 3.0f;
+            if (settings.useCurrentExposure){
+                targetExposureLevel = exposureLevel;
+                settings.useCurrentExposure = false;
+                updateScreen();
+            }
+            tvExposureLevel.setText(String.format("%.2f", exposureLevel));
+        }
+    };
+
     private void updateShutterSpeed(){
         log("updateShutterSpeed");
-        final Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
-        final CameraEx.ParametersModifier paramsModifier = cameraEx.createParametersModifier(params);
-        Pair<Integer, Integer> sp = paramsModifier.getShutterSpeed();
+        Result<int[]> sp = safeCamera.shutterSpeed();
+        if (!sp.isOk())
+            return;
 
         //find the shutterspeed in the list (list of int[][])
         for(int i = 0; i < SHUTTER_SPEEDS.length; i++){
-            if(SHUTTER_SPEEDS[i][0] == sp.first && SHUTTER_SPEEDS[i][1] == sp.second){
+            if(SHUTTER_SPEEDS[i][0] == sp.get()[0] && SHUTTER_SPEEDS[i][1] == sp.get()[1]){
                 shutterSpeedIndex = i;
                 break;
             }
@@ -361,9 +313,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private void updateISOLevel(){
         log("updateISOLevel");
-        final Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
-        final CameraEx.ParametersModifier paramsModifier = cameraEx.createParametersModifier(params);
-        int iso = paramsModifier.getISOSensitivity();
+        Result<Integer> isoResult = safeCamera.isoSensitivity();
+        if (!isoResult.isOk())
+            return;
+        int iso = isoResult.get();
         for(int i = 0; i < ISO_VALUES.length; i++){
             if(ISO_VALUES[i] == iso){
                 ISOLevelIndex = i;
@@ -425,8 +378,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     @Override
     protected void onPause() {
-        display.on();
-        display.turnAutoOff(Display.NO_AUTO_OFF);
+        if (display != null) {
+            display.on();
+            display.turnAutoOff(Display.NO_AUTO_OFF);
+        }
 
         super.onPause();
 
@@ -435,23 +390,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         shootRunnableHandler.removeCallbacks(shootRunnable);
         shootRunnableHandler.removeCallbacks(delayCountdownRunnable);
 
-        // Restore the focus mode the camera had before MF was forced
-        if (savedFocusMode != null && cameraEx != null) {
-            try {
-                Camera.Parameters params = cameraEx.getNormalCamera().getParameters();
-                params.setFocusMode(savedFocusMode);
-                cameraEx.getNormalCamera().setParameters(params);
-            } catch (Exception ignored) {}
-        }
-        savedFocusMode = null;
+        // Undo the MF toggle or focus mode the run set
+        if (safeCamera != null)
+            safeCamera.restoreFocus();
 
         if(cameraSurfaceHolder == null)
             log("cameraSurfaceHolder == null");
         else {
             cameraSurfaceHolder.removeCallback(this);
         }
-
-        autoReviewControl = null;
 
         if(camera == null)
             log("camera == null");
@@ -460,13 +407,11 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             camera = null;
         }
 
-        if(cameraEx == null)
-            log("cameraEx == null");
-        else {
-            cameraEx.setAutoPictureReviewControl(null);
-            cameraEx.release();
-            cameraEx = null;
-        }
+        // Kept after close(): a late shutter callback then gets a FAILED result instead of a null pointer.
+        if(safeCamera == null)
+            log("safeCamera == null");
+        else
+            safeCamera.close();
 
         setAutoPowerOffMode(true);
     }
@@ -475,7 +420,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         try {
-            camera = cameraEx.getNormalCamera();
+            camera = safeCamera.normalCamera();
             camera.setPreviewDisplay(holder);
         }
         catch (IOException e) {}
@@ -491,7 +436,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
 
         shootTime = System.currentTimeMillis();
-        cameraEx.burstableTakePicture();
+        safeCamera.takePicture();
 
         shotCount++;
         shotsSinceLastChange++;
@@ -525,7 +470,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                         if (shutterSpeedIndex < settings.maxShutterSpeedIndex){
                             log("shutter speed is less than max shutter speed");
                             //make the shutter open longer
-                            cameraEx.decrementShutterSpeed();
+                            safeCamera.decrementShutterSpeed();
                             shotsSinceLastChange = 0;
                         } else if (ISOLevelIndex < settings.maxISOIndex){
                             log("ISO is less than max ISO");
@@ -549,7 +494,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                         } else if (shutterSpeedIndex > 0){
                             log("shutterSpeedIndex, trying lower shutterspeed: " + shutterSpeedIndex);
                             //make the shutter open shorter
-                            cameraEx.incrementShutterSpeed();
+                            safeCamera.incrementShutterSpeed();
                             shotsSinceLastChange = 0;
                         } else {
                             log("can't decrease shutter speed or ISO");
@@ -567,9 +512,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("incrementISO");
         ISOLevelIndex++;
         if (ISOLevelIndex < ISO_VALUES.length){
-            Camera.Parameters params = cameraEx.createEmptyParameters();
-            cameraEx.createParametersModifier(params).setISOSensitivity(ISO_VALUES[ISOLevelIndex]);
-            cameraEx.getNormalCamera().setParameters(params);
+            safeCamera.setIsoSensitivity(ISO_VALUES[ISOLevelIndex]);
         } else {
             log("can't increase ISO");
         }
@@ -579,9 +522,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("decrementISO");
         ISOLevelIndex--;
         if (ISOLevelIndex >= 0){
-            Camera.Parameters params = cameraEx.createEmptyParameters();
-            cameraEx.createParametersModifier(params).setISOSensitivity(ISO_VALUES[ISOLevelIndex]);
-            cameraEx.getNormalCamera().setParameters(params);
+            safeCamera.setIsoSensitivity(ISO_VALUES[ISOLevelIndex]);
         } else {
             log("can't decrease ISO");
         }
@@ -593,7 +534,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     // When burst shooting this method is not called automatically
     // Therefore we called it every second manually
     @Override
-    public void onShutter(int i, CameraEx cameraEx) {
+    public void onShutter(int status) {
 
         if(brck.get()<0){
             brck = new AtomicInteger(0);
@@ -612,7 +553,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
             // just keep shooting until we have all shots
             if (System.currentTimeMillis() >= shootStartTime + (long) settings.shotCount * 1000) {
-                this.cameraEx.cancelTakePicture();
+                safeCamera.cancelTakePicture();
                 stopPicturePreview = true;
                 display.on();
 
@@ -628,7 +569,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             }
         }
         else {
-            this.cameraEx.cancelTakePicture();
+            safeCamera.cancelTakePicture();
 
             //camera.startPreview();
 
