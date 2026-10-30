@@ -13,6 +13,7 @@ import com.sony.scalar.hardware.CameraEx;
 import com.sony.scalar.hardware.CameraEx.ParametersModifier;
 
 import io.github.nathanrcast.timelapse.Logger;
+import io.github.nathanrcast.timelapse.core.camera.BracketPlan;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
 import io.github.nathanrcast.timelapse.core.camera.Feature;
 import io.github.nathanrcast.timelapse.core.camera.OptionVisibility.FocusControl;
@@ -255,22 +256,31 @@ public final class SafeCamera {
             }
         }
 
-        if (run.bracket3) {
-            try {
-                modifier.setDriveMode(ParametersModifier.DRIVE_MODE_BRACKET);
-                modifier.setBracketMode(ParametersModifier.BRACKET_MODE_EXPOSURE);
-                modifier.setExposureBracketMode(ParametersModifier.EXPOSURE_BRACKET_MODE_SINGLE);
-                modifier.setExposureBracketPeriod(30);
-                modifier.setNumOfBracketPicture(3);
-            } catch (Throwable t) {
-                failed("bracket", t);
-            }
-        }
+        if (run.bracket3)
+            configureBracket(modifier, run.bracket);
 
         Result<Void> applied = apply(params);
         if (applied.isOk() && run.focus == FocusControl.TOGGLE)
             engageToggleFocus();
         return applied;
+    }
+
+    // The EV step and picture count are the camera's own menu choice (run.bracket, resolved from the values read at
+    // open()). A body already in bracket drive keeps its drive and count; the app fires one frame per press, so the
+    // exposure bracket mode is always single.
+    private void configureBracket(ParametersModifier modifier, BracketPlan bracket) {
+        Logger.info("SafeCamera: bracket: " + bracket.describe());
+        try {
+            if (!bracket.cameraConfigured) {
+                modifier.setDriveMode(ParametersModifier.DRIVE_MODE_BRACKET);
+                modifier.setBracketMode(ParametersModifier.BRACKET_MODE_EXPOSURE);
+                modifier.setNumOfBracketPicture(BracketPlan.FRAMES);
+                modifier.setExposureBracketPeriod(bracket.periodTenths);
+            }
+            modifier.setExposureBracketMode(ParametersModifier.EXPOSURE_BRACKET_MODE_SINGLE);
+        } catch (Throwable t) {
+            failed("bracket", t);
+        }
     }
 
     private void configureBurst(ParametersModifier modifier) {
