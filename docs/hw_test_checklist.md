@@ -1,6 +1,6 @@
 # Camera test checklist
 
-One consolidated camera session covers every pending `hw:required` item for issues #2, #4, #5, #7, #8, #9, #10, #11, #12, #13, #14, #15 and #20, using the build from merged `main`. Do **CAPS capture first**: its files answer open questions in several later rows. Paste results and attach the card files on each issue named in the row. Rows marked `(PR 35)` need T11/T12 merged.
+One consolidated camera session covers every pending `hw:required` item for issues #2, #4, #5, #7, #8, #9, #10, #11, #12, #13, #14, #15 and #20, using the build from merged `main`. Do **CAPS capture first**: its files answer open questions in several later rows. Paste results and attach the card files on each issue named in the row.
 
 ## Setup (both bodies)
 
@@ -30,9 +30,9 @@ One consolidated camera session covers every pending `hw:required` item for issu
 | A4 | SS on, 100 shots @ 2 s, 1/250 s | 100 files; EXIF times show no bursts; `LOG.TXT` shows no unexplained skips; SS works | | #7, #8 |
 | A5 | DOFF on, 20 shots @ 5 s | No black flash between shots; the display wakes on a key | | #5 |
 | A6 | BRC3: camera set to 3-frame bracket at 0.7 EV, 10 shots @ 5 s | 30 files, EXIF exposure spread 0.7 EV, 3 frames counted per slot; drive mode restored after the run | | #10 |
-| A7 | Start delay: Start = Delay 2 min | Countdown shows; first frame within 1 s of zero (PR 35) | | #12 |
-| A8 | Start = At time, 2 min ahead; press a key during the countdown with DOFF on | First frame at the set time; key wakes the screen, then DOFF returns (PR 35) | | #12 |
-| A9 | LENR on, 2 s shutter, 3 s interval, "Turn LENR off during runs" ticked | LENR turned off for the run, every slot fires, LENR restored after the run; with the box unticked the warning shows and the interval is raised to 5 s (PR 35) | | #13 |
+| A7 | Start delay: Start = Delay 2 min | Countdown shows; first frame within 1 s of zero | | #12 |
+| A8 | Start = At time, 2 min ahead; press a key during the countdown with DOFF on | First frame at the set time; key wakes the screen, then DOFF returns | | #12 |
+| A9 | LENR on, 2 s shutter, 3 s interval, "Turn LENR off during runs" ticked | LENR turned off for the run, every slot fires, LENR restored after the run; with the box unticked the warning shows and the interval is raised to 5 s | | #13 |
 | A10 | HUD: 30-shot run; press MENU mid-run | HUD fields readable at 640x480; MENU stops within one interval, summary shown, back to settings; free-card estimate sane | | #14 |
 | A11 | Any key during a DOFF run | Display wakes without stopping the run | | #14 |
 | A12 | Power switch off during a run | Camera powers down cleanly; last file intact | | #14 |
@@ -50,8 +50,8 @@ One consolidated camera session covers every pending `hw:required` item for issu
 | N3 | Every setting with the arrow keys; note whether the wheel moves anything; hold left or right on a bar | Arrow keys always work; hold repeats; wheel result recorded | | #11, #5 |
 | N4 | 100 shots @ 2 s, 1/250 s | 100 files; no bursts in EXIF times; no unexplained skips in `LOG.TXT` | | #7 |
 | N5 | BRC3 (if shown): 10 shots @ 0.7 EV | 30 files, 0.7 EV spread; drive mode restored | | #10 |
-| N6 | Start delay 2 min | First frame within 1 s of zero (PR 35) | | #12 |
-| N7 | LENR: if the body can't set it, long shutter with LENR on | Warning shows and the interval is raised to `2 x shutter + 1 s` (PR 35) | | #13 |
+| N6 | Start delay 2 min | First frame within 1 s of zero | | #12 |
+| N7 | LENR: if the body can't set it, long shutter with LENR on | Warning shows and the interval is raised to `2 x shutter + 1 s` | | #13 |
 | N8 | HUD run, MENU stop, key-wake under DOFF, power switch off | Same expectations as A10 to A12 | | #14 |
 | N9 | Holy grail off | App launches and runs normally | | #4 |
 | N10 | Holy grail on, if shown | Runs without `NoSuchMethodError` or reboot; ramp visible, else option hidden | | #4, #15 |
