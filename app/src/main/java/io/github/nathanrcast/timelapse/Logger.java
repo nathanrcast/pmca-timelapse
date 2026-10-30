@@ -1,4 +1,4 @@
-package com.jonasjuffinger.timelapse;
+package io.github.nathanrcast.timelapse;
 
 import android.os.Environment;
 

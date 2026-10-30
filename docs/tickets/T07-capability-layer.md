@@ -24,3 +24,6 @@ No Sony API call can crash or reboot an older camera, and the UI shows only the 
 - [ ] A unit test with a fake that is missing every optional method shows the UI model hides SS/AEL/BRC3 and nothing throws.
 - [ ] Both `CAPS-*.txt` files are summarized in `docs/cameras.md`.
 - [ ] **HW:** on the NEX-5T, every visible option works and SS is hidden; on the a6500, SS works and is visible (pending maintainer).
+
+## Inherited from T03
+- The holy-grail checkbox is shown on every body. HG on calls `setProgramLineRangeOverListener`, `ParametersModifier.getShutterSpeed`/`getISOSensitivity`, `CameraEx.incrementShutterSpeed`/`decrementShutterSpeed` and `setISOSensitivity`, any of which may be missing on PMCA API 1.1. Hide the HG checkbox unless all of them are present, so that ticking it can't cause a `NoSuchMethodError` on the NEX-5T. T03 only kept these calls off the HG-off path, with ad-hoc `if (settings.holyGrail)` gating that this layer replaces.

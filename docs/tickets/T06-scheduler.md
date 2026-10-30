@@ -28,3 +28,6 @@ Replace the relative `postDelayed` loop with an absolute-deadline scheduler, whi
   - 10 000-slot long run with cumulative drift of 0
 - [ ] `ShootActivity` has no scheduling arithmetic left; it calls `Scheduler`.
 - [ ] **HW:** 100 shots @ 2 s on both bodies. EXIF timestamps (1 s resolution) show no bursts, and LOG.TXT shows no unexplained skips (pending maintainer).
+
+## Inherited from T03
+- With holy grail on, `shoot()` runs `holyGrailPrePhotoEvent()` before it stamps `shootTime`: two `getParameters()`, a possible `setParameters()`, `updateScreen()` (which includes `registerReceiver`) and several synchronous log writes. The next shot is scheduled from `shootTime + interval`, so that latency adds to every interval and the cadence falls behind over a long run. The absolute-deadline scheduler must time each shot from its deadline (`t0 + n·interval`), not from after the HG work.

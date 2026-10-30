@@ -20,7 +20,7 @@ The maintainer runs one orchestrating agent session. It hands tickets to impleme
 
    **Hardware deferral:** while the maintainer can't run camera sessions (adopted 2026-10-29 so software work isn't blocked on camera availability; hardware evidence is still required before the release, T18), `hw:required` PRs merge once CI and review pass. The PR body uses `Refs #N` instead of `Closes #N`, so the issue stays open with its on-camera boxes. A comment on the issue says what is pending, and all deferred checks run in one consolidated camera session before the release (T18).
 
-   Merge with squash and delete the branch. Rebase any open sibling branches onto the new `main`.
+   Squash-merge and delete the branch, except PRs that import external history (T03, T04): those use a merge commit so upstream authorship and `git log --follow` survive. Rebase any open sibling branches onto the new `main`.
 6. **Close-out.** Update the ticket file's status line and `docs/plan.md` if the scope moved, in the same PR.
 
 ## Wave cadence

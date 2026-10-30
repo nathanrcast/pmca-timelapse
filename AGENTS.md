@@ -19,9 +19,8 @@ python3 tools/analyze_log.py <LOG.CSV>                                          
 
 ## Layout
 
-- `app/src/main/java/com/jonasjuffinger/timelapse/`: upstream sources. `ShootActivity` holds the capture loop and `SettingsActivity` the setup UI.
-- `app/src/main/java/com/github/ma1co/pmcademo/app/BaseActivity.java`: Sony `ScalarInput` key handling, inherited from PMCADemo.
-- The Java namespace is still `com.jonasjuffinger.timelapse`, and only `applicationId` was changed (to `io.github.nathanrcast.timelapse`). T03 settles the final namespace.
+- `app/src/main/java/io/github/nathanrcast/timelapse/`: app sources; the Java namespace matches `applicationId`. `ShootActivity` holds the capture loop and the holy-grail ramp, `SettingsActivity` the setup UI, `Settings` the persisted options, and `Util` the shutter/ISO/deadband step tables.
+- `app/src/main/java/com/github/ma1co/pmcademo/app/`: `BaseActivity` (Sony `ScalarInput` key handling) and `AppNotificationManager`, vendored from PMCADemo. They keep their own package and `LICENSE.txt`.
 
 ## Invariants
 
@@ -41,7 +40,7 @@ python3 tools/analyze_log.py <LOG.CSV>                                          
 - **Upstream issue numbers ≠ ours.** In issues, PRs and commit messages, write upstream refs as `` `up#41` `` inside backticks. A bare `#41` links to *our* issue 41. A `jonasjuffinger/TimeLapse#41` or upstream issue URL posts a backlink on the dormant upstream repo. Link to upstream issues only from files under `docs/`.
 - Don't `@`-mention upstream authors in issues/PRs. Credits live in README.
 - Long-exposure NR makes the camera shoot a dark frame after each exposure, which shows up as "skipped every other shot" (upstream issues 26/50). Rule it out before blaming the scheduler.
-- The Frosbe fork moved sources to `com/frosbe/holygrail/` and added `com.jjoe64:graphview:3.1.4`.
+- The Frosbe fork is merged with its history (T03): `git log --follow` on a moved file runs through `com/frosbe/holygrail/` back to `com/jonasjuffinger/timelapse/`. Holy grail defaults to off, and its Sony calls run only when it is on. Its `com.jjoe64:graphview:3.1.4` dependency (LGPL, never shown) was removed.
 - `local.properties` is machine-specific and untracked.
 - Release minify is off on purpose; re-enabling it (R8) needs an on-camera Dalvik 2.3 test.
 
