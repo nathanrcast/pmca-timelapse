@@ -45,8 +45,8 @@ import java.util.TreeSet;
 public class CapsDumpActivity extends BaseActivity {
     private static final long MENU_HOLD_MS = 2000;
     private static final int SCREEN_LINES = 15;
-    private static final String EXIT = "Hold MENU 2 s to exit.";
-    private static final String HINT = "Turn every dial and press every button.\n" + EXIT;
+    private static final String EXIT = "Hold MENU 2 s or press DELETE to exit.";
+    private static final String HINT = "Turn every dial and press every button (DELETE last).\n" + EXIT;
 
     private static final String CAMERA_EX = "com.sony.scalar.hardware.CameraEx";
     private static final String SCALAR_INPUT = "com.sony.scalar.sysutil.ScalarInput";
@@ -125,6 +125,7 @@ public class CapsDumpActivity extends BaseActivity {
     private Handler worker;
     private boolean probeStarted;
     private long menuDownAt = -1;
+    private boolean exitKeyDown;
 
     // Owned by the worker thread: the one CAPS writer, kept open for the key log until onDestroy.
     private CapsWriter caps;
@@ -189,6 +190,7 @@ public class CapsDumpActivity extends BaseActivity {
     protected void onPause() {
         ui.removeCallbacks(menuHeldRunnable);
         menuDownAt = -1;
+        exitKeyDown = false;
         setAutoPowerOffMode(true);
         super.onPause();
     }
@@ -208,7 +210,7 @@ public class CapsDumpActivity extends BaseActivity {
         super.onDestroy();
     }
 
-    // Above BaseActivity's onKeyDown/onKeyUp switch, so every key, wheel and dial event is logged. Only the exit acts.
+    // Above BaseActivity's onKeyDown/onKeyUp switch, so every key, wheel and dial event is logged. Only the exits act.
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         try {
@@ -228,7 +230,7 @@ public class CapsDumpActivity extends BaseActivity {
                 CapsFormat.actionName(action, event.getRepeatCount()),
                 code, scan, CapsFormat.keyName(keyNames, scan), extra));
 
-        // Finish on key-up, so the release can't reach SettingsActivity (whose MENU key-up closes the app).
+        // Both exits finish on key-up, so the release can't reach SettingsActivity (whose MENU/DELETE key-up closes the app).
         if (scan == ScalarInput.ISV_KEY_MENU || scan == ScalarInput.ISV_KEY_SK1 || code == KeyEvent.KEYCODE_MENU) {
             if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                 menuDownAt = event.getEventTime();
@@ -240,6 +242,11 @@ public class CapsDumpActivity extends BaseActivity {
                 if (held)
                     finish();
             }
+        } else if (scan == ScalarInput.ISV_KEY_DELETE || scan == ScalarInput.ISV_KEY_SK2 || code == KeyEvent.KEYCODE_BACK) {
+            if (action == KeyEvent.ACTION_DOWN)
+                exitKeyDown = true;
+            else if (action == KeyEvent.ACTION_UP && exitKeyDown)
+                finish();
         }
     }
 
