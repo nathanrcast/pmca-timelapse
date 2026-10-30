@@ -212,18 +212,18 @@ public final class Scheduler {
      * Stops the clock on the run. A capture in flight can't be trusted after the camera is
      * released, so its slot is counted as an {@link SkipReason#INTERRUPTED} skip; if that was the
      * last slot of a {@link StopOn#SLOTS} run, the run is done.
+     *
+     * @return the INTERRUPTED SKIP decision for the slot that was capturing, otherwise WAIT
      */
-    public void pause() {
+    public Decision pause() {
         if (!started || paused || done)
-            return;
+            return Decision.WAIT;
         paused = true;
         pausedAtMs = clock.nowMs();
-        if (capturing) {
-            capturing = false;
-            lastCaptureEndMs = pausedAtMs;
-            skips[SkipReason.INTERRUPTED.ordinal()]++;
-        }
+        if (capturing)
+            return closeCapture(pausedAtMs, SkipReason.INTERRUPTED);
         updateDone();
+        return Decision.WAIT;
     }
 
     /** Shifts {@code t0} by the paused time, so every remaining deadline keeps its place in the run. */

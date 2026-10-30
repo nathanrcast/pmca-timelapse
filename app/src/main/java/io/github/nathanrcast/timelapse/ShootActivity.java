@@ -6,9 +6,9 @@ import static io.github.nathanrcast.timelapse.core.Util.SHUTTER_SPEEDS;
 import static io.github.nathanrcast.timelapse.core.Util.formatShutterSpeedIndex;
 
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
 import android.hardware.Camera;
-import android.os.BatteryManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.SurfaceHolder;
@@ -27,6 +27,8 @@ import io.github.nathanrcast.timelapse.core.Clock;
 import io.github.nathanrcast.timelapse.core.Progress;
 import io.github.nathanrcast.timelapse.core.Scheduler;
 import io.github.nathanrcast.timelapse.core.Settings;
+import io.github.nathanrcast.timelapse.core.ShotLogCsv;
+import io.github.nathanrcast.timelapse.core.ShotRecord;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
 import io.github.nathanrcast.timelapse.core.Util;
 
@@ -35,6 +37,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class ShootActivity extends BaseActivity implements SurfaceHolder.Callback, SafeCamera.ShutterCallback
 {
@@ -44,6 +47,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private final Clock clock = Clocks.UPTIME;
 
     private int shotCount;
+
+    // LOG.CSV: one row per scheduler decision, written on a background thread.
+    private ShotLog shotLog;
+    private final SimpleDateFormat logTime = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
 
     private TextView tvCount, tvBattery, tvRemaining;
 
@@ -236,6 +243,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (scheduler == null) {
             scheduler = new Scheduler(plan, clock, Scheduler.StopOn.CAPTURED);
             scheduler.start();
+            shotLog = new ShotLog(this, Build.MODEL, Build.VERSION.INCREMENTAL, appVersion(), clock.nowMs(),
+                    ShotLogCsv.settingsJson(settings));
         } else {
             scheduler.resume();
         }
@@ -294,7 +303,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     };
 
     private void updateShutterSpeed(){
-        log("updateShutterSpeed");
         Result<int[]> sp = safeCamera.shutterSpeed();
         if (!sp.isOk())
             return;
@@ -306,11 +314,9 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 break;
             }
         }
-        log("shutterSpeedIndex: " + shutterSpeedIndex);
     }
 
     private void updateISOLevel(){
-        log("updateISOLevel");
         Result<Integer> isoResult = safeCamera.isoSensitivity();
         if (!isoResult.isOk())
             return;
@@ -321,7 +327,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 break;
             }
         }
-        log("ISOLevelIndex: " + ISOLevelIndex);
     }
 
     private long delaySecondsRemaining() {
@@ -384,8 +389,11 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("on pause");
 
         handler.removeCallbacksAndMessages(null);
-        if (scheduler != null)
-            scheduler.pause();
+        if (scheduler != null) {
+            logDecision(scheduler.pause());
+            if (shotLog != null)
+                shotLog.flush();
+        }
         stopReview(false);
         finishing = false;
 
@@ -412,6 +420,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
 
     @Override
+    protected void onDestroy() {
+        if (shotLog != null) {
+            shotLog.close();
+            shotLog = null;
+        }
+        super.onDestroy();
+    }
+
+    @Override
     public void surfaceCreated(SurfaceHolder holder) {
         try {
             camera = safeCamera.normalCamera();
@@ -422,7 +439,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private void shoot() {
         if (settings.holyGrail){
-            log("holyGrail shot " + shotCount + ", exposureLevel: " + exposureLevel + ", target:" + targetExposureLevel);
             holyGrailPrePhotoEvent();
         }
 
@@ -455,20 +471,14 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 if (usableExposureLevel < targetExposureLevel - deadbandSize){
 
                     if (settings.holyGrailAllowExposureUp) {
-                        log("trying to get higher exposure");
-
                         if (shutterSpeedIndex < settings.maxShutterSpeedIndex){
-                            log("shutter speed is less than max shutter speed");
                             //make the shutter open longer
                             safeCamera.decrementShutterSpeed();
                             shotsSinceLastChange = 0;
                         } else if (ISOLevelIndex < settings.maxISOIndex){
-                            log("ISO is less than max ISO");
                             //increase ISO
                             incrementISO();
                             shotsSinceLastChange = 0;
-                        } else {
-                            log("can't increase shutter speed or ISO");
                         }
                     }
                 }
@@ -477,17 +487,13 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
                     if (settings.holyGrailAllowExposureDown) {
                         if (ISOLevelIndex > 3){
-                            log("ISOLevelIdex, trying lower iso: " + ISOLevelIndex);
                             //decrease ISO
                             decrementISO();
                             shotsSinceLastChange = 0;
                         } else if (shutterSpeedIndex > 0){
-                            log("shutterSpeedIndex, trying lower shutterspeed: " + shutterSpeedIndex);
                             //make the shutter open shorter
                             safeCamera.incrementShutterSpeed();
                             shotsSinceLastChange = 0;
-                        } else {
-                            log("can't decrease shutter speed or ISO");
                         }
                     }
                 }
@@ -499,22 +505,16 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private void incrementISO(){
-        log("incrementISO");
         ISOLevelIndex++;
         if (ISOLevelIndex < ISO_VALUES.length){
             safeCamera.setIsoSensitivity(ISO_VALUES[ISOLevelIndex]);
-        } else {
-            log("can't increase ISO");
         }
     }
 
     private void decrementISO(){
-        log("decrementISO");
         ISOLevelIndex--;
         if (ISOLevelIndex >= 0){
             safeCamera.setIsoSensitivity(ISO_VALUES[ISOLevelIndex]);
-        } else {
-            log("can't decrease ISO");
         }
     }
 
@@ -542,9 +542,44 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         logDecision(decision);
     }
 
+    // Every non-WAIT decision becomes a LOG.CSV row; LOG.TXT keeps only a lost frame, which is an error.
     private void logDecision(Scheduler.Decision decision) {
-        if (decision.action != Scheduler.Action.WAIT)
+        if (decision.action == Scheduler.Action.WAIT || shotLog == null)
+            return;
+        if (decision.skipReason == Scheduler.SkipReason.LOST)
             log(decision.toString());
+        String ss = "", iso = "", ev = "";
+        boolean idle = decision.action == Scheduler.Action.SLOT_DONE;
+        if (settings.holyGrail && (idle || decision.action == Scheduler.Action.FIRE)) {
+            ss = formatShutterSpeedIndex(shutterSpeedIndex);
+            iso = Integer.toString(ISO_VALUES[ISOLevelIndex]);
+            ev = String.format(Locale.US, "%.2f", exposureLevel);
+        } else if (idle && !burstShooting && safeCamera != null) {
+            // One read, once the camera is idle: never while a capture or a burst is in flight.
+            Result<int[]> exposure = safeCamera.exposure();
+            if (exposure.isOk()) {
+                int[] e = exposure.get();
+                if (e[0] >= 0)
+                    ss = Util.formatShutterSpeed(e[0], e[1]);
+                if (e[2] >= 0)
+                    iso = Integer.toString(e[2]);
+            }
+        }
+        // The writer thread adds battery and free space.
+        ShotRecord row = ShotRecord.of(shotLog.runId, decision, ss, iso, ev, ShotRecord.NONE, ShotRecord.NONE);
+        if (row != null)
+            shotLog.add(row);
+        if (scheduler.isDone())
+            shotLog.flush();
+    }
+
+    private String appVersion() {
+        try {
+            PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return pi.versionName + " (" + pi.versionCode + ")";
+        } catch (Exception e) {
+            return "?";
+        }
     }
 
     private void armTimer() {
@@ -600,24 +635,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     private String getBatteryPercentage()
     {
-        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = registerReceiver(null, ifilter);
-
-        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-
-        int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-        int chargePlug = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
-        boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL ||
-                chargePlug == BatteryManager.BATTERY_PLUGGED_USB ||
-                chargePlug == BatteryManager.BATTERY_PLUGGED_AC;
-
-        String s = "";
-        if(isCharging)
-            s = "c ";
-
-        return s + (int)(level / (float)scale * 100) + "%";
+        Battery battery = Battery.read(this);
+        if (battery.pct < 0)
+            return "?";
+        return (battery.charging ? "c " : "") + battery.pct + "%";
     }
 
     @Override
@@ -640,9 +661,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
 
     private void log(String s) {
-        //add timestamp
-        s = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date()) + " " + s;
-        Logger.info(s);
+        Logger.info(logTime.format(new Date()) + " " + s);
     }
 
     private void dumpList(List list, String name) {

@@ -461,6 +461,31 @@ public final class SafeCamera {
         }
     }
 
+    // {shutter numerator, denominator, ISO} from one getParameters() round-trip; a part this body can't read is -1.
+    // Fails only when it can read neither.
+    public Result<int[]> exposure() {
+        if (released)
+            return closed(GET_SHUTTER_SPEED.key());
+        boolean ss = caps.has(GET_SHUTTER_SPEED);
+        boolean iso = caps.has(GET_ISO_SENSITIVITY);
+        if (!ss && !iso)
+            return unsupported(GET_SHUTTER_SPEED.key());
+        try {
+            ParametersModifier pm = cameraEx.createParametersModifier(normal.getParameters());
+            int[] out = {-1, -1, -1};
+            if (ss) {
+                Pair<?, ?> sp = pm.getShutterSpeed();
+                out[0] = ((Number) sp.first).intValue();
+                out[1] = ((Number) sp.second).intValue();
+            }
+            if (iso)
+                out[2] = pm.getISOSensitivity();
+            return Result.ok(out);
+        } catch (Throwable t) {
+            return failed(GET_SHUTTER_SPEED.key(), t);
+        }
+    }
+
     public Result<Integer> isoSensitivity() {
         if (released)
             return closed(GET_ISO_SENSITIVITY.key());
