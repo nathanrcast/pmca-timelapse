@@ -33,7 +33,7 @@ public class RunOptionsTest {
         Settings s = everythingOn(true);
         RunOptions run = RunOptions.mask(caps(all(), fullValues()), s);
         assertTrue(run.masked().isEmpty());
-        assertTrue(run.burst && run.aeLock && run.bracket3 && run.holyGrail);
+        assertTrue(run.burst && run.aeLock && run.bracket.active && run.holyGrail);
         assertEquals(Boolean.TRUE, run.silentShutter);
         assertEquals(FocusControl.TOGGLE, run.focus);
         assertTrue(s.silentShutter && s.ael && s.brs && s.mf && s.holyGrail);
@@ -45,7 +45,7 @@ public class RunOptionsTest {
         Settings s = everythingOn(true);
         RunOptions run = RunOptions.mask(caps(core(), noValues()), s);
         assertFalse(s.silentShutter || s.ael || s.brs || s.holyGrail);
-        assertFalse(run.burst || run.aeLock || run.bracket3 || run.holyGrail);
+        assertFalse(run.burst || run.aeLock || run.bracket.active || run.holyGrail);
         assertNull(run.silentShutter);
         assertTrue(s.mf);
         assertEquals(FocusControl.FOCUS_MODE, run.focus);
