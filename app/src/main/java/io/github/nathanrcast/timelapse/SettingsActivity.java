@@ -128,10 +128,11 @@ public class SettingsActivity extends BaseActivity
         sbTargetExposure = (AdvancedSeekBar) findViewById(R.id.sbTargetExposure);
         tvTargetExposureValue = (TextView) findViewById(R.id.tvTargetExposureValue);
         tvTargetExposureUnit = (TextView) findViewById(R.id.tvTargetExposureUnit);
-        sbTargetExposure.setMax(60);
+        sbTargetExposure.setMax(SliderMapping.TARGET_EXPOSURE_MAX);
         sbTargetExposure.setOnSeekBarChangeListener(sbTargetExposureOnSeekBarChangeListener);
-        sbTargetExposure.setProgress(settings.targetExposure);
-        sbTargetExposureOnSeekBarChangeListener.onProgressChanged(sbTargetExposure, settings.targetExposure, false);
+        int targetExposureProgress = SliderMapping.targetExposureToProgress(settings.targetExposure);
+        sbTargetExposure.setProgress(targetExposureProgress);
+        sbTargetExposureOnSeekBarChangeListener.onProgressChanged(sbTargetExposure, targetExposureProgress, false);
 
         cbUseCurrentExposure = (CheckBox) findViewById(R.id.cbUseCurrentExposure);
         cbUseCurrentExposure.setChecked(settings.useCurrentExposure);
@@ -164,18 +165,20 @@ public class SettingsActivity extends BaseActivity
         sbCooldown = (AdvancedSeekBar) findViewById(R.id.sbCooldown);
         tvCooldownValue = (TextView) findViewById(R.id.tvCooldownValue);
         tvCooldownUnit = (TextView) findViewById(R.id.tvCooldownUnit);
-        sbCooldown.setMax(100);
+        sbCooldown.setMax(SliderMapping.COUNT_MAX);
         sbCooldown.setOnSeekBarChangeListener(sbCooldownOnSeekBarChangeListener);
-        sbCooldown.setProgress(settings.cooldown);
-        sbCooldownOnSeekBarChangeListener.onProgressChanged(sbCooldown, settings.cooldown, false);
+        int cooldownProgress = SliderMapping.countToProgress(settings.cooldown);
+        sbCooldown.setProgress(cooldownProgress);
+        sbCooldownOnSeekBarChangeListener.onProgressChanged(sbCooldown, cooldownProgress, false);
 
         sbAverageAmount = (AdvancedSeekBar) findViewById(R.id.sbAverageAmount);
         tvAverageAmountValue = (TextView) findViewById(R.id.tvAverageAmountValue);
         tvAverageAmountUnit = (TextView) findViewById(R.id.tvAverageAmountUnit);
-        sbAverageAmount.setMax(100);
+        sbAverageAmount.setMax(SliderMapping.COUNT_MAX);
         sbAverageAmount.setOnSeekBarChangeListener(sbAverageAmountOnSeekBarChangeListener);
-        sbAverageAmount.setProgress(settings.averageExposureAmount);
-        sbAverageAmountOnSeekBarChangeListener.onProgressChanged(sbAverageAmount, settings.averageExposureAmount, false);
+        int averageAmountProgress = SliderMapping.countToProgress(settings.averageExposureAmount);
+        sbAverageAmount.setProgress(averageAmountProgress);
+        sbAverageAmountOnSeekBarChangeListener.onProgressChanged(sbAverageAmount, averageAmountProgress, false);
 
         sbDeadbandIndex = (AdvancedSeekBar) findViewById(R.id.sbDeadbandIndex);
         tvDeadbandIndexValue = (TextView) findViewById(R.id.tvDeadbandIndexValue);
@@ -296,8 +299,8 @@ public class SettingsActivity extends BaseActivity
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
             //should always be > 0
-            settings.cooldown = i + 1;
-            tvCooldownValue.setText(Integer.toString(i + 1));
+            settings.cooldown = SliderMapping.progressToCount(i);
+            tvCooldownValue.setText(Integer.toString(settings.cooldown));
             tvCooldownUnit.setText("pics");
         }
 
@@ -310,8 +313,8 @@ public class SettingsActivity extends BaseActivity
     sbAverageAmountOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-            settings.averageExposureAmount = i + 1;
-            tvAverageAmountValue.setText(Integer.toString(i + 1));
+            settings.averageExposureAmount = SliderMapping.progressToCount(i);
+            tvAverageAmountValue.setText(Integer.toString(settings.averageExposureAmount));
             tvAverageAmountUnit.setText("pics");
         }
 
@@ -340,7 +343,7 @@ public class SettingsActivity extends BaseActivity
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
             //the seekbar is from 0 to 60, but we want -30 to 30
-            settings.targetExposure = i - 30;
+            settings.targetExposure = SliderMapping.progressToTargetExposure(i);
             //Float.toString(settings.targetExposure/3.0f) show only 2 decimals
             tvTargetExposureValue.setText(String.format("%.2f", settings.targetExposure/3.0f));
             tvTargetExposureUnit.setText("EV");
