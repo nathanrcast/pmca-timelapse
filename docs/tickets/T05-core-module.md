@@ -19,5 +19,5 @@ Pull the logic that needs no camera into a JVM-testable `java-library` module so
 
 ## Acceptance
 - [ ] `./gradlew :core:test` passes, with ≥ 90 % line coverage on `ShotPlan`.
-- [ ] `:core` has no `android.*` or `com.sony.*` imports (check with grep in the test or CI).
+- [ ] `:core` has no `android.*` or `com.sony.*` imports (enforced by the compile classpath: `:core` has no Android or Sony jar).
 - [ ] App behavior is unchanged: same settings and same displayed durations.
