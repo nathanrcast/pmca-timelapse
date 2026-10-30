@@ -389,10 +389,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
         shootRunnableHandler.removeCallbacks(shootRunnable);
         shootRunnableHandler.removeCallbacks(delayCountdownRunnable);
-
-        // Undo the MF toggle or focus mode the run set
-        if (safeCamera != null)
-            safeCamera.restoreFocus();
+        manualShutterCallbackCallRunnableHandler.removeCallbacks(manualShutterCallbackCallRunnable);
 
         if(cameraSurfaceHolder == null)
             log("cameraSurfaceHolder == null");
@@ -407,7 +404,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             camera = null;
         }
 
-        // Kept after close(): a late shutter callback then gets a FAILED result instead of a null pointer.
         if(safeCamera == null)
             log("safeCamera == null");
         else
