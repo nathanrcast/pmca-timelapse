@@ -42,7 +42,7 @@ Start the app, set the interval and the number of pictures. The screen shows how
 
 ## Building
 
-Needs a JDK 17+ and the Android SDK with platform 34 (`sdk.dir` in `local.properties`). `./gradlew :app:assembleDebug` writes `app/build/outputs/apk/debug/app-debug.apk`. Full commands: [AGENTS.md](AGENTS.md) § Commands.
+Needs a JDK 17–21 and the Android SDK with platform 34 (`sdk.dir` in `local.properties`). `./gradlew :app:assembleDebug` writes `app/build/outputs/apk/debug/app-debug.apk`. Full commands: [AGENTS.md](AGENTS.md) § Commands.
 
 ## Credits
 

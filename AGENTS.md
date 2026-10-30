@@ -4,11 +4,11 @@ TimeLapse+: an in-camera intervalometer for Sony PlayMemories (PMCA) cameras, ha
 
 ## Commands
 
-Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17+ (a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. T02 owns CI.
+Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17–21 (Gradle 8.7 cannot run on 22+, and a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. T02 owns CI.
 
 ```
-JAVA_HOME=<JDK 17+> ./gradlew clean :app:assembleDebug :app:assembleRelease :app:lint   # full build
-JAVA_HOME=<JDK 17+> ./gradlew :app:assembleDebug :app:lint                              # pre-push gate; + :core:test once T05 adds :core
+JAVA_HOME=<JDK 17–21> ./gradlew clean :app:assembleDebug :app:assembleRelease :app:lint   # full build
+JAVA_HOME=<JDK 17–21> ./gradlew :app:assembleDebug :app:lint                              # pre-push gate; + :core:test once T05 adds :core
 python3 tools/analyze_log.py <LOG.CSV>                                                  # once T16 lands (stdlib only)
 ```
 
