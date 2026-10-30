@@ -97,6 +97,7 @@ public final class ShotLogCsv {
         sb.append(",\"shotsIndex\":").append(StepTables.SHOTS.nearestIndex(s.shotCount));
         sb.append(",\"delayIndex\":").append(StepTables.DELAY_MIN.nearestIndex(s.delay));
         sb.append(",\"displayOff\":").append(s.displayOff);
+        sb.append(",\"reviewSeconds\":").append(s.reviewSeconds);
         sb.append(",\"silentShutter\":").append(s.silentShutter);
         sb.append(",\"ael\":").append(s.ael);
         sb.append(",\"fps\":").append(s.fps);
