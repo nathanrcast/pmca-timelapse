@@ -18,10 +18,10 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
-
-import io.github.nathanrcast.timelapse.core.Util;
-
 import com.sony.scalar.hardware.CameraEx;
+
+import io.github.nathanrcast.timelapse.core.Settings;
+import io.github.nathanrcast.timelapse.core.Util;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -157,7 +157,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         setContentView(R.layout.activity_shoot);
 
         Intent intent = getIntent();
-        settings = Settings.getFromIntent(intent);
+        settings = SettingsIntent.get(intent);
 
         shotCount = 0;
         takingPicture = false;

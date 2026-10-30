@@ -22,6 +22,7 @@ import android.widget.TextView;
 import com.github.ma1co.pmcademo.app.BaseActivity;
 import com.sony.scalar.hardware.CameraEx;
 
+import io.github.nathanrcast.timelapse.core.Settings;
 import io.github.nathanrcast.timelapse.core.SliderMapping;
 import io.github.nathanrcast.timelapse.core.Util;
 
@@ -30,6 +31,7 @@ public class SettingsActivity extends BaseActivity
     private SettingsActivity that = this;
 
     private Settings settings;
+    private SharedPreferencesSettingsStore store;
     private CameraEx cameraEx;
 
     private TabHost tabHost;
@@ -91,8 +93,9 @@ public class SettingsActivity extends BaseActivity
 
         Logger.info("Hello World");
 
+        store = new SharedPreferencesSettingsStore(this);
         settings = new Settings();
-        settings.load(this);
+        settings.load(store);
         fps = 24;
 
 
@@ -201,17 +204,17 @@ public class SettingsActivity extends BaseActivity
         cbMF   = (CheckBox) findViewById(R.id.cbMF);
         cbDOFF = (CheckBox) findViewById(R.id.cbDOFF);
 
-        sbInterval.setMax(119);
+        sbInterval.setMax(Settings.RAW_INTERVAL_MAX);
         sbInterval.setOnSeekBarChangeListener(sbIntervalOnSeekBarChangeListener);
         sbInterval.setProgress(settings.rawInterval);
         sbIntervalOnSeekBarChangeListener.onProgressChanged(sbInterval, settings.rawInterval, false);
 
-        sbShots.setMax(130);
+        sbShots.setMax(Settings.RAW_SHOT_COUNT_MAX);
         sbShots.setOnSeekBarChangeListener(sbShotsOnSeekBarChangeListener);
         sbShots.setProgress(settings.rawShotCount);
         sbShotsOnSeekBarChangeListener.onProgressChanged(sbShots, settings.rawShotCount, false);
 
-        sbDelay.setMax(39);
+        sbDelay.setMax(Settings.RAW_DELAY_MAX);
         sbDelay.setOnSeekBarChangeListener(sbDelayOnSeekBarChangeListener);
         sbDelay.setProgress(settings.rawDelay);
         sbDelayOnSeekBarChangeListener.onProgressChanged(sbDelay, settings.rawDelay, false);
@@ -252,16 +255,16 @@ public class SettingsActivity extends BaseActivity
     View.OnClickListener bnStartOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            settings.save(that);
+            settings.save(store);
             Intent intent = new Intent(that, ShootActivity.class);
-            settings.putInIntent(intent);
+            SettingsIntent.put(intent, settings);
             startActivity(intent);
         }
     },
     bnCloseOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            settings.save(that);
+            settings.save(store);
             finish();
         }
     };
@@ -443,7 +446,7 @@ public class SettingsActivity extends BaseActivity
             shotsText = Integer.toString(settings.shotCount);
 
             if(i == 131) {
-                settings.shotCount = Integer.MAX_VALUE;
+                settings.shotCount = Settings.SHOTS_INFINITE;
                 shotsText = "inf";
             }
 
