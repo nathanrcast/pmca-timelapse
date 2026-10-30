@@ -7,23 +7,28 @@ package io.github.nathanrcast.timelapse.core;
  *
  * <p>The caller arms one timer for {@link #nextWakeMs()} and calls {@link #onTimer()} when it
  * fires, and calls {@link #onFrameCaptured()} when the camera reports a frame done (onShutter).
- * Each slot resolves exactly once, as a fire or a skip:
+ * All calls must come from one thread. Each slot either is skipped at its deadline or fires and
+ * then ends as {@link Action#SLOT_DONE}, a {@link SkipReason#LOST} or an
+ * {@link SkipReason#INTERRUPTED} skip:
  * <ul>
- * <li>A capture still running at a deadline makes that slot a {@link SkipReason#BUSY} skip; the
- *     next chance is the following deadline. There is never more than one capture in flight and
- *     never a catch-up shot.</li>
+ * <li>A capture still running at a deadline makes that slot a {@link SkipReason#BUSY} skip, even if
+ *     the timer only gets to it after the capture ends; the next chance is the following deadline.
+ *     There is never more than one capture in flight and never a catch-up shot.</li>
  * <li>A timer that wakes after a slot's window has ended makes it a {@link SkipReason#LATE} skip,
  *     one slot per call, until the current slot.</li>
+ * <li>A frame with no onShutter within the capture timeout closes its slot as LOST, so a missing
+ *     callback can't stall the run.</li>
  * <li>With brackets, a slot fires {@code framesPerInterval} frames back to back and completes
  *     after the last one is captured.</li>
- * <li>Burst mode (interval 0) is one slot: it fires at {@code t0} and completes at the end of the
- *     burst, found by the timer or by a poll through {@link #onFrameCaptured()}.</li>
+ * <li>Burst mode (interval 0) is one slot: it fires at {@code t0} and the timer completes it at
+ *     the end of the burst. onShutter plays no part in a burst.</li>
  * </ul>
  * The run ends when {@code shotCount} slots are captured ({@link StopOn#CAPTURED}) or have
  * elapsed ({@link StopOn#SLOTS}), once no capture is in flight.
  */
 public final class Scheduler {
     public static final long NEVER = Long.MAX_VALUE;
+    public static final long MIN_CAPTURE_TIMEOUT_MS = 120000;
 
     public enum StopOn { CAPTURED, SLOTS }
 
@@ -33,7 +38,9 @@ public final class Scheduler {
         /** The timer woke after this slot's window had ended. */
         LATE,
         /** The run was paused while this slot was capturing. */
-        INTERRUPTED
+        INTERRUPTED,
+        /** The slot fired but no onShutter came within the capture timeout. */
+        LOST
     }
 
     public enum Action {
@@ -49,10 +56,13 @@ public final class Scheduler {
 
     /** What to do, and for which slot; one per {@link #onTimer()} or {@link #onFrameCaptured()} call. */
     public static final class Decision {
+        /** Every WAIT is this one instance; its slot, frame and times are -1/0. */
+        static final Decision WAIT = new Decision(Action.WAIT, -1, -1, 0, 0, null);
+
         public final Action action;
         /** The slot, or -1 for {@link Action#WAIT}. */
         public final long slot;
-        /** For FIRE and SLOT_DONE, the bracket frame (0-based); otherwise -1. */
+        /** The bracket frame (0-based) for FIRE, SLOT_DONE and LOST; otherwise -1. */
         public final int frame;
         /** The slot's deadline. */
         public final long scheduledMs;
@@ -79,7 +89,7 @@ public final class Scheduler {
             if (action == Action.WAIT)
                 return "WAIT";
             StringBuilder sb = new StringBuilder().append(action).append(" slot ").append(slot);
-            if (action == Action.FIRE)
+            if (frame >= 0 && action != Action.SLOT_DONE)
                 sb.append(" frame ").append(frame);
             if (action == Action.SKIP)
                 sb.append(' ').append(skipReason);
@@ -92,6 +102,7 @@ public final class Scheduler {
     private final StopOn stopOn;
     private final long intervalMs;
     private final long slotTarget;
+    private final long captureTimeoutMs;
 
     private boolean started;
     private boolean paused;
@@ -103,17 +114,32 @@ public final class Scheduler {
     private boolean capturing;
     private long captureSlot;
     private int captureFrame;
+    private long frameFiredAtMs;
+    private long lastCaptureEndMs = Long.MIN_VALUE;
 
     private long captured;
     private long framesFired;
     private final long[] skips = new long[SkipReason.values().length];
 
+    /** Uses the default capture timeout, {@link #defaultCaptureTimeoutMs(ShotPlan)}. */
     public Scheduler(ShotPlan plan, Clock clock, StopOn stopOn) {
+        this(plan, clock, stopOn, defaultCaptureTimeoutMs(plan));
+    }
+
+    public Scheduler(ShotPlan plan, Clock clock, StopOn stopOn, long captureTimeoutMs) {
+        if (captureTimeoutMs <= 0)
+            throw new IllegalArgumentException("captureTimeoutMs <= 0: " + captureTimeoutMs);
         this.plan = plan;
         this.clock = clock;
         this.stopOn = stopOn;
         this.intervalMs = plan.intervalMs();
         this.slotTarget = plan.isBurst() ? 1 : plan.shotCount();
+        this.captureTimeoutMs = captureTimeoutMs;
+    }
+
+    /** Three intervals, but at least {@link #MIN_CAPTURE_TIMEOUT_MS} for long exposures and noise reduction. */
+    public static long defaultCaptureTimeoutMs(ShotPlan plan) {
+        return Math.max(3 * plan.intervalMs(), MIN_CAPTURE_TIMEOUT_MS);
     }
 
     /** Starts the run now; the first slot is due after the plan's delay. */
@@ -130,33 +156,37 @@ public final class Scheduler {
             return NEVER;
         if (plan.isBurst())
             return capturing ? burstEndMs() : t0;
-        if (allSlotsClaimed())
-            return NEVER;
-        return deadlineMs(nextSlot);
+        long wake = allSlotsClaimed() ? NEVER : deadlineMs(nextSlot);
+        if (capturing)
+            wake = Math.min(wake, frameFiredAtMs + captureTimeoutMs);
+        return wake;
     }
 
     public Decision onTimer() {
         long now = clock.nowMs();
         if (!started || paused || done)
-            return waitAt(now);
+            return Decision.WAIT;
         if (plan.isBurst())
             return burstTimer(now);
+        if (capturing && now >= frameFiredAtMs + captureTimeoutMs)
+            return closeCapture(now, SkipReason.LOST);
         if (allSlotsClaimed())
-            return waitAt(now);
+            return Decision.WAIT;
         long deadline = deadlineMs(nextSlot);
         if (now < deadline)
-            return waitAt(now);
+            return Decision.WAIT;
 
         long slot = nextSlot++;
         Decision decision;
-        if (capturing)
-            decision = skip(slot, deadline, now, SkipReason.BUSY);
+        if (capturing || deadline < lastCaptureEndMs)
+            decision = skip(slot, -1, deadline, now, SkipReason.BUSY);
         else if (now >= deadline + intervalMs)
-            decision = skip(slot, deadline, now, SkipReason.LATE);
+            decision = skip(slot, -1, deadline, now, SkipReason.LATE);
         else {
             capturing = true;
             captureSlot = slot;
             captureFrame = 0;
+            frameFiredAtMs = now;
             framesFired++;
             decision = new Decision(Action.FIRE, slot, 0, deadline, now, null);
         }
@@ -164,17 +194,14 @@ public final class Scheduler {
         return decision;
     }
 
+    /** A frame is captured. Ignored in burst mode, and when no frame is in flight (a late or duplicate callback). */
     public Decision onFrameCaptured() {
+        if (!capturing || plan.isBurst())
+            return Decision.WAIT;
         long now = clock.nowMs();
-        if (!capturing)
-            return waitAt(now);
-        if (plan.isBurst()) {
-            if (now < burstEndMs())
-                return waitAt(now);
-            return completeSlot(now);
-        }
         if (captureFrame + 1 < plan.framesPerInterval()) {
             captureFrame++;
+            frameFiredAtMs = now;
             framesFired++;
             return new Decision(Action.FIRE, captureSlot, captureFrame, deadlineMs(captureSlot), now, null);
         }
@@ -183,7 +210,8 @@ public final class Scheduler {
 
     /**
      * Stops the clock on the run. A capture in flight can't be trusted after the camera is
-     * released, so its slot is counted as an {@link SkipReason#INTERRUPTED} skip.
+     * released, so its slot is counted as an {@link SkipReason#INTERRUPTED} skip; if that was the
+     * last slot of a {@link StopOn#SLOTS} run, the run is done.
      */
     public void pause() {
         if (!started || paused || done)
@@ -192,8 +220,10 @@ public final class Scheduler {
         pausedAtMs = clock.nowMs();
         if (capturing) {
             capturing = false;
+            lastCaptureEndMs = pausedAtMs;
             skips[SkipReason.INTERRUPTED.ordinal()]++;
         }
+        updateDone();
     }
 
     /** Shifts {@code t0} by the paused time, so every remaining deadline keeps its place in the run. */
@@ -201,7 +231,10 @@ public final class Scheduler {
         if (!paused)
             return;
         paused = false;
-        t0 += clock.nowMs() - pausedAtMs;
+        long shift = clock.nowMs() - pausedAtMs;
+        t0 += shift;
+        if (lastCaptureEndMs != Long.MIN_VALUE)
+            lastCaptureEndMs += shift;
     }
 
     /**
@@ -220,8 +253,24 @@ public final class Scheduler {
         return t0 + slot * intervalMs;
     }
 
+    public ShotPlan plan() {
+        return plan;
+    }
+
+    public StopOn stopOn() {
+        return stopOn;
+    }
+
+    public long captureTimeoutMs() {
+        return captureTimeoutMs;
+    }
+
     public long t0Ms() {
         return t0;
+    }
+
+    public boolean isStarted() {
+        return started;
     }
 
     public boolean isDone() {
@@ -236,7 +285,7 @@ public final class Scheduler {
         return capturing;
     }
 
-    /** Slots resolved so far (fired or skipped). */
+    /** Slots resolved so far (fired or skipped at their deadline). */
     public long slotsElapsed() {
         return nextSlot;
     }
@@ -263,7 +312,7 @@ public final class Scheduler {
     private Decision burstTimer(long now) {
         if (!capturing) {
             if (now < t0)
-                return waitAt(now);
+                return Decision.WAIT;
             capturing = true;
             captureSlot = 0;
             captureFrame = 0;
@@ -272,7 +321,7 @@ public final class Scheduler {
             return new Decision(Action.FIRE, 0, 0, t0, now, null);
         }
         if (now < burstEndMs())
-            return waitAt(now);
+            return Decision.WAIT;
         return completeSlot(now);
     }
 
@@ -282,18 +331,23 @@ public final class Scheduler {
 
     private Decision completeSlot(long now) {
         capturing = false;
+        lastCaptureEndMs = now;
         captured++;
         updateDone();
         return new Decision(Action.SLOT_DONE, captureSlot, captureFrame, deadlineMs(captureSlot), now, null);
     }
 
-    private Decision skip(long slot, long deadline, long now, SkipReason reason) {
-        skips[reason.ordinal()]++;
-        return new Decision(Action.SKIP, slot, -1, deadline, now, reason);
+    private Decision closeCapture(long now, SkipReason reason) {
+        capturing = false;
+        lastCaptureEndMs = now;
+        Decision decision = skip(captureSlot, captureFrame, deadlineMs(captureSlot), now, reason);
+        updateDone();
+        return decision;
     }
 
-    private Decision waitAt(long now) {
-        return new Decision(Action.WAIT, -1, -1, now, now, null);
+    private Decision skip(long slot, int frame, long deadline, long now, SkipReason reason) {
+        skips[reason.ordinal()]++;
+        return new Decision(Action.SKIP, slot, frame, deadline, now, reason);
     }
 
     // No slot left to resolve: the target is reached, or will be once the capture in flight is done.

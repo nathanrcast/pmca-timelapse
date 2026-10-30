@@ -8,15 +8,16 @@ import static io.github.nathanrcast.timelapse.core.Scheduler.NEVER;
 import static io.github.nathanrcast.timelapse.core.Scheduler.SkipReason.BUSY;
 import static io.github.nathanrcast.timelapse.core.Scheduler.SkipReason.INTERRUPTED;
 import static io.github.nathanrcast.timelapse.core.Scheduler.SkipReason.LATE;
+import static io.github.nathanrcast.timelapse.core.Scheduler.SkipReason.LOST;
 import static io.github.nathanrcast.timelapse.core.Scheduler.StopOn.CAPTURED;
 import static io.github.nathanrcast.timelapse.core.Scheduler.StopOn.SLOTS;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.Test;
@@ -30,7 +31,7 @@ public class SchedulerTest {
 
     @Test
     public void steadyStateFiresOnEveryDeadline() {
-        Rig rig = new Rig(new ShotPlan(2, 100, 0, 1), CAPTURED).captureMs(300);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 100, 0, 1), CAPTURED).captureMs(300);
         rig.run();
 
         List<Decision> fires = rig.only(FIRE);
@@ -52,7 +53,7 @@ public class SchedulerTest {
 
     @Test
     public void firstSlotIsDueAfterTheDelay() {
-        Rig rig = new Rig(new ShotPlan(5, 3, 2, 1), CAPTURED).captureMs(300);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(5, 3, 2, 1), CAPTURED).captureMs(300);
         assertEquals(START + 120000, rig.scheduler.t0Ms());
         assertEquals(START + 120000, rig.scheduler.nextWakeMs());
         rig.run();
@@ -62,7 +63,7 @@ public class SchedulerTest {
 
     @Test
     public void captureSlowerThanTheIntervalSkipsSlotsWithoutBursts() {
-        Rig rig = new Rig(new ShotPlan(2, 10, 0, 1), CAPTURED).captureMs(3000);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 10, 0, 1), CAPTURED).captureMs(3000);
         rig.run();
 
         List<Decision> fires = rig.only(FIRE);
@@ -83,7 +84,7 @@ public class SchedulerTest {
 
     @Test
     public void aSingleSlowCaptureIsNotCaughtUp() {
-        Rig rig = new Rig(new ShotPlan(2, 10, 0, 1), CAPTURED).captureMs(300).slowFrame(5, 5000);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 10, 0, 1), CAPTURED).captureMs(300).slowFrame(5, 5000);
         rig.run();
 
         long[] firedSlots = new long[10];
@@ -100,7 +101,7 @@ public class SchedulerTest {
 
     @Test
     public void aLateTimerSkipsTheSlotsItMissedAndFiresOnlyTheCurrentOne() {
-        Rig rig = new Rig(new ShotPlan(2, 8, 0, 1), CAPTURED).captureMs(300).lateWake(START + 6000, 5000);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 8, 0, 1), CAPTURED).captureMs(300).lateWake(START + 6000, 5000);
         rig.run();
 
         List<Decision> skips = rig.only(SKIP);
@@ -120,7 +121,7 @@ public class SchedulerTest {
 
     @Test
     public void pauseAndResumeShiftTheRemainingDeadlines() {
-        Rig rig = new Rig(new ShotPlan(10, 5, 0, 1), CAPTURED).captureMs(300);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(10, 5, 0, 1), CAPTURED).captureMs(300);
         rig.runUntil(START + 15000);
         assertEquals(2, rig.only(FIRE).size());
 
@@ -148,8 +149,23 @@ public class SchedulerTest {
     }
 
     @Test
+    public void pausingDuringTheDelayPushesTheFirstSlotBack() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(2, 3, 1, 1), clock, CAPTURED);
+        s.start();
+        clock.advance(20000);
+        s.pause();
+        clock.advance(30000);
+        s.resume();
+        assertEquals(START + 90000, s.nextWakeMs());
+        clock.set(START + 90000);
+        assertEquals(FIRE, s.onTimer().action);
+        assertEquals(0, s.skipped());
+    }
+
+    @Test
     public void pausingMidCaptureInterruptsThatSlot() {
-        Rig rig = new Rig(new ShotPlan(10, 3, 0, 1), CAPTURED).captureMs(5000);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(10, 3, 0, 1), CAPTURED).captureMs(5000);
         rig.runUntil(START + 1000);
         Scheduler s = rig.scheduler;
         assertTrue(s.isCapturing());
@@ -185,11 +201,13 @@ public class SchedulerTest {
     }
 
     @Test
-    public void burstFiresOnceAndEndsWhenThePollSeesTheEnd() {
-        Rig rig = new Rig(new ShotPlan(0, 10, 0, 1), CAPTURED).pollMs(500);
+    public void burstFiresOnceAndOnlyTheTimerEndsIt() {
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(0, 10, 0, 1), CAPTURED).pollMs(500);
         rig.run();
 
         Scheduler s = rig.scheduler;
+        assertTrue("polls ran", rig.polls > 15);
+        assertEquals(0, rig.pollDecisions);
         assertEquals(1, rig.only(FIRE).size());
         assertEquals(START, rig.only(FIRE).get(0).nowMs);
         assertEquals(START + 10000, rig.last(SLOT_DONE).nowMs);
@@ -224,7 +242,7 @@ public class SchedulerTest {
 
     @Test
     public void infiniteBurstNeverEnds() {
-        Rig rig = new Rig(new ShotPlan(0, INF, 0, 1), CAPTURED).pollMs(500);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(0, INF, 0, 1), CAPTURED).pollMs(500);
         rig.runUntil(START + 3600000);
         assertFalse(rig.scheduler.isDone());
         assertTrue(rig.scheduler.isCapturing());
@@ -235,12 +253,13 @@ public class SchedulerTest {
     @Test
     public void pausedBurstRestartsOnResumeAndKeepsItsLength() {
         FakeClock clock = new FakeClock(START);
-        Scheduler s = new Scheduler(new ShotPlan(0, 10, 0, 1), clock, SLOTS);
+        Scheduler s = new Scheduler(new ShotPlan(0, 10, 0, 1), clock, CAPTURED);
         s.start();
         assertEquals(FIRE, s.onTimer().action);
         clock.advance(3000);
         s.pause();
         assertEquals(1, s.skipped(INTERRUPTED));
+        assertFalse(s.isDone());
 
         clock.advance(60000);
         s.resume();
@@ -248,16 +267,151 @@ public class SchedulerTest {
         assertEquals(FIRE, s.onTimer().action);
         assertEquals(START + 70000, s.nextWakeMs());
         clock.set(START + 70000);
-        assertEquals(SLOT_DONE, s.onFrameCaptured().action);
+        assertEquals(WAIT, s.onFrameCaptured().action);
+        assertEquals(SLOT_DONE, s.onTimer().action);
         assertTrue(s.isDone());
         assertEquals(2, s.framesFired());
+    }
+
+    @Test
+    public void pausingAStopOnSlotsBurstEndsIt() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(0, 10, 0, 1), clock, SLOTS);
+        s.start();
+        s.onTimer();
+        clock.advance(3000);
+        s.pause();
+        assertTrue(s.isDone());
+        s.resume();
+        assertEquals(NEVER, s.nextWakeMs());
+        assertEquals(WAIT, s.onTimer().action);
+        assertEquals(1, s.framesFired());
+    }
+
+    @Test
+    public void pausingDuringTheLastSlotOfAStopOnSlotsRunEndsIt() {
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 3, 0, 1), SLOTS).captureMs(1000);
+        rig.runUntil(START + 4500);
+        Scheduler s = rig.scheduler;
+        assertTrue(s.isCapturing());
+        assertEquals(3, s.slotsElapsed());
+
+        s.pause();
+        assertTrue(s.isDone());
+        assertEquals(1, s.skipped(INTERRUPTED));
+        rig.clock.advance(30000);
+        s.resume();
+        assertTrue(s.isDone());
+        assertEquals(NEVER, s.nextWakeMs());
+    }
+
+    @Test
+    public void pausingDuringTheLastCaptureOfACapturedRunTakesOneMoreSlot() {
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 3, 0, 1), CAPTURED).captureMs(1000);
+        rig.runUntil(START + 4500);
+        Scheduler s = rig.scheduler;
+        s.pause();
+        assertFalse(s.isDone());
+        rig.clock.advance(30000);
+        s.resume();
+        rig.dropPendingShutter();
+        rig.run();
+        assertTrue(s.isDone());
+        assertEquals(3, s.captured());
+        assertEquals(4, s.framesFired());
+        assertEquals(START + 30000 + 6000, rig.last(FIRE).nowMs);
+    }
+
+    @Test
+    public void aLostCaptureIsClosedAfterTheTimeoutAndTheRunGoesOn() {
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 5, 0, 1), CAPTURED, 5000).captureMs(300).loseFrame(1);
+        rig.run();
+
+        Scheduler s = rig.scheduler;
+        assertTrue(s.isDone());
+        assertEquals(5, s.captured());
+        Decision lost = rig.only(SKIP).get(2);
+        assertEquals(LOST, lost.skipReason);
+        assertEquals(1, lost.slot);
+        assertEquals(0, lost.frame);
+        assertEquals(START + 7000, lost.nowMs);
+        assertEquals(2, s.skipped(BUSY));
+        assertEquals(1, s.skipped(LOST));
+        assertEquals(START + 8000, rig.only(FIRE).get(2).nowMs);
+        assertEquals(4, rig.only(FIRE).get(2).slot);
+    }
+
+    @Test
+    public void losingTheLastNeededCaptureStillEndsACapturedRun() {
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 2, 0, 1), CAPTURED, 5000).captureMs(300).loseFrame(1);
+        rig.run();
+
+        Scheduler s = rig.scheduler;
+        assertTrue(s.isDone());
+        assertEquals(2, s.captured());
+        assertEquals(1, s.skipped(LOST));
+        // Slots 2 and 3 fell due while the lost capture was open: BUSY, though resolved after it closed.
+        assertEquals(2, s.skipped(BUSY));
+        assertEquals(0, s.skipped(LATE));
+        assertEquals(4, rig.last(FIRE).slot);
+        assertEquals(START + 8000, rig.last(FIRE).nowMs);
+    }
+
+    @Test
+    public void aLostLastSlotEndsAStopOnSlotsRun() {
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 2, 0, 1), SLOTS, 5000).captureMs(300).loseFrame(1);
+        rig.run();
+        assertTrue(rig.scheduler.isDone());
+        assertEquals(1, rig.scheduler.captured());
+        assertEquals(LOST, rig.last(SKIP).skipReason);
+        assertEquals(START + 7000, rig.last(SKIP).nowMs);
+    }
+
+    @Test
+    public void theTimeoutRunsFromEachBracketFrame() {
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(10, 2, 0, 3), CAPTURED, 5000).captureMs(400).loseFrame(2);
+        rig.run();
+        Decision lost = rig.only(SKIP).get(0);
+        assertEquals(LOST, lost.skipReason);
+        assertEquals(0, lost.slot);
+        assertEquals(2, lost.frame);
+        assertEquals(START + 800 + 5000, lost.nowMs);
+        assertEquals("SKIP slot 0 frame 2 LOST +5800 ms", lost.toString());
+        assertEquals(2, rig.scheduler.captured());
+    }
+
+    @Test
+    public void theDefaultCaptureTimeoutIsThreeIntervalsButAtLeastTwoMinutes() {
+        assertEquals(120000, Scheduler.defaultCaptureTimeoutMs(new ShotPlan(2, 10, 0, 1)));
+        assertEquals(180000, Scheduler.defaultCaptureTimeoutMs(new ShotPlan(60, 10, 0, 1)));
+        assertEquals(120000, Scheduler.defaultCaptureTimeoutMs(new ShotPlan(0, 10, 0, 1)));
+        FakeClock clock = new FakeClock(START);
+        assertEquals(6840000, new Scheduler(new ShotPlan(2280, 10, 0, 1), clock, CAPTURED).captureTimeoutMs());
+        try {
+            new Scheduler(new ShotPlan(2, 10, 0, 1), clock, CAPTURED, 0);
+            fail();
+        } catch (IllegalArgumentException expected) {
+        }
+    }
+
+    @Test
+    public void waitIsOneSharedInstance() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(2, 5, 0, 1), clock, CAPTURED);
+        assertSame(Decision.WAIT, s.onTimer());
+        s.start();
+        clock.set(START - 1);
+        assertSame(Decision.WAIT, s.onTimer());
+        assertSame(Decision.WAIT, s.onFrameCaptured());
+        assertEquals(-1, Decision.WAIT.slot);
+        assertEquals(0, Decision.WAIT.lateMs());
     }
 
     // 10 000 slots with every timer wake-up 0-150 ms late: each shot is still timed from its own
     // deadline, so the last one is due exactly 9 999 intervals after the first.
     @Test
     public void tenThousandSlotsAccumulateNoDrift() {
-        Rig rig = new Rig(new ShotPlan(0.5, 10000, 0, 1), CAPTURED).captureMs(200).jitterUpToMs(150);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(0.5, 10000, 0, 1), CAPTURED).captureMs(200).jitterUpToMs(150);
         rig.run();
 
         List<Decision> fires = rig.only(FIRE);
@@ -278,7 +432,7 @@ public class SchedulerTest {
 
     @Test
     public void bracketsFireBackToBackAndCountAsOneSlot() {
-        Rig rig = new Rig(new ShotPlan(5, 4, 0, 3), CAPTURED).captureMs(400);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(5, 4, 0, 3), CAPTURED).captureMs(400);
         rig.run();
 
         Scheduler s = rig.scheduler;
@@ -302,7 +456,7 @@ public class SchedulerTest {
 
     @Test
     public void bracketsSlowerThanTheIntervalSkipTheNextSlot() {
-        Rig rig = new Rig(new ShotPlan(1, 3, 0, 3), CAPTURED).captureMs(400);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(1, 3, 0, 3), CAPTURED).captureMs(400);
         rig.run();
         assertEquals(9, rig.scheduler.framesFired());
         assertEquals(3, rig.scheduler.captured());
@@ -314,7 +468,7 @@ public class SchedulerTest {
 
     @Test
     public void stopOnSlotsEndsAfterTheLastSlotsCapture() {
-        Rig rig = new Rig(new ShotPlan(2, 6, 0, 1), SLOTS).captureMs(3000);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 6, 0, 1), SLOTS).captureMs(3000);
         rig.run();
 
         Scheduler s = rig.scheduler;
@@ -327,7 +481,7 @@ public class SchedulerTest {
 
     @Test
     public void stopOnSlotsCanEndOnASkip() {
-        Rig rig = new Rig(new ShotPlan(2, 3, 0, 1), SLOTS).captureMs(300).lateWake(START + 4000, 2500);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(2, 3, 0, 1), SLOTS).captureMs(300).lateWake(START + 4000, 2500);
         rig.run();
         Scheduler s = rig.scheduler;
         assertTrue(s.isDone());
@@ -338,7 +492,7 @@ public class SchedulerTest {
 
     @Test
     public void infiniteShotsKeepGoing() {
-        Rig rig = new Rig(new ShotPlan(1, INF, 0, 1), CAPTURED).captureMs(300);
+        SchedulerRig rig = new SchedulerRig(new ShotPlan(1, INF, 0, 1), CAPTURED).captureMs(300);
         rig.runUntil(START + 100000);
         assertFalse(rig.scheduler.isDone());
         assertEquals(100, rig.scheduler.captured());
@@ -378,7 +532,8 @@ public class SchedulerTest {
         s.onFrameCaptured();
         clock.set(START + 1000);
         assertEquals(FIRE, s.onTimer().action);
-        assertEquals(NEVER, s.nextWakeMs());
+        // No slot left to resolve; the timer only stays armed for the capture timeout.
+        assertEquals(START + 1000 + s.captureTimeoutMs(), s.nextWakeMs());
 
         clock.set(START + 5000);
         assertEquals(WAIT, s.onTimer().action);
@@ -414,117 +569,5 @@ public class SchedulerTest {
         assertEquals("SKIP slot 1 BUSY +0 ms", s.onTimer().toString());
         clock.advance(300);
         assertEquals("SLOT_DONE slot 0 +1300 ms", s.onFrameCaptured().toString());
-    }
-
-    // Drives a Scheduler the way ShootActivity does: one timer armed for nextWakeMs(), possibly
-    // late, and the camera's onShutter some time after each FIRE. In burst mode onShutter is a
-    // poll every pollMs while the burst runs. A capture that ends exactly at a deadline is
-    // reported before the timer.
-    private static final class Rig {
-        final FakeClock clock = new FakeClock(START);
-        final Scheduler scheduler;
-        final List<Decision> decisions = new ArrayList<Decision>();
-
-        private long captureMs = 300;
-        private long pollMs;
-        private int slowFrame = -1;
-        private long slowFrameMs;
-        private long lateWakeAt = -1;
-        private long lateWakeBy;
-        private long jitterMax;
-        private int framesFired;
-        private long shutterAt = NEVER;
-
-        Rig(ShotPlan plan, Scheduler.StopOn stopOn) {
-            scheduler = new Scheduler(plan, clock, stopOn);
-            scheduler.start();
-        }
-
-        Rig captureMs(long ms) {
-            captureMs = ms;
-            return this;
-        }
-
-        Rig pollMs(long ms) {
-            pollMs = ms;
-            return this;
-        }
-
-        Rig slowFrame(int frame, long ms) {
-            slowFrame = frame;
-            slowFrameMs = ms;
-            return this;
-        }
-
-        Rig lateWake(long wake, long byMs) {
-            lateWakeAt = wake;
-            lateWakeBy = byMs;
-            return this;
-        }
-
-        Rig jitterUpToMs(long ms) {
-            jitterMax = ms;
-            return this;
-        }
-
-        void dropPendingShutter() {
-            shutterAt = NEVER;
-        }
-
-        void run() {
-            runUntil(NEVER);
-        }
-
-        void runUntil(long untilMs) {
-            while (!scheduler.isDone()) {
-                long wake = scheduler.nextWakeMs();
-                long timerAt = wake == NEVER ? NEVER : Math.max(clock.nowMs(), wake + lateness(wake));
-                long next = Math.min(timerAt, shutterAt);
-                if (next == NEVER || next > untilMs)
-                    break;
-                clock.set(next);
-                if (shutterAt <= timerAt) {
-                    shutterAt = NEVER;
-                    record(scheduler.onFrameCaptured());
-                } else {
-                    record(scheduler.onTimer());
-                }
-            }
-            if (untilMs != NEVER && clock.nowMs() < untilMs)
-                clock.set(untilMs);
-        }
-
-        List<Decision> only(Action action) {
-            List<Decision> out = new ArrayList<Decision>();
-            for (Decision d : decisions)
-                if (d.action == action)
-                    out.add(d);
-            return out;
-        }
-
-        Decision last(Action action) {
-            List<Decision> all = only(action);
-            return all.get(all.size() - 1);
-        }
-
-        private void record(Decision d) {
-            decisions.add(d);
-            if (d.action == FIRE) {
-                long ms = pollMs > 0 ? pollMs : framesFired == slowFrame ? slowFrameMs : captureMs;
-                framesFired++;
-                shutterAt = clock.nowMs() + ms;
-            } else if (d.action == WAIT && pollMs > 0 && scheduler.isCapturing() && shutterAt == NEVER) {
-                shutterAt = clock.nowMs() + pollMs;
-            }
-        }
-
-        private long lateness(long wake) {
-            if (wake == lateWakeAt)
-                return lateWakeBy;
-            if (jitterMax == 0)
-                return 0;
-            long h = (wake * 6364136223846793005L + 1442695040888963407L) >>> 33;
-            return h % (jitterMax + 1);
-        }
     }
 }
