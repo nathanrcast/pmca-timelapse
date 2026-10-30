@@ -250,12 +250,14 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             return;
         }
         safeCamera = opened.get();
+        // The run plan is final before configure: capabilities mask, then the LENR decision (which may raise the
+        // interval), then configure and the bracket timing, both from that plan.
         RunOptions run = applyCapabilities(safeCamera.capabilities());
+        long shutterMs = readShutterMs();
+        applyLenrGuard(run, shutterMs);
         cameraSurfaceHolder.addCallback(this);
         safeCamera.configure(run);
-
-        startBracketTiming();
-        applyLenrGuard();
+        startBracketTiming(shutterMs);
 
         // Built after applyCapabilities, from the masked plan (BRC3 or burst may be off on this body).
         // A resumed run keeps its slots: the scheduler shifts every remaining deadline by the pause.
@@ -265,7 +267,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             shotLog = new ShotLog(this, Build.MODEL, Build.VERSION.INCREMENTAL, appVersion(), clock.nowMs(),
                     ShotLogCsv.settingsJson(settings), LenrGuard.headerValue(lenrAtStart));
         } else {
-            scheduler.resume();
+            // A start fixed on the wall clock (AT) must not slip by the time spent paused.
+            scheduler.resume(settings.startMode == StartMode.AT);
         }
         if (scheduler.isDone())
             finishRun();
@@ -308,27 +311,33 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         }
     }
 
-    // Long-exposure NR halves the shot count when the interval is under 2 x shutter + 1 s. If the body can switch it
-    // off (and "Disable LENR during runs" is on) it is off for the run and SafeCamera restores it on close; else
-    // the status line warns and the first start raises the interval to the minimum. The camera is re-opened on
-    // every resume, so this runs each time; the interval and the header only change on the first.
-    private void applyLenrGuard() {
-        Result<Boolean> state = safeCamera.longExposureNr();
-        Boolean lenr = state.isOk() ? state.get() : null;
+    // The shutter time in ms, read once per resume for the LENR guard and the bracket timing; -1 if unreadable.
+    private long readShutterMs() {
+        Result<int[]> sp = safeCamera.shutterSpeed();
+        return sp.isOk() ? Util.shutterMs(sp.get()[0], sp.get()[1]) : -1;
+    }
+
+    // Long-exposure NR makes the camera shoot a dark frame after every frame of 1 s or more, which loses slots when
+    // the interval is shorter than the frames, dark frames and writes take (LenrGuard.minIntervalMs). If the body
+    // can switch it off (and "Disable LENR during runs" is on) it is off for the run and SafeCamera restores it on
+    // close; else the status line warns and the interval is raised to the minimum. The camera is re-opened on every
+    // resume, so this runs each time: on the first start the plan is raised before the scheduler exists, later the
+    // running scheduler is raised. Only the header's LENR state is taken once.
+    private void applyLenrGuard(RunOptions run, long shutterMs) {
+        Boolean lenr = safeCamera.longExposureNr();
         if (!lenrChecked) {
             lenrChecked = true;
             lenrAtStart = lenr;
             log("LENR " + LenrGuard.headerValue(lenr));
         }
-        long shutterMs = -1;
-        Result<int[]> sp = safeCamera.shutterSpeed();
-        if (sp.isOk())
-            shutterMs = LenrGuard.shutterMs(sp.get()[0], sp.get()[1]);
+        long base = shutterMs;
         if (settings.holyGrail && settings.maxShutterSpeedIndex < SHUTTER_SPEEDS.length)
-            shutterMs = Math.max(shutterMs, LenrGuard.shutterMs(SHUTTER_SPEEDS[settings.maxShutterSpeedIndex][0],
+            base = Math.max(base, Util.shutterMs(SHUTTER_SPEEDS[settings.maxShutterSpeedIndex][0],
                     SHUTTER_SPEEDS[settings.maxShutterSpeedIndex][1]));
-        LenrGuard.Action action = LenrGuard.decide(lenr, shutterMs, safeCamera.canSetLongExposureNr(),
-                settings.disableLenr);
+        int frames = plan.framesPerInterval();
+        int period = run.bracket.active ? run.bracket.periodTenths : 0;
+        LenrGuard.Action action = LenrGuard.decide(lenr, LenrGuard.longestFrameMs(base, frames, period),
+                safeCamera.canSetLongExposureNr(), settings.disableLenr, plan.isBurst());
         if (action == LenrGuard.Action.TURN_OFF) {
             if (safeCamera.disableLongExposureNr().isOk()) {
                 lenrNote = "LENR off for this run";
@@ -337,35 +346,30 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             }
             action = LenrGuard.Action.WARN;
         }
+        lenrNote = null;
         if (action == LenrGuard.Action.WARN) {
-            long min = LenrGuard.minIntervalMs(lenr, shutterMs);
-            if (scheduler == null && plan.intervalMs() < min) {
-                settings.interval = min / 1000.0;
+            long min = LenrGuard.minIntervalMs(lenr, base, frames, period);
+            long effective = LenrGuard.effectiveIntervalMs(plan.intervalMs(), lenr, base, frames, period);
+            if (effective > plan.intervalMs()) {
+                settings.interval = effective / 1000.0;
                 plan = ShotPlan.of(settings);
-                log("LENR on: interval raised to " + min + " ms");
+                if (scheduler != null)
+                    scheduler.raiseInterval(effective);
+                log("LENR on: interval raised to " + effective + " ms");
             }
             lenrNote = "LENR on: min interval " + Util.formatTime((min + 999) / 1000);
-        } else if (scheduler == null) {
-            lenrNote = null;
         }
         showStatus();
     }
 
     // The warning is estimated from the shutter time at start and replaced by the measured slot time after each
     // bracket. It only informs: the scheduler skips a slot that is still busy.
-    private void startBracketTiming() {
+    private void startBracketTiming(long shutterMs) {
         BracketTiming previous = bracketTiming;
         bracketTiming = new BracketTiming(plan);
         bracketTiming.inherit(previous);
-        updateBracketShutter();
-    }
-
-    private void updateBracketShutter() {
-        if (bracketTiming == null)
-            return;
-        Result<int[]> sp = safeCamera.shutterSpeed();
-        if (sp.isOk() && sp.get()[1] > 0)
-            bracketTiming.setShutterMs(sp.get()[0] * 1000L / sp.get()[1]);
+        if (shutterMs > 0)
+            bracketTiming.setShutterMs(shutterMs);
         showBracketWarning();
     }
 
@@ -436,7 +440,12 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 break;
             }
         }
-        updateBracketShutter();
+        if (bracketTiming != null) {
+            long ms = Util.shutterMs(sp.get()[0], sp.get()[1]);
+            if (ms > 0)
+                bracketTiming.setShutterMs(ms);
+            showBracketWarning();
+        }
     }
 
     private void updateISOLevel(){

@@ -148,6 +148,7 @@ public final class SafeCamera {
             SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             // Before the values are read: a run that never reached close() left its bracket drive on the body.
             restoreDriveState(cam, normal, m.keySet(), prefs, "an earlier run");
+            restoreStaleLenr(cam, normal, m.keySet(), prefs);
             camera = new SafeCamera(cam, normal, readSession(m, cam), prefs);
             cam.setShutterListener(new ShutterBridge(callback));
         } catch (Throwable t) {
@@ -158,7 +159,6 @@ public final class SafeCamera {
             return logged(Result.<SafeCamera>failed("SafeCamera.open", t));
         }
         camera.releaseStaleToggle();
-        camera.restoreStaleLenr();
         camera.enableAutoReview();
         return Result.ok(camera);
     }
@@ -466,17 +466,13 @@ public final class SafeCamera {
 
     // ---- long-exposure NR ----
 
-    // Whether long-exposure NR is on now, read fresh from the camera. Fails if the body has no getter.
-    public Result<Boolean> longExposureNr() {
-        if (released)
-            return closed(GET_LONG_EXPOSURE_NR.key());
-        if (!caps.has(GET_LONG_EXPOSURE_NR))
-            return unsupported(GET_LONG_EXPOSURE_NR.key());
-        try {
-            return Result.ok(cameraEx.createParametersModifier(normal.getParameters()).getLongExposureNR());
-        } catch (Throwable t) {
-            return failed(GET_LONG_EXPOSURE_NR.key(), t);
-        }
+    // Whether long-exposure NR was on when this session opened (the probe's one read, taken after any stale restore);
+    // null if the body can't say. A run that turns it off knows the original from this.
+    public Boolean longExposureNr() {
+        List<String> v = caps.values(Query.LONG_EXPOSURE_NR);
+        if (v == null || v.isEmpty())
+            return null;
+        return Boolean.valueOf("true".equals(v.get(0)));
     }
 
     // True if this body can switch long-exposure NR (Feature.SET_LENR).
@@ -519,21 +515,26 @@ public final class SafeCamera {
             setLenrFlag(false);
     }
 
-    // A run that turned LENR off and never reached close() left the flag set. The flag stays set if the restore
-    // fails, so the next open() tries again.
-    private void restoreStaleLenr() {
+    // A run that turned LENR off and never reached close() left the flag set. Runs before the session's values are
+    // read, so those show the restored state. The flag stays set if the restore fails, so the next open() tries again.
+    private static void restoreStaleLenr(CameraEx cam, Camera normal, Set<SonyMethod> present,
+                                         SharedPreferences prefs) {
         if (!prefs.getBoolean(KEY_LENR_OFF_BY_APP, false))
             return;
-        if (!canSetLongExposureNr()) {
-            setLenrFlag(false);
-            return;
+        try {
+            if (present.contains(SET_LONG_EXPOSURE_NR) && present.contains(GET_LONG_EXPOSURE_NR)) {
+                Camera.Parameters params = normal.getParameters();
+                ParametersModifier mod = cam.createParametersModifier(params);
+                if (LenrGuard.shouldRestore(true, Boolean.valueOf(mod.getLongExposureNR()))) {
+                    mod.setLongExposureNR(true);
+                    normal.setParameters(params);
+                    Logger.info("SafeCamera: long-exposure NR restored after an earlier run");
+                }
+            }
+            prefs.edit().putBoolean(KEY_LENR_OFF_BY_APP, false).commit();
+        } catch (Throwable t) {
+            Logger.error("SafeCamera: restore long-exposure NR: " + Result.failed(SET_LONG_EXPOSURE_NR.key(), t));
         }
-        Result<Boolean> now = longExposureNr();
-        Boolean current = now.isOk() ? now.get() : null;
-        if (LenrGuard.shouldRestore(true, current) && !setLongExposureNr(true).isOk())
-            return;
-        setLenrFlag(false);
-        Logger.info("SafeCamera: long-exposure NR restored after an earlier run");
     }
 
     private void setLenrFlag(boolean set) {
