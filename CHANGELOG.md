@@ -15,7 +15,7 @@ First TimeLapse+ release: a hard fork of jonasjuffinger/TimeLapse. New applicati
 - Per-shot `TIMELPS/LOG.CSV` and `tools/analyze_log.py`, which reports drift and unexplained skips.
 - Capability layer: options a body does not support are hidden instead of called.
 - Desktop assembly: `tools/assemble.sh` and `tools/frames_for_run.py` turn a run's frames into a clip; README rewritten for users; consolidated camera checklist.
-- Soak tooling for long unattended runs.
+- Soak tooling: `tools/soak_meminfo.sh` and `tools/meminfo_trend.py` (slope and quartile leak test).
 - CI that builds unsigned APKs, and `scripts/release.sh` for local signing.
 - Bulb exposure spike (feasible, unverified); no bulb feature ships in this release.
 
@@ -29,10 +29,10 @@ First TimeLapse+ release: a hard fork of jonasjuffinger/TimeLapse. New applicati
 
 ### Fixed
 
-- Failed captures are reported to the scheduler (`Scheduler.captureFailed`) instead of being lost.
-- Camera auto power-off during a run: the power-off hold is re-asserted.
-- Inconsistent intervals on large SDXC cards, from logging on the capture path; the logger is now asynchronous (upstream issue 46).
-- Black screen after a long run: display-off state is restored safely (upstream issue 52).
+- A refused frame closes as LOST immediately and a refused burst ends the run as LOST (`Scheduler.captureFailed`).
+- Camera auto power-off during a run: the hold is taken after a successful open, re-asserted every 10 minutes and released only at teardown (`AwakeGuard`).
+- Inconsistent intervals on large SDXC cards, from logging on the capture path; the capture looper no longer does card I/O: the logger is asynchronous and drains before crash traces and at teardown (upstream issue 46).
+- Black screen after a long run: the display restore always goes to the panel, and a crash flag repairs it at the next start (upstream issue 52). Display calls are guarded by capability presence checks.
 - Interval drift and catch-up bursts, seen as bursts of up to 6 frames per second on NEX-5R-class bodies (upstream issue 5).
 - Every other shot missing when capture takes longer than the interval (upstream issues 26, 50).
 - Camera reboot from `NoSuchMethodError` on older bodies (upstream issue 4).
