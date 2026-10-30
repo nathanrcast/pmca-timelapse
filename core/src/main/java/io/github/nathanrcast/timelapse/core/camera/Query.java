@@ -16,6 +16,8 @@ public enum Query {
     // The body's current state, read before the run changes anything: one element each. EXPOSURE_BRACKET_PERIOD is
     // in tenths of EV (3 = 0.3 EV, 7 = 0.7, 10, 20, 30).
     DRIVE_MODE(SonyMethod.GET_DRIVE_MODE),
+    BRACKET_MODE(SonyMethod.GET_BRACKET_MODE),
+    EXPOSURE_BRACKET_MODE(SonyMethod.GET_EXPOSURE_BRACKET_MODE),
     EXPOSURE_BRACKET_PERIOD(SonyMethod.GET_EXPOSURE_BRACKET_PERIOD),
     NUM_OF_BRACKET_PICTURE(SonyMethod.GET_NUM_OF_BRACKET_PICTURE),
     EXPOSURE_BRACKET_PERIODS(SonyMethod.GET_SUPPORTED_EXPOSURE_BRACKET_PERIODS),

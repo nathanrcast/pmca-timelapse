@@ -3,7 +3,7 @@ package io.github.nathanrcast.timelapse.core;
 /**
  * Warns when the interval is shorter than a bracket takes. A bracket is estimated at
  * {@code frames x (shutter + WRITE_MS_PER_FRAME)} until a slot has run; after that the last slot's measured time (its
- * first FIRE to its last capture) is used. The run isn't blocked: the scheduler skips a slot that is still busy.
+ * first FIRE to its last capture) is used, moved by any later change of the shutter time. The run isn't blocked: the scheduler skips a slot that is still busy.
  */
 public final class BracketTiming {
     public static final long WRITE_MS_PER_FRAME = 600;
@@ -13,6 +13,7 @@ public final class BracketTiming {
     private long shutterMs;
     private long slotStartMs = -1;
     private long measuredMs = -1;
+    private long shutterAtMeasureMs;
 
     public BracketTiming(ShotPlan plan) {
         this.intervalMs = plan.intervalMs();
@@ -32,6 +33,7 @@ public final class BracketTiming {
             slotStartMs = d.nowMs;
         } else if (d.action == Scheduler.Action.SLOT_DONE && slotStartMs >= 0) {
             measuredMs = d.nowMs - slotStartMs;
+            shutterAtMeasureMs = shutterMs;
             slotStartMs = -1;
             return true;
         }
@@ -42,8 +44,19 @@ public final class BracketTiming {
         return measuredMs >= 0;
     }
 
+    /** Keeps the other timing's measurement when it was for the same bracket size (a resumed run). */
+    public void inherit(BracketTiming other) {
+        if (other != null && other.frames == frames && other.measuredMs >= 0) {
+            measuredMs = other.measuredMs;
+            shutterAtMeasureMs = other.shutterAtMeasureMs;
+        }
+    }
+
+    /** The measured slot time, moved by the change in shutter time since it was measured (holy grail ramps it). */
     public long estimateMs() {
-        return isMeasured() ? measuredMs : frames * (shutterMs + WRITE_MS_PER_FRAME);
+        if (isMeasured())
+            return Math.max(0, measuredMs + frames * (shutterMs - shutterAtMeasureMs));
+        return frames * (shutterMs + WRITE_MS_PER_FRAME);
     }
 
     /** The warning text, or null when the interval is long enough (or the run isn't bracketed). */

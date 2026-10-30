@@ -18,7 +18,6 @@ public final class RunOptions {
     // null: the body has no silent shutter, so the run leaves it alone. Otherwise it is set either way.
     public final Boolean silentShutter;
     public final boolean aeLock;
-    public final boolean bracket3;
     public final BracketPlan bracket;
     public final boolean holyGrail;
     // NONE when MF is off for the run.
@@ -31,7 +30,6 @@ public final class RunOptions {
         this.silentShutter = silentShutter;
         this.aeLock = aeLock;
         this.bracket = bracket;
-        this.bracket3 = bracket.active;
         this.holyGrail = holyGrail;
         this.focus = focus;
         this.masked = Collections.unmodifiableList(masked);
@@ -50,10 +48,9 @@ public final class RunOptions {
             run.ael = false;
             masked.add(Feature.AE_LOCK.name());
         }
-        if (run.brs && !options.bracket3()) {
-            run.brs = false;
+        boolean bracketRequested = run.brs;
+        if (bracketRequested && !options.bracket3())
             masked.add(Feature.BRACKET_3.name());
-        }
         if (run.mf && !options.manualFocus()) {
             run.mf = false;
             masked.add("MANUAL_FOCUS");
@@ -68,13 +65,11 @@ public final class RunOptions {
             masked.add(Feature.BURST.name() + " (interval " + run.interval + " s)");
         }
         // A burst run is never auto-detected as bracketed; the box alone still asks for it.
-        BracketPlan bracket = run.interval == 0 && !run.brs ? BracketPlan.off()
+        BracketPlan bracket = run.interval == 0 && !bracketRequested ? BracketPlan.off()
                 : BracketPlan.resolve(caps, options.bracket3(), run.brs);
-        if (run.brs != bracket.active) {
-            run.brs = bracket.active;
-            if (bracket.unsupportedReason != null)
-                masked.add(Feature.BRACKET_3.name() + " (" + bracket.unsupportedReason + ")");
-        }
+        if (bracket.unsupportedReason != null)
+            masked.add(Feature.BRACKET_3.name() + " (" + bracket.unsupportedReason + ")");
+        run.brs = bracket.active;
         return new RunOptions(run.interval == 0,
                 options.silentShutter() ? Boolean.valueOf(run.silentShutter) : null,
                 run.ael, bracket, run.holyGrail,

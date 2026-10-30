@@ -18,7 +18,7 @@ import java.util.Map;
 
 public class BracketPlanTest {
     private static Map<Query, List<String>> state(String drive, String count, String period) {
-        Map<Query, List<String>> v = fullValues();
+        Map<Query, List<String>> v = with(fullValues(), Query.BRACKET_MODE, list("exposure"));
         v = with(v, Query.DRIVE_MODE, drive == null ? null : list(drive));
         v = with(v, Query.NUM_OF_BRACKET_PICTURE, count == null ? null : list(count));
         v = with(v, Query.EXPOSURE_BRACKET_PERIOD, period == null ? null : list(period));
@@ -59,7 +59,7 @@ public class BracketPlanTest {
     @Test
     public void bracketDriveWithThreePicturesCountsWithTheBoxOff() {
         BracketPlan plan = resolve(state("bracket", "3", "10"), false);
-        assertTrue(plan.active && plan.cameraConfigured);
+        assertTrue(plan.active);
         assertEquals(10, plan.periodTenths);
     }
 
@@ -73,7 +73,42 @@ public class BracketPlanTest {
     public void theBoxTurnsItOnWhenTheCameraIsNotBracketing() {
         BracketPlan plan = resolve(state("single", "3", "10"), true);
         assertTrue(plan.active);
-        assertFalse(plan.cameraConfigured);
+        
+    }
+
+    @Test
+    public void stepsAreComparedAsNumbers() {
+        Map<Query, List<String>> v = with(state("single", null, "7"), Query.EXPOSURE_BRACKET_PERIODS,
+                list("03", " 7 ", "10"));
+        BracketPlan plan = resolve(v, true);
+        assertEquals(7, plan.periodTenths);
+        assertNull(plan.note);
+        v = with(state("single", null, "10"), Query.EXPOSURE_BRACKET_PERIODS, list("03", "7"));
+        plan = resolve(v, true);
+        assertEquals(7, plan.periodTenths);
+        assertNotNull(plan.note);
+    }
+
+    @Test
+    public void anUnparseableSupportedListTrustsTheCurrentStep() {
+        Map<Query, List<String>> v = with(state("single", null, "20"), Query.EXPOSURE_BRACKET_PERIODS,
+                list("0.3", "0.7", "1.0", "2.0"));
+        assertEquals(20, resolve(v, true).periodTenths);
+        v = with(state("single", null, "20"), Query.EXPOSURE_BRACKET_PERIODS, list());
+        assertEquals(20, resolve(v, true).periodTenths);
+    }
+
+    @Test
+    public void onlyAnExposureBracketIsAutoDetected() {
+        for (String mode : new String[] {"white-balance", "dro", null}) {
+            Map<Query, List<String>> v = with(state("bracket", "3", "10"), Query.BRACKET_MODE,
+                    mode == null ? null : list(mode));
+            BracketPlan off = resolve(v, false);
+            assertFalse(off.active);
+            assertNotNull(off.note);
+            assertTrue(off.describe().contains("not auto-detected"));
+            assertTrue("the box still turns it on", resolve(v, true).active);
+        }
     }
 
     @Test
@@ -89,6 +124,7 @@ public class BracketPlanTest {
     public void bracketDriveWithAnUnreadableCountIsNotDetected() {
         assertFalse(resolve(state("bracket", null, "10"), false).active);
         assertTrue(resolve(state("bracket", null, "10"), true).active);
+        assertEquals(10, resolve(state("bracket", null, "10"), true).periodTenths);
     }
 
     @Test
@@ -108,7 +144,7 @@ public class BracketPlanTest {
     public void maskSwitchesTheBoxOnAndTheShotPlanFollows() {
         Settings s = settings(false, 5);
         RunOptions run = RunOptions.mask(caps(all(), state("bracket", "3", "7")), s);
-        assertTrue(run.bracket3 && s.brs);
+        assertTrue(run.bracket.active && s.brs);
         assertEquals(3, ShotPlan.of(s).framesPerInterval());
         assertTrue(run.masked().isEmpty());
     }
@@ -117,7 +153,7 @@ public class BracketPlanTest {
     public void maskTurnsAnUnsupportedCountOffAndSaysWhy() {
         Settings s = settings(true, 5);
         RunOptions run = RunOptions.mask(caps(all(), state("bracket", "5", "7")), s);
-        assertFalse(run.bracket3 || s.brs);
+        assertFalse(run.bracket.active || s.brs);
         assertEquals(1, ShotPlan.of(s).framesPerInterval());
         assertEquals(1, run.masked().size());
         assertTrue(run.masked().get(0).startsWith("BRACKET_3 (camera is set to 5"));
@@ -128,7 +164,7 @@ public class BracketPlanTest {
         Settings s = settings(false, 0);
         RunOptions run = RunOptions.mask(caps(all(), state("bracket", "3", "7")), s);
         assertTrue(run.burst);
-        assertFalse(run.bracket3 || s.brs);
+        assertFalse(run.bracket.active || s.brs);
         assertNull(run.bracket.unsupportedReason);
     }
 

@@ -70,4 +70,36 @@ public class BracketTimingTest {
         assertNull(t.warning());
         assertEquals(3, rig.only(FIRE).size() / 3);
     }
+
+    @Test
+    public void aShutterChangeMovesTheMeasuredEstimate() {
+        ShotPlan plan = new ShotPlan(5, 3, 0, 3);
+        BracketTiming t = new BracketTiming(plan);
+        t.setShutterMs(100);
+        SchedulerRig rig = new SchedulerRig(plan, CAPTURED).captureMs(700);
+        rig.run();
+        for (Scheduler.Decision d : rig.decisions)
+            t.onDecision(d);
+        assertEquals(2100, t.estimateMs());
+        assertNull(t.warning());
+        t.setShutterMs(1100);
+        assertEquals(2100 + 3 * 1000, t.estimateMs());
+        assertNotNull(t.warning());
+    }
+
+    @Test
+    public void aResumedRunKeepsTheMeasurementOnlyForTheSameBracketSize() {
+        ShotPlan plan = new ShotPlan(5, 3, 0, 3);
+        BracketTiming old = new BracketTiming(plan);
+        SchedulerRig rig = new SchedulerRig(plan, CAPTURED).captureMs(700);
+        rig.run();
+        for (Scheduler.Decision d : rig.decisions)
+            old.onDecision(d);
+        BracketTiming same = new BracketTiming(plan);
+        same.inherit(old);
+        assertTrue(same.isMeasured());
+        BracketTiming other = new BracketTiming(new ShotPlan(5, 3, 0, 1));
+        other.inherit(old);
+        assertFalse(other.isMeasured());
+    }
 }

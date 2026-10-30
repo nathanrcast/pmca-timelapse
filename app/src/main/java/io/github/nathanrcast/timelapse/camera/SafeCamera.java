@@ -49,6 +49,10 @@ public final class SafeCamera {
     // Set while the app holds the AF/MF toggle, so a run that never reached close() (crash, reboot, kill) can be
     // released by the next open().
     private static final String KEY_TOGGLE_ENGAGED = "toggleFocusEngagedByApp";
+    // The body's drive and bracket state from before configure() changed it, "drive|bracketMode|exposureBracketMode|
+    // count|period" with an empty field for a value that couldn't be read. Set while a run is active, so close() or,
+    // after a crash, the next open() puts the user's own state back.
+    private static final String KEY_ORIGINAL_DRIVE = "originalDriveState";
     // The settings-screen probe tries twice at most: once, then once more on the next onResume.
     private static final int PROBE_ATTEMPTS = 2;
 
@@ -136,8 +140,10 @@ public final class SafeCamera {
             Camera normal = cam.getNormalCamera();
             if (normal == null)
                 throw new IllegalStateException("getNormalCamera() returned null");
-            camera = new SafeCamera(cam, normal, readSession(m, cam),
-                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE));
+            SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            // Before the values are read: a run that never reached close() left its bracket drive on the body.
+            restoreDriveState(cam, normal, m.keySet(), prefs, "an earlier run");
+            camera = new SafeCamera(cam, normal, readSession(m, cam), prefs);
             cam.setShutterListener(new ShutterBridge(callback));
         } catch (Throwable t) {
             try {
@@ -235,9 +241,10 @@ public final class SafeCamera {
             params.setFocusMode(FOCUS_MODE_AUTO);
         }
 
+        saveDriveState();
         if (run.burst)
             configureBurst(modifier);
-        else
+        else if (!run.bracket.active)
             setDriveMode(modifier, ParametersModifier.DRIVE_MODE_SINGLE);
 
         if (run.silentShutter != null) {
@@ -256,7 +263,7 @@ public final class SafeCamera {
             }
         }
 
-        if (run.bracket3)
+        if (run.bracket.active)
             configureBracket(modifier, run.bracket);
 
         Result<Void> applied = apply(params);
@@ -266,20 +273,63 @@ public final class SafeCamera {
     }
 
     // The EV step and picture count are the camera's own menu choice (run.bracket, resolved from the values read at
-    // open()). A body already in bracket drive keeps its drive and count; the app fires one frame per press, so the
-    // exposure bracket mode is always single.
+    // open()). Every bracketed run sets the whole bracket state, so none of it depends on what the body held before:
+    // the app fires one frame per press, hence the exposure bracket mode is always single.
     private void configureBracket(ParametersModifier modifier, BracketPlan bracket) {
         Logger.info("SafeCamera: bracket: " + bracket.describe());
         try {
-            if (!bracket.cameraConfigured) {
-                modifier.setDriveMode(ParametersModifier.DRIVE_MODE_BRACKET);
-                modifier.setBracketMode(ParametersModifier.BRACKET_MODE_EXPOSURE);
-                modifier.setNumOfBracketPicture(BracketPlan.FRAMES);
-                modifier.setExposureBracketPeriod(bracket.periodTenths);
-            }
+            modifier.setDriveMode(ParametersModifier.DRIVE_MODE_BRACKET);
+            modifier.setBracketMode(ParametersModifier.BRACKET_MODE_EXPOSURE);
             modifier.setExposureBracketMode(ParametersModifier.EXPOSURE_BRACKET_MODE_SINGLE);
+            modifier.setNumOfBracketPicture(BracketPlan.FRAMES);
+            modifier.setExposureBracketPeriod(bracket.periodTenths);
         } catch (Throwable t) {
             failed("bracket", t);
+        }
+    }
+
+    private String first(Query q) {
+        List<String> v = caps.values(q);
+        return v == null || v.isEmpty() ? "" : v.get(0);
+    }
+
+    // commit(), not apply(): it must be on the card before a crash could follow.
+    private void saveDriveState() {
+        String state = first(Query.DRIVE_MODE) + "|" + first(Query.BRACKET_MODE) + "|"
+                + first(Query.EXPOSURE_BRACKET_MODE) + "|" + first(Query.NUM_OF_BRACKET_PICTURE) + "|"
+                + first(Query.EXPOSURE_BRACKET_PERIOD);
+        try {
+            prefs.edit().putString(KEY_ORIGINAL_DRIVE, state).commit();
+        } catch (Throwable t) {
+            failed("save " + KEY_ORIGINAL_DRIVE, t);
+        }
+    }
+
+    // Puts the saved drive and bracket state back (drive mode last) and clears it once setParameters took it.
+    private static void restoreDriveState(CameraEx cam, Camera normal, Set<SonyMethod> present,
+                                          SharedPreferences prefs, String origin) {
+        String saved = prefs.getString(KEY_ORIGINAL_DRIVE, null);
+        if (saved == null)
+            return;
+        String[] f = (saved + "|x").split("\\|");
+        try {
+            Camera.Parameters params = normal.getParameters();
+            ParametersModifier mod = cam.createParametersModifier(params);
+            if (f[1].length() > 0 && present.contains(SET_BRACKET_MODE))
+                mod.setBracketMode(f[1]);
+            if (f[2].length() > 0 && present.contains(SET_EXPOSURE_BRACKET_MODE))
+                mod.setExposureBracketMode(f[2]);
+            if (f[3].length() > 0 && present.contains(SET_NUM_OF_BRACKET_PICTURE))
+                mod.setNumOfBracketPicture(Integer.parseInt(f[3]));
+            if (f[4].length() > 0 && present.contains(SET_EXPOSURE_BRACKET_PERIOD))
+                mod.setExposureBracketPeriod(Integer.parseInt(f[4]));
+            if (f[0].length() > 0 && present.contains(SET_DRIVE_MODE))
+                mod.setDriveMode(f[0]);
+            normal.setParameters(params);
+            prefs.edit().remove(KEY_ORIGINAL_DRIVE).commit();
+            Logger.info("SafeCamera: restored drive state " + saved + " from " + origin);
+        } catch (Throwable t) {
+            Logger.error("SafeCamera: restore drive state: " + Result.failed("setParameters", t));
         }
     }
 
@@ -534,6 +584,7 @@ public final class SafeCamera {
         if (released)
             return;
         restoreFocus();
+        restoreDriveState(cameraEx, normal, methods().keySet(), prefs, "this run");
         if (reviewControl != null) {
             reviewControl = null;
             try {

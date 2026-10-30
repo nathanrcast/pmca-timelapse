@@ -273,8 +273,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     // The warning is estimated from the shutter time at start and replaced by the measured slot time after each
     // bracket. It only informs: the scheduler skips a slot that is still busy.
     private void startBracketTiming() {
+        BracketTiming previous = bracketTiming;
+        bracketTiming = new BracketTiming(plan);
+        bracketTiming.inherit(previous);
+        updateBracketShutter();
+    }
+
+    private void updateBracketShutter() {
         if (bracketTiming == null)
-            bracketTiming = new BracketTiming(plan);
+            return;
         Result<int[]> sp = safeCamera.shutterSpeed();
         if (sp.isOk() && sp.get()[1] > 0)
             bracketTiming.setShutterMs(sp.get()[0] * 1000L / sp.get()[1]);
@@ -307,7 +314,6 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         RunOptions run = RunOptions.mask(caps, settings);
         if (!run.masked().isEmpty())
             log("not on this body, off for this run: " + run.masked());
-        log("bracket: " + run.bracket.describe());
         if (!settings.holyGrail) {
             findViewById(R.id.divider2).setVisibility(View.GONE);
             findViewById(R.id.textView4).setVisibility(View.GONE);
@@ -346,6 +352,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             }
         }
         log("shutterSpeedIndex: " + shutterSpeedIndex);
+        updateBracketShutter();
     }
 
     private void updateISOLevel(){
