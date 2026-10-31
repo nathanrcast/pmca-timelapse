@@ -26,12 +26,12 @@ public class ModelProfileTest {
     }
 
     @Test
-    public void everyNexBodyHasNoSilentShutterAndAnUnreliableDial() {
+    public void everyNexBodyHasNoSilentShutterAndNoQuirks() {
         for (String model : new String[] {"NEX-5T", "NEX-5R", "NEX-6", "NEX-7", "NEX-3N"}) {
             ModelProfile p = ModelProfile.forModel(model);
             assertEquals(model, "NEX", p.name());
             assertEquals(model, EnumSet.of(Feature.SILENT_SHUTTER), p.disabled());
-            assertEquals(model, EnumSet.of(Quirk.DIAL_UNRELIABLE), p.quirks());
+            assertEquals(model, EnumSet.noneOf(Quirk.class), p.quirks());
         }
     }
 
@@ -66,7 +66,7 @@ public class ModelProfileTest {
         ProbedCapabilities nex = ReflectiveCapabilities.build("NEX-5T", all, silentShutterSupported(), true);
         assertFalse(nex.supports(Feature.SILENT_SHUTTER));
         assertTrue(nex.disabledByProfile(Feature.SILENT_SHUTTER));
-        assertTrue(nex.hasQuirk(Quirk.DIAL_UNRELIABLE));
+        assertFalse(nex.hasQuirk(Quirk.DIAL_UNRELIABLE));
         assertTrue(nex.supports(Feature.HOLY_GRAIL));
         assertEquals("NEX", nex.profile());
         assertFalse(ReflectiveCapabilities.build("NEX-5R", all, silentShutterSupported(), true)

@@ -19,10 +19,8 @@ public final class ModelProfile {
 
     private static final ModelProfile[] KNOWN = {
             // Every model starting with NEX-. No NEX body has a silent shutter (upstream issue 5 reports it for the
-            // NEX-5R/5T), and the NEX-5R wheel isn't read reliably there; the quirk only means input must also work
-            // with the arrow keys (T10), so it is safe for the whole family.
-            new ModelProfile("NEX", "NEX-", true, EnumSet.of(Feature.SILENT_SHUTTER),
-                    EnumSet.of(Quirk.DIAL_UNRELIABLE)),
+            // NEX-5R/5T; the NEX-5T CAPS confirms it). The NEX-5T wheel does report (KURU 522/523), so no dial quirk.
+            new ModelProfile("NEX", "NEX-", true, EnumSet.of(Feature.SILENT_SHUTTER), EnumSet.noneOf(Quirk.class)),
             new ModelProfile("ILCE-6500", "ILCE-6500", false, EnumSet.noneOf(Feature.class),
                     EnumSet.noneOf(Quirk.class)),
     };
