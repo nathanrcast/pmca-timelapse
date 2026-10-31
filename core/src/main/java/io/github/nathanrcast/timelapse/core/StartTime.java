@@ -5,7 +5,22 @@ package io.github.nathanrcast.timelapse.core;
 public final class StartTime {
     public static final long DAY_MS = 24L * 60 * 60 * 1000;
 
+    /** Pause between configure() and slot 0 when the run starts at once, so the first shot meets the drift gate. */
+    public static final long NOW_SETTLE_MS = 500;
+
     private StartTime() {}
+
+    /** How long after now slot 0 is due: the settle for NOW, the delay for DELAY, the wait to hh:mm for AT. */
+    public static long firstSlotOffsetMs(StartMode mode, long delayMs, long atWaitMs) {
+        switch (mode) {
+            case DELAY:
+                return delayMs;
+            case AT:
+                return atWaitMs;
+            default:
+                return NOW_SETTLE_MS;
+        }
+    }
 
     public static long msOfDay(int hour, int minute, int second, int millis) {
         return ((hour * 60L + minute) * 60 + second) * 1000 + millis;

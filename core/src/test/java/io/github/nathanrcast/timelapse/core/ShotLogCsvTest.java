@@ -51,12 +51,22 @@ public class ShotLogCsvTest {
 
     @Test
     public void runHeaderIsCommentLinesOnOneLineEach() {
-        String h = ShotLogCsv.runHeader("run1", "ILCE-6500", "fw\n1.0", "1.4.0 (5)", 1700000000000L, "{\"a\":1}",
-                "on");
-        assertEquals("# run_id=run1\n# model=ILCE-6500\n# firmware=fw 1.0\n# app_version=1.4.0 (5)\n"
-                + "# uptime_to_wall_ms=1700000000000\n# settings={\"a\":1}\n# lenr=on\n", h);
+        WallTime wall = new WallTime(1761899041000L, -6 * 3600000, WallTime.SOURCE_CAMERA);
+        String h = ShotLogCsv.runHeader("run1", "ILCE-6500", "fw\n1.0", "4.1.2/16", "1.4.0 (5)", wall,
+                1000000L, "{\"a\":1}", "on");
+        assertEquals("# run_id=run1\n# model=ILCE-6500\n# firmware=fw 1.0\n# android=4.1.2/16\n"
+                + "# app_version=1.4.0 (5)\n# clock=camera\n# utc_offset_min=-360\n"
+                + "# uptime_to_wall_ms=1761898041000\n# settings={\"a\":1}\n# lenr=on\n", h);
         for (String line : h.split("\n"))
             assertTrue(line.startsWith("# "));
+    }
+
+    @Test
+    public void runHeaderNamesTheSystemClockWhenTheCameraOneFailed() {
+        WallTime wall = new WallTime(5000L, 0, WallTime.SOURCE_SYSTEM);
+        String h = ShotLogCsv.runHeader("r", "m", "f", "2.3.7/10", "v", wall, 1000L, "{}", "off");
+        assertTrue(h, h.contains("# clock=system\n"));
+        assertTrue(h, h.contains("# uptime_to_wall_ms=4000\n"));
     }
 
     @Test

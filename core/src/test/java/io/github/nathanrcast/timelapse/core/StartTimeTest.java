@@ -50,4 +50,22 @@ public class StartTimeTest {
         assertEquals(StartMode.NOW, StartMode.fromOrdinal(7, StartMode.NOW));
         assertEquals(StartMode.DELAY, StartMode.fromOrdinal(-1, StartMode.DELAY));
     }
+
+    @Test
+    public void nowSettlesBeforeSlotZeroAndTheOtherModesDoNot() {
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.NOW, 0, 0));
+        assertEquals(60000, StartTime.firstSlotOffsetMs(StartMode.DELAY, 60000, 99));
+        assertEquals(99, StartTime.firstSlotOffsetMs(StartMode.AT, 60000, 99));
+    }
+
+    @Test
+    public void theSettleMovesSlotZeroNotTheLaterDeadlines() {
+        FakeClock clock = new FakeClock(10000);
+        Settings s = new Settings();
+        Scheduler sched = new Scheduler(ShotPlan.of(s), clock, Scheduler.StopOn.CAPTURED);
+        sched.start(clock.nowMs() + StartTime.firstSlotOffsetMs(StartMode.NOW, 0, 0));
+        assertEquals(10500, sched.nextWakeMs());
+        clock.set(10500);
+        assertEquals(Scheduler.Action.FIRE, sched.onTimer().action);
+    }
 }

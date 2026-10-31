@@ -1,6 +1,7 @@
 package io.github.nathanrcast.timelapse;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -203,12 +204,14 @@ public class CapsFormatTest {
     }
 
     @Test
-    public void fileSafeModelNames() {
-        assertEquals("ILCE-6500", CapsFormat.fileSafe("ILCE-6500"));
-        assertEquals("NEX-5T", CapsFormat.fileSafe(" NEX-5T "));
-        assertEquals("a_b_c", CapsFormat.fileSafe("a b/c"));
-        assertEquals("unknown", CapsFormat.fileSafe(null));
-        assertEquals("unknown", CapsFormat.fileSafe(""));
+    public void capsFileNameIsUpperCaseDashAndAlphanumericOnly() {
+        assertEquals("CAPS-ILCE-6500.TXT", CapsFormat.capsFileName("ILCE-6500"));
+        assertEquals("CAPS-NEX-5T.TXT", CapsFormat.capsFileName(" NEX-5T "));
+        assertEquals("CAPS-A-B-C.TXT", CapsFormat.capsFileName("a b/c"));
+        assertEquals("CAPS-ILCE-7M3.TXT", CapsFormat.capsFileName("ilce-7m3"));
+        assertEquals("CAPS-UNKNOWN.TXT", CapsFormat.capsFileName(null));
+        assertEquals("CAPS-UNKNOWN.TXT", CapsFormat.capsFileName(""));
+        assertTrue(CapsFormat.capsFileName("a.b_c").matches("CAPS-[A-Z0-9-]+\\.TXT"));
     }
 
     @Test

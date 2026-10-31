@@ -10,13 +10,11 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
-import java.util.Date;
-import java.util.Locale;
 
 import io.github.nathanrcast.timelapse.core.ShotLogCsv;
 import io.github.nathanrcast.timelapse.core.ShotRecord;
+import io.github.nathanrcast.timelapse.core.WallTime;
 
 /**
  * Appends one row per scheduler decision to TIMELPS/LOG.CSV. Callers only post to a background
@@ -33,7 +31,6 @@ final class ShotLog {
     static final int MAX_PENDING = 50;
     static final int MAX_REOPENS = 3;
     static final int FREE_SPACE_EVERY_ROWS = 20;
-    private static final String RUN_ID_FORMAT = "yyyyMMdd-HHmmss";
 
     final String runId;
 
@@ -51,13 +48,13 @@ final class ShotLog {
     private long freeMb = ShotRecord.NONE;
     private int rowsSinceFreeSpace = FREE_SPACE_EVERY_ROWS;
 
-    ShotLog(Context context, String model, String firmware, String appVersion, long uptimeNowMs,
+    ShotLog(Context context, DeviceId device, String appVersion, WallTime wall, long uptimeNowMs,
             String settingsJson, String lenr) {
         this.context = context.getApplicationContext();
-        long wallNow = System.currentTimeMillis();
-        runId = new SimpleDateFormat(RUN_ID_FORMAT, Locale.US).format(new Date(wallNow));
+        runId = wall.runId();
         file = new File(Environment.getExternalStorageDirectory(), "TIMELPS/LOG.CSV");
-        header = ShotLogCsv.runHeader(runId, model, firmware, appVersion, wallNow - uptimeNowMs, settingsJson, lenr);
+        header = ShotLogCsv.runHeader(runId, device.model, device.firmware, device.android, appVersion, wall,
+                uptimeNowMs, settingsJson, lenr);
         thread = new HandlerThread("ShotLog");
         thread.start();
         handler = new Handler(thread.getLooper());

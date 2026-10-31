@@ -67,18 +67,23 @@ public final class ShotLogCsv {
     }
 
     /**
-     * The {@code #} lines that open a run, each ending in a newline. {@code uptimeToWallMs} is
-     * wall-clock ms minus uptime ms, so wall = uptime + offset. {@code lenr} is the long-exposure NR state
-     * the run found ({@link LenrGuard#headerValue}).
+     * The {@code #} lines that open a run, each ending in a newline. {@code wall} is the run-start reading;
+     * {@code uptime_to_wall_ms} is its epoch ms minus uptime ms, so wall = uptime + offset. {@code clock} says
+     * which source that was ({@code camera} or {@code system}) and {@code utc_offset_min} the zone it was read in.
+     * {@code android} is {@code release/sdk}. {@code lenr} is the long-exposure NR state the run found
+     * ({@link LenrGuard#headerValue}).
      */
-    public static String runHeader(String runId, String model, String firmware, String appVersion,
-                                   long uptimeToWallMs, String settingsJson, String lenr) {
+    public static String runHeader(String runId, String model, String firmware, String android, String appVersion,
+                                   WallTime wall, long uptimeNowMs, String settingsJson, String lenr) {
         return new StringBuilder()
                 .append("# run_id=").append(comment(runId)).append('\n')
                 .append("# model=").append(comment(model)).append('\n')
                 .append("# firmware=").append(comment(firmware)).append('\n')
+                .append("# android=").append(comment(android)).append('\n')
                 .append("# app_version=").append(comment(appVersion)).append('\n')
-                .append("# uptime_to_wall_ms=").append(uptimeToWallMs).append('\n')
+                .append("# clock=").append(comment(wall.source)).append('\n')
+                .append("# utc_offset_min=").append(wall.utcOffsetMinutes()).append('\n')
+                .append("# uptime_to_wall_ms=").append(wall.epochMs - uptimeNowMs).append('\n')
                 .append("# settings=").append(comment(settingsJson)).append('\n')
                 .append("# lenr=").append(comment(lenr)).append('\n')
                 .toString();

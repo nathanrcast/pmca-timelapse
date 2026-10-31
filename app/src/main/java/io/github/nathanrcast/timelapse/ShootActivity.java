@@ -20,12 +20,15 @@ import com.sony.scalar.sysutil.ScalarInput;
 
 import io.github.nathanrcast.timelapse.camera.Result;
 import io.github.nathanrcast.timelapse.camera.SafeCamera;
+import io.github.nathanrcast.timelapse.core.camera.BracketPlan;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
+import io.github.nathanrcast.timelapse.core.camera.DriveReadback;
 import io.github.nathanrcast.timelapse.core.camera.RunOptions;
 
 import io.github.nathanrcast.timelapse.core.AwakeGuard;
 import io.github.nathanrcast.timelapse.core.BracketTiming;
 import io.github.nathanrcast.timelapse.core.Clock;
+import io.github.nathanrcast.timelapse.core.ContinuousBracket;
 import io.github.nathanrcast.timelapse.core.LenrGuard;
 import io.github.nathanrcast.timelapse.core.StartMode;
 import io.github.nathanrcast.timelapse.core.StartTime;
@@ -38,13 +41,13 @@ import io.github.nathanrcast.timelapse.core.ShotLogCsv;
 import io.github.nathanrcast.timelapse.core.ShotRecord;
 import io.github.nathanrcast.timelapse.core.ShotPlan;
 import io.github.nathanrcast.timelapse.core.Util;
+import io.github.nathanrcast.timelapse.core.WallTime;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 
 public class ShootActivity extends BaseActivity implements SurfaceHolder.Callback, SafeCamera.ShutterCallback
 {
@@ -57,7 +60,13 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
     // LOG.CSV: one row per scheduler decision, written on a background thread.
     private ShotLog shotLog;
-    private final SimpleDateFormat logTime = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
+
+    // onShutter statuses seen this session: OK, CANCELED, ERROR (CameraEx.ShutterListener.STATUS_*), anything else.
+    private final AtomicIntegerArray shutterStatuses = new AtomicIntegerArray(4);
+    // Non-null when the body only has continuous bracketing: one press shoots all frames, and onShutter reports each.
+    private volatile ContinuousBracket continuous;
+    private long bracketShutterMs = -1;
+    private String driveNote;
 
     private TextView tvCount, tvBattery, tvRemaining, tvStatus, tvHud;
     private CardSpace cardSpace;
@@ -282,16 +291,19 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         int[] shutter = readShutter();
         applyLenrGuard(run, shutterMs(shutter));
         cameraSurfaceHolder.addCallback(this);
+        continuous = run.bracket.continuous() ? new ContinuousBracket(BracketPlan.FRAMES) : null;
         safeCamera.configure(run);
+        checkDriveReadback(run);
         startBracketTiming(shutter);
 
         // Built after applyCapabilities, from the masked plan (BRC3 or burst may be off on this body).
         // A resumed run keeps its slots: the scheduler shifts every remaining deadline by the pause.
         if (scheduler == null) {
             scheduler = new Scheduler(plan, clock, Scheduler.StopOn.CAPTURED);
+            WallTime wall = Clocks.wallNow();
             scheduler.start(clock.nowMs() + startDelayMs());
-            runStartWallMs = System.currentTimeMillis();
-            shotLog = new ShotLog(this, Build.MODEL, Build.VERSION.INCREMENTAL, appVersion(), clock.nowMs(),
+            runStartWallMs = wall.mtimeFloorMs(TimeZone.getDefault().getOffset(wall.epochMs));
+            shotLog = new ShotLog(this, DeviceId.read(), appVersion(), wall, clock.nowMs(),
                     ShotLogCsv.settingsJson(settings), LenrGuard.headerValue(lenrAtStart));
         } else {
             // A start fixed on the wall clock (AT) must not slip by the time spent paused.
@@ -325,21 +337,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         updateScreen();
     }
 
-    // How long after now the first slot is due: nothing, the delay setting, or the next hh:mm on the camera clock.
+    // How long after now slot 0 is due: a settle after configure() for NOW, the delay setting, or the next hh:mm on
+    // the camera clock.
     private long startDelayMs() {
-        switch (settings.startMode) {
-            case DELAY:
-                return plan.delayMs();
-            case AT:
-                Calendar c = Clocks.wallCalendar();
-                long wait = StartTime.msUntilNext(StartTime.msOfDay(c.get(Calendar.HOUR_OF_DAY),
-                        c.get(Calendar.MINUTE), c.get(Calendar.SECOND), c.get(Calendar.MILLISECOND)),
-                        settings.atHour, settings.atMinute);
-                log("start at " + StartTime.format(settings.atHour, settings.atMinute) + " in " + wait / 1000 + " s");
-                return wait;
-            default:
-                return 0;
+        long atWait = 0;
+        if (settings.startMode == StartMode.AT) {
+            atWait = StartTime.msUntilNext(Clocks.wallMsOfDay(), settings.atHour, settings.atMinute);
+            log("start at " + StartTime.format(settings.atHour, settings.atMinute) + " in " + atWait / 1000 + " s");
         }
+        return StartTime.firstSlotOffsetMs(settings.startMode, plan.delayMs(), atWait);
     }
 
     // The shutter time in ms, read once per resume for the LENR guard and the bracket timing; -1 if unreadable.
@@ -417,8 +423,10 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     private void updateBracketShutter(int[] sp) {
         if (bracketTiming == null)
             return;
-        if (sp != null && sp[1] > 0)
-            bracketTiming.setShutterMs(Util.shutterMs(sp[0], sp[1]));
+        if (sp != null && sp[1] > 0) {
+            bracketShutterMs = Util.shutterMs(sp[0], sp[1]);
+            bracketTiming.setShutterMs(bracketShutterMs);
+        }
         showBracketWarning();
     }
 
@@ -438,12 +446,44 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
     private void showStatus() {
-        String text = lenrNote == null ? bracketWarning : bracketWarning == null ? lenrNote : lenrNote + "\n" + bracketWarning;
-        if (text == null) {
+        StringBuilder text = new StringBuilder();
+        String[] notes = {lenrNote, driveNote, bracketWarning};
+        for (String note : notes) {
+            if (note == null)
+                continue;
+            if (text.length() > 0)
+                text.append('\n');
+            text.append(note);
+        }
+        if (text.length() == 0) {
             tvStatus.setVisibility(View.GONE);
         } else {
-            tvStatus.setText(text);
+            tvStatus.setText(text.toString());
             tvStatus.setVisibility(View.VISIBLE);
+        }
+    }
+
+    // Reads the drive and bracket state back after configure(): setParameters returns normally even when the body
+    // ignores a value. A body that kept another drive mode while bracketing was asked for runs unbracketed.
+    private void checkDriveReadback(RunOptions run) {
+        DriveReadback rb = safeCamera.driveReadback();
+        if (rb == null) {
+            log("drive after configure: unreadable");
+            return;
+        }
+        log("drive after configure: " + rb.describe() + (run.bracket.active ? " (asked for bracket, "
+                + run.bracket.exposureMode + ", period " + run.bracket.periodTenths + ")" : ""));
+        driveNote = null;
+        if (!run.bracket.active || !rb.bracketRefused())
+            return;
+        driveNote = Boolean.TRUE.equals(run.silentShutter) ? "Bracketing unavailable with silent shutter"
+                : "Bracketing unavailable: camera stayed in " + rb.drive + " drive";
+        log("warning: " + driveNote + "; run is unbracketed");
+        continuous = null;
+        if (scheduler == null) {
+            settings.brs = false;
+            plan = ShotPlan.of(settings);
+            burstShooting = plan.isBurst();
         }
     }
 
@@ -534,7 +574,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             return;
         stopping = true;
         String summary = scheduler == null ? "Stopped" : "Stopped: " + HudModel.summary(scheduler, clock.nowMs());
-        log(summary);
+        log(summary + " (" + shutterSummary() + ")");
         teardown();
         Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
         finish();
@@ -629,6 +669,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (controller != null && settings.holyGrail && decision.frame == 0)
             holyGrailSlot(decision.slot);
 
+        ContinuousBracket cont = continuous;
+        if (cont != null && decision.frame > 0) {
+            // The camera is already shooting this slot's remaining frames from the first press.
+            shotCount++;
+            updateScreen();
+            return true;
+        }
+        if (cont != null)
+            cont.startSlot();
         Result<Void> taken = safeCamera.takePicture();
         if (!taken.isOk()) {
             log("takePicture failed: " + taken);
@@ -685,7 +734,15 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     public void onShutter(int status) {
         if (tornDown)
             return;
-        if(!burstShooting) {
+        shutterStatuses.incrementAndGet(status >= 0 && status < 3 ? status : 3);
+        ContinuousBracket cont = continuous;
+        int n = cont == null ? 0 : cont.onCallback();
+        if (cont != null)
+            log("onShutter status=" + status + " callback " + n + " of " + BracketPlan.FRAMES);
+        else if (status != 0)
+            log("shutter_status=" + status);
+        // A continuous bracket is one press: cancelling after the first callback would end the other frames.
+        if (!burstShooting && (cont == null || cont.complete())) {
             safeCamera.cancelTakePicture();
 
             //camera.startPreview();
@@ -693,9 +750,33 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         handler.post(shutterRunnable);
     }
 
+    // "onShutter ok=N canceled=N error=N" for the run summary line.
+    private String shutterSummary() {
+        return "onShutter ok=" + shutterStatuses.get(0) + " canceled=" + shutterStatuses.get(1) + " error="
+                + shutterStatuses.get(2) + (shutterStatuses.get(3) > 0 ? " other=" + shutterStatuses.get(3) : "");
+    }
+
+    // The body reported fewer callbacks than frames for a continuous bracket: close the slot with what it gave.
+    private final Runnable continuousTimeoutRunnable = new Runnable() {
+        @Override
+        public void run() {
+            ContinuousBracket cont = continuous;
+            if (tornDown || cont == null || !cont.waiting())
+                return;
+            int missing = cont.missing();
+            log("continuous bracket: " + (BracketPlan.FRAMES - missing) + " of " + BracketPlan.FRAMES
+                    + " callbacks, closing the slot");
+            safeCamera.cancelTakePicture();
+            cont.abandon();
+            for (int i = 0; i < missing && !tornDown; i++)
+                frameCaptured();
+        }
+    };
+
     private void frameCaptured() {
         if (tornDown)
             return;
+        armContinuousTimeout();
         Scheduler.Decision decision = scheduler.onFrameCaptured();
         trackBracket(decision);
         if (decision.action == Scheduler.Action.FIRE) {
@@ -710,6 +791,13 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 showReview();
         }
         logDecision(decision);
+    }
+
+    private void armContinuousTimeout() {
+        ContinuousBracket cont = continuous;
+        handler.removeCallbacks(continuousTimeoutRunnable);
+        if (cont != null && cont.waiting())
+            handler.postDelayed(continuousTimeoutRunnable, ContinuousBracket.timeoutMs(bracketShutterMs, cont.missing()));
     }
 
     // Takes the frame and logs its FIRE row; if the camera refuses it at once, closes the slot as LOST right away
@@ -823,6 +911,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         if (finishing)
             return;
         finishing = true;
+        log("Done: " + HudModel.summary(scheduler, clock.nowMs()) + " (" + shutterSummary() + ")");
         handler.removeCallbacks(tickRunnable);
         handler.removeCallbacks(burstPollRunnable);
         handler.removeCallbacks(wakeOffRunnable);
@@ -925,7 +1014,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
 
 
     private void log(String s) {
-        Logger.info(logTime.format(new Date()) + " " + s);
+        Logger.info(Clocks.wallNow().format("HH:mm:ss.SSS") + " " + s);
     }
 
     private void dumpList(List list, String name) {
