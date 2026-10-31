@@ -2,7 +2,8 @@ package io.github.nathanrcast.timelapse.core;
 
 /**
  * The primary clock (camera RTC) with a fallback (system) for when the primary throws or returns null. The switch is
- * reported once, through {@link Notice}, and the fallback then serves that call only: the primary is tried again.
+ * reported once, through {@link Notice}, and the clock then stays on the fallback for good: a run never mixes camera
+ * and boot-based times, and a broken primary costs one failed call, not one per log line.
  */
 public final class FallbackWallClock implements WallClock {
     public interface Notice {
@@ -12,7 +13,7 @@ public final class FallbackWallClock implements WallClock {
     private final WallClock primary;
     private final WallClock fallback;
     private final Notice notice;
-    private boolean reported;
+    private boolean latched;
 
     public FallbackWallClock(WallClock primary, WallClock fallback, Notice notice) {
         this.primary = primary;
@@ -22,19 +23,17 @@ public final class FallbackWallClock implements WallClock {
 
     @Override
     public synchronized WallTime now() {
-        Throwable cause;
-        try {
-            WallTime t = primary.now();
-            if (t != null)
-                return t;
-            cause = new IllegalStateException("camera clock returned null");
-        } catch (RuntimeException e) {
-            cause = e;
-        } catch (LinkageError e) {
-            cause = e;
-        }
-        if (!reported) {
-            reported = true;
+        if (!latched) {
+            Throwable cause;
+            try {
+                WallTime t = primary.now();
+                if (t != null)
+                    return t;
+                cause = new IllegalStateException("camera clock returned null");
+            } catch (Throwable e) {
+                cause = e;
+            }
+            latched = true;
             if (notice != null)
                 notice.fellBack(cause);
         }

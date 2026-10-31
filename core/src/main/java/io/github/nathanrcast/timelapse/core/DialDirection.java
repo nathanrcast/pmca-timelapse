@@ -11,8 +11,10 @@ public final class DialDirection {
 
     private DialDirection() {}
 
-    /** +n for clockwise, -n for counter-clockwise; n is 1 unless |status| exceeds one notch. */
+    /** +n for clockwise, -n for counter-clockwise; n is 1 unless |status| exceeds one notch; 0 for status 0. */
     public static int steps(boolean clockwise, int status) {
+        if (status == 0)
+            return 0;
         int magnitude = Math.abs(status);
         int n = magnitude > NOTCH ? magnitude / NOTCH : 1;
         return clockwise ? n : -n;

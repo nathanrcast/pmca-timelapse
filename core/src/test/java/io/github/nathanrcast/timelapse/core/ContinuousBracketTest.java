@@ -44,6 +44,31 @@ public class ContinuousBracketTest {
     }
 
     @Test
+    public void callbacksAfterAnAbandonedSlotAreStraysNotTheNextSlots() {
+        ContinuousBracket b = new ContinuousBracket(3);
+        assertEquals(1, b.startSlot());
+        b.onCallback();
+        b.abandon();
+        assertEquals(0, b.onCallback());
+        assertEquals(0, b.onCallback());
+        assertEquals(2, b.strays());
+        assertEquals(2, b.startSlot());
+        assertEquals(1, b.onCallback());
+        assertEquals(2, b.missing());
+    }
+
+    @Test
+    public void aCallbackAfterACompleteSlotIsAStray() {
+        ContinuousBracket b = new ContinuousBracket(3);
+        b.startSlot();
+        b.onCallback();
+        b.onCallback();
+        b.onCallback();
+        assertEquals(0, b.onCallback());
+        assertEquals(1, b.strays());
+    }
+
+    @Test
     public void aNewSlotResetsTheCount() {
         ContinuousBracket b = new ContinuousBracket(3);
         b.startSlot();

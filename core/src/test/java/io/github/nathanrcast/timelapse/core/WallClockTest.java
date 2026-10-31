@@ -88,6 +88,36 @@ public class WallClockTest {
     }
 
     @Test
+    public void onceFallenBackItStaysOnTheSystemClock() {
+        final int[] calls = {0};
+        WallClock flaky = new WallClock() {
+            @Override
+            public WallTime now() {
+                if (calls[0]++ == 0)
+                    throw new IllegalStateException("once");
+                return new WallTime(EPOCH, OFFSET, WallTime.SOURCE_CAMERA);
+            }
+        };
+        WallTime sys = new WallTime(5000, 0, WallTime.SOURCE_SYSTEM);
+        FallbackWallClock c = new FallbackWallClock(flaky, fixed(sys), null);
+        assertSame(sys, c.now());
+        assertSame(sys, c.now());
+        assertEquals(1, calls[0]);
+    }
+
+    @Test
+    public void anErrorFromTheFrameworkIsCaughtToo() {
+        WallClock bad = new WallClock() {
+            @Override
+            public WallTime now() {
+                throw new AssertionError("firmware");
+            }
+        };
+        WallTime sys = new WallTime(5000, 0, WallTime.SOURCE_SYSTEM);
+        assertSame(sys, new FallbackWallClock(bad, fixed(sys), null).now());
+    }
+
+    @Test
     public void aNullReadingFallsBackToo() {
         WallTime sys = new WallTime(5000, 0, WallTime.SOURCE_SYSTEM);
         FallbackWallClock c = new FallbackWallClock(fixed(null), fixed(sys), null);

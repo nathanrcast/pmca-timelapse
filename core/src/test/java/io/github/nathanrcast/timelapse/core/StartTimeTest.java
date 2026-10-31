@@ -55,7 +55,16 @@ public class StartTimeTest {
     public void nowSettlesBeforeSlotZeroAndTheOtherModesDoNot() {
         assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.NOW, 0, 0));
         assertEquals(60000, StartTime.firstSlotOffsetMs(StartMode.DELAY, 60000, 99));
-        assertEquals(99, StartTime.firstSlotOffsetMs(StartMode.AT, 60000, 99));
+        assertEquals(90000, StartTime.firstSlotOffsetMs(StartMode.AT, 60000, 90000));
+    }
+
+    @Test
+    public void everyModeSettlesWhenSlotZeroWouldLandTooSoon() {
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.DELAY, 0, 0));
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.AT, 0, 0));
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.AT, 0, 120));
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.AT, 0, 500));
+        assertEquals(501, StartTime.firstSlotOffsetMs(StartMode.AT, 0, 501));
     }
 
     @Test

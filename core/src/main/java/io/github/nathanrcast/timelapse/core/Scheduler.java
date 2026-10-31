@@ -285,6 +285,16 @@ public final class Scheduler {
     }
 
     /**
+     * Changes the frames per slot (a bracket the body refused): a slot that fires from now on has that many frames.
+     * Deadlines are unchanged. Ignored for bursts and before start.
+     */
+    public void setFramesPerInterval(int frames) {
+        if (!started || plan.isBurst() || frames < 1 || frames == plan.framesPerInterval())
+            return;
+        plan = plan.withFramesPerInterval(frames);
+    }
+
+    /**
      * When to stop showing the review of the last capture: the next deadline or
      * {@code maxReviewMs} from now, whichever is first. -1 if the next deadline has already passed.
      */

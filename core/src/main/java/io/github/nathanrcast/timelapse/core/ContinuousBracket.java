@@ -9,19 +9,40 @@ package io.github.nathanrcast.timelapse.core;
 public final class ContinuousBracket {
     private final int frames;
     private int received;
+    private int generation;
+    private int strays;
 
     public ContinuousBracket(int frames) {
         this.frames = frames;
     }
 
-    /** A new slot is firing. */
-    public synchronized void startSlot() {
+    /** A new slot is firing; returns its generation (1-based). */
+    public synchronized int startSlot() {
         received = 0;
+        return ++generation;
     }
 
-    /** Counts one callback; returns the number received in this slot so far (1-based). */
+    /** The generation of the slot that is firing or was last fired. */
+    public synchronized int generation() {
+        return generation;
+    }
+
+    /**
+     * Counts one callback and returns the number received in this slot so far (1-based), or 0 for a stray: a
+     * callback after the slot already completed or was abandoned (a CANCELED one from cancelTakePicture, or frames
+     * the body reported late). Strays are counted and must not reach the scheduler.
+     */
     public synchronized int onCallback() {
+        if (received >= frames) {
+            strays++;
+            return 0;
+        }
         return ++received;
+    }
+
+    /** Callbacks ignored as strays so far. */
+    public synchronized int strays() {
+        return strays;
     }
 
     /** True when the callback just counted was the last one expected. */
@@ -34,7 +55,10 @@ public final class ContinuousBracket {
         return received > 0 && received < frames;
     }
 
-    /** Gives up on the callbacks still missing, so the slot counts as complete and no timeout is re-armed. */
+    /**
+     * Gives up on the callbacks still missing: the slot counts as complete, no timeout is re-armed, and callbacks
+     * that still arrive before the next {@link #startSlot()} are strays.
+     */
     public synchronized void abandon() {
         received = frames;
     }

@@ -28,8 +28,8 @@ public class DialDirectionTest {
     }
 
     @Test
-    public void aZeroOrUnreadableStatusStillStepsOnce() {
-        assertEquals(1, DialDirection.steps(true, 0));
-        assertEquals(-1, DialDirection.steps(false, 0));
+    public void aZeroStatusMovesNothing() {
+        assertEquals(0, DialDirection.steps(true, 0));
+        assertEquals(0, DialDirection.steps(false, 0));
     }
 }

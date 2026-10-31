@@ -10,16 +10,23 @@ public final class StartTime {
 
     private StartTime() {}
 
-    /** How long after now slot 0 is due: the settle for NOW, the delay for DELAY, the wait to hh:mm for AT. */
+    /**
+     * How long after now slot 0 is due: the delay or the wait to hh:mm, but never less than the settle, so slot 0
+     * never lands right after configure() in any start mode.
+     */
     public static long firstSlotOffsetMs(StartMode mode, long delayMs, long atWaitMs) {
+        long wait;
         switch (mode) {
             case DELAY:
-                return delayMs;
+                wait = delayMs;
+                break;
             case AT:
-                return atWaitMs;
+                wait = atWaitMs;
+                break;
             default:
-                return NOW_SETTLE_MS;
+                wait = 0;
         }
+        return Math.max(NOW_SETTLE_MS, wait);
     }
 
     public static long msOfDay(int hour, int minute, int second, int millis) {
