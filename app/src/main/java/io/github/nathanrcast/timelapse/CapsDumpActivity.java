@@ -373,13 +373,7 @@ public class CapsDumpActivity extends BaseActivity {
     // Worker thread from here on.
 
     private void probe() {
-        String model = null;
-        try {
-            model = DeviceInfo.getInstance().getModel();
-        } catch (Throwable ignored) {
-        }
-        if (model == null || model.length() == 0)
-            model = Build.MODEL;
+        String model = DeviceId.read().model;
 
         String openError = openCaps(CapsFormat.capsFileName(model));
         if (caps == null) {

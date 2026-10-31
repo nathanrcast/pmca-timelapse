@@ -11,7 +11,8 @@ A frame's time is its EXIF DateTimeOriginal when the file has one (JPEG APP1 or 
 parser), else its mtime. EXIF is the camera's own local clock time, so it is free of the host's time zone; it is
 matched against the log's wall times shifted by the run's `# utc_offset_min` header. mtimes are what exFAT local time
 looks like to the host's zone (often hours off): they must survive the copy off the card (cp -p, rsync -t), and
---offset-s corrects a time-zone or clock mismatch. --no-exif forces mtime; --include-raw also lists .arw files.
+--offset-s corrects a time-zone or clock mismatch. One run uses one time base: if any candidate frame (one whose mtime
+is within a day of the run) has no readable EXIF, mtime is used for the whole run and a warning says so. --no-exif forces mtime; --include-raw also lists .arw files.
 Prints absolute paths, one per line, ordered by (folder, file name). Exit 2 on bad input, 3 when nothing matches.
 """
 import argparse
@@ -142,18 +143,40 @@ def frames_for_run(files, run, window_s=2.0, offset_s=0.0, mtime=os.path.getmtim
     return [p for p in files if lo <= mtime(p) <= hi], fires
 
 
-def time_fn(run, use_exif=True):
-    """Frame-time function for one run: EXIF (converted to the log's UTC base), else mtime."""
-    utc_offset_s = 60 * (analyze_log.parse_int(run.meta.get("utc_offset_min")) or 0)
+CANDIDATE_SLACK_S = 26 * 3600  # any time-zone offset between the card's local time and the host's
 
-    def frame_time(path):
-        if use_exif:
-            t = exif_time(path)
-            if t is not None:
-                return t - utc_offset_s
-        return os.path.getmtime(path)
 
-    return frame_time
+def time_fn(files, run, window_s=2.0, offset_s=0.0, use_exif=True, warn=None):
+    """Frame-time function for one run, on a single time base.
+
+    EXIF (converted to the log's UTC base) when every candidate frame has it, else mtime for all of them."""
+    if use_exif:
+        try:
+            lo, hi, _fires = run_span(run, window_s, offset_s)
+        except ValueError:
+            lo = hi = None
+        if lo is not None:
+            near = []
+            for p in files:
+                try:
+                    m = os.path.getmtime(p)
+                except OSError:
+                    continue
+                if lo - CANDIDATE_SLACK_S <= m <= hi + CANDIDATE_SLACK_S:
+                    near.append(p)
+            exif = {p: exif_time(p) for p in near}
+            if near and all(t is not None for t in exif.values()):
+                utc_offset_s = 60 * (analyze_log.parse_int(run.meta.get("utc_offset_min")) or 0)
+                return lambda path: (exif[path] if path in exif else exif_time(path) or 0) - utc_offset_s
+            if near and warn and any(t is not None for t in exif.values()):
+                missing = sum(1 for t in exif.values() if t is None)
+                warn("%d of %d candidate frames have no EXIF DateTimeOriginal; matching the whole run on file "
+                     "mtime (use --offset-s for a host time-zone difference)" % (missing, len(near)))
+    return os.path.getmtime
+
+
+def warn(msg):
+    print("frames_for_run: " + msg, file=sys.stderr)
 
 
 def main(argv=None):
@@ -191,7 +214,8 @@ def main(argv=None):
             return 2
         try:
             files, fires = frames_for_run(files, chosen[0], args.window_s, args.offset_s,
-                                       time_fn(chosen[0], not args.no_exif))
+                                       time_fn(files, chosen[0], args.window_s, args.offset_s,
+                                                not args.no_exif, warn))
         except ValueError as e:
             print("frames_for_run: %s" % e, file=sys.stderr)
             return 2

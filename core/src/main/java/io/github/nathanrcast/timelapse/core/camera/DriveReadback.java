@@ -8,6 +8,11 @@ import java.util.Map;
  * bracket drive is only knowable from here: setParameters returns normally even when the body ignores a value.
  */
 public final class DriveReadback {
+    /** The only queries the read-back needs. */
+    public static final java.util.Set<Query> QUERIES = java.util.Collections.unmodifiableSet(java.util.EnumSet.of(
+            Query.DRIVE_MODE, Query.BRACKET_MODE, Query.EXPOSURE_BRACKET_MODE, Query.NUM_OF_BRACKET_PICTURE,
+            Query.EXPOSURE_BRACKET_PERIOD));
+
     public final String drive;
     public final String bracketMode;
     public final String exposureBracketMode;

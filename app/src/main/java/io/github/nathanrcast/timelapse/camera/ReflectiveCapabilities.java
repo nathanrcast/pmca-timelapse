@@ -92,8 +92,16 @@ public final class ReflectiveCapabilities {
     // throws is left out (unknown). focusModes is Camera.Parameters.getSupportedFocusModes(), read by the caller.
     public static Map<Query, List<String>> readValues(Map<SonyMethod, Method> methods, Object modifier,
                                                       Collection<?> focusModes) {
+        return readValues(methods, modifier, focusModes, null);
+    }
+
+    // As above, restricted to the given queries when `only` is not null.
+    public static Map<Query, List<String>> readValues(Map<SonyMethod, Method> methods, Object modifier,
+                                                      Collection<?> focusModes, Collection<Query> only) {
         Map<Query, List<String>> values = new EnumMap<Query, List<String>>(Query.class);
         for (Query q : Query.values()) {
+            if (only != null && !only.contains(q))
+                continue;
             if (q.method() == null) {
                 if (focusModes != null)
                     values.put(q, asStrings(focusModes));

@@ -308,7 +308,7 @@ public final class SafeCamera {
         try {
             Camera.Parameters params = normal.getParameters();
             Object modifier = cameraEx.createParametersModifier(params);
-            return DriveReadback.of(ReflectiveCapabilities.readValues(methods(), modifier, null));
+            return DriveReadback.of(ReflectiveCapabilities.readValues(methods(), modifier, null, DriveReadback.QUERIES));
         } catch (Throwable t) {
             failed("getParameters", t);
             return null;

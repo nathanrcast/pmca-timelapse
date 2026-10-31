@@ -223,6 +223,21 @@ class ExifMatching(Tree):
         self.shot("DSC00001.JPG", 5000, 100)
         self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A")[0], 3)
 
+    def test_one_missing_exif_puts_the_whole_run_on_mtime(self):
+        a = self.shot("DSC00001.JPG", 0, 100.5)  # EXIF says in-run, mtime in-run
+        b = self.touch("DSC00002.JPG", 101.2)  # no EXIF
+        rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "A")
+        self.assertEqual((rc, lines), (0, [a, b]))
+        self.assertIn("no EXIF", self.last_err)
+        self.assertIn("mtime", self.last_err)
+
+    def test_mixed_run_does_not_mix_bases(self):
+        # Wrong mtime on the EXIF file (7 h off): on a mixed run the whole run is matched on mtime, so it drops out.
+        self.shot("DSC00001.JPG", 0, 7 * 3600)
+        b = self.touch("DSC00002.JPG", 101.2)
+        rc, lines = self.run_main(self.tmp, "--log", self.log, "--run", "A")
+        self.assertEqual(lines, [b])
+
     def test_raw_files_only_with_include_raw(self):
         j = self.shot("DSC00001.JPG", 0, 0)
         raw = os.path.join(self.dcim, "DSC00001.ARW")

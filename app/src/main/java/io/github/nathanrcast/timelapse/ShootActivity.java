@@ -8,6 +8,7 @@ import android.hardware.Camera;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.KeyEvent;
@@ -44,6 +45,8 @@ import io.github.nathanrcast.timelapse.core.Util;
 import io.github.nathanrcast.timelapse.core.WallTime;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -269,6 +272,7 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         log("onResume");
 
         super.onResume();
+        logOffsetMs = Clocks.wallNow().localMs() - SystemClock.uptimeMillis();
         tornDown = false;
         stopping = false;
         display = new Display(getDisplayManager(), this);
@@ -300,13 +304,16 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         // A resumed run keeps its slots: the scheduler shifts every remaining deadline by the pause.
         if (scheduler == null) {
             scheduler = new Scheduler(plan, clock, Scheduler.StopOn.CAPTURED);
+            // The two readings back to back: uptime_to_wall_ms is their difference.
+            long uptimeAtWall = clock.nowMs();
             WallTime wall = Clocks.wallNow();
             scheduler.start(clock.nowMs() + startDelayMs());
             runStartWallMs = wall.mtimeFloorMs(TimeZone.getDefault().getOffset(wall.epochMs));
-            shotLog = new ShotLog(this, DeviceId.read(), appVersion(), wall, clock.nowMs(),
+            shotLog = new ShotLog(this, DeviceId.read(), appVersion(), wall, uptimeAtWall,
                     ShotLogCsv.settingsJson(settings), LenrGuard.headerValue(lenrAtStart));
         } else {
             // A start fixed on the wall clock (AT) must not slip by the time spent paused.
+            syncSchedulerFrames();
             scheduler.resume(settings.startMode == StartMode.AT);
         }
         if (scheduler.isDone())
@@ -480,11 +487,17 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
                 : "Bracketing unavailable: camera stayed in " + rb.drive + " drive";
         log("warning: " + driveNote + "; run is unbracketed");
         continuous = null;
-        if (scheduler == null) {
-            settings.brs = false;
-            plan = ShotPlan.of(settings);
-            burstShooting = plan.isBurst();
-        }
+        settings.brs = false;
+        plan = ShotPlan.of(settings);
+        burstShooting = plan.isBurst();
+        syncSchedulerFrames();
+    }
+
+    // A running scheduler (a resume) fires the plan's frames per slot from the next slot on, so the log matches
+    // what fires.
+    private void syncSchedulerFrames() {
+        if (scheduler != null && scheduler.plan().framesPerInterval() != plan.framesPerInterval())
+            scheduler.setFramesPerInterval(plan.framesPerInterval());
     }
 
     // Masks this run's settings (the intent's copy; the saved ones are untouched) against the values the camera
@@ -737,6 +750,12 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
         shutterStatuses.incrementAndGet(status >= 0 && status < 3 ? status : 3);
         ContinuousBracket cont = continuous;
         int n = cont == null ? 0 : cont.onCallback();
+        if (cont != null && n == 0) {
+            // After a completed or abandoned slot (e.g. the CANCELED one cancelTakePicture can produce): never the
+            // next slot's frame.
+            log("onShutter status=" + status + " stray (slot " + cont.generation() + ", " + cont.strays() + " so far)");
+            return;
+        }
         if (cont != null)
             log("onShutter status=" + status + " callback " + n + " of " + BracketPlan.FRAMES);
         else if (status != 0)
@@ -766,8 +785,8 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
             int missing = cont.missing();
             log("continuous bracket: " + (BracketPlan.FRAMES - missing) + " of " + BracketPlan.FRAMES
                     + " callbacks, closing the slot");
-            safeCamera.cancelTakePicture();
             cont.abandon();
+            safeCamera.cancelTakePicture();
             for (int i = 0; i < missing && !tornDown; i++)
                 frameCaptured();
         }
@@ -1013,8 +1032,26 @@ public class ShootActivity extends BaseActivity implements SurfaceHolder.Callbac
     }
 
 
+    // One formatter for every line (GMT: the offset is already in the local time it formats), used under its lock
+    // because log() runs from the main looper and from onShutter on the camera thread.
+    private static final SimpleDateFormat LOG_TIME = newLogTime();
+    // Camera local time minus uptime, read once per onResume: lines are timed from uptime without a clock call.
+    private volatile long logOffsetMs = Long.MIN_VALUE;
+
+    private static SimpleDateFormat newLogTime() {
+        SimpleDateFormat f = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
+        f.setTimeZone(TimeZone.getTimeZone("GMT"));
+        return f;
+    }
+
     private void log(String s) {
-        Logger.info(Clocks.wallNow().format("HH:mm:ss.SSS") + " " + s);
+        long offset = logOffsetMs;
+        long local = offset == Long.MIN_VALUE ? Clocks.wallNow().localMs() : SystemClock.uptimeMillis() + offset;
+        String stamp;
+        synchronized (LOG_TIME) {
+            stamp = LOG_TIME.format(new Date(local));
+        }
+        Logger.info(stamp + " " + s);
     }
 
     private void dumpList(List list, String name) {
