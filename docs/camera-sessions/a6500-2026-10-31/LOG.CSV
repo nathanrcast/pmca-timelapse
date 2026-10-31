@@ -1,0 +1,23 @@
+run_id,slot,scheduled_ms,actual_ms,capture_done_ms,result,skip_reason,ss,iso,ev,bracket_idx,battery_pct,free_mb
+# run_id=19700101-012144
+# model=ScalarA
+# firmware=59
+# app_version=2.0.0 (8)
+# uptime_to_wall_ms=1
+# settings={"interval":1.0,"delay":0,"shotCount":10,"intervalIndex":2,"shotsIndex":4,"delayIndex":0,"startMode":"NOW","at":"00:00","disableLenr":true,"displayOff":false,"reviewSeconds":0,"silentShutter":true,"ael":true,"fps":0,"brs":true,"mf":true,"holyGrail":true,"useCurrentExposure":true,"targetExposure":0,"maxShutterSpeedIndex":24,"maxISOIndex":18,"cooldown":5,"averageExposureAmount":1,"deadbandIndex":0,"holyGrailAllowExposureUp":true,"holyGrailAllowExposureDown":true}
+# lenr=on
+19700101-012144,0,4904712,4904824,,FIRE,,1/160,,0.00,0,91,66255
+19700101-012144,0,4904712,4905531,,FIRE,,1/160,,0.00,1,91,66255
+19700101-012144,1,4905712,,,SKIP,BUSY,,,,,91,66255
+19700101-012144,0,4904712,4905992,,FIRE,,1/160,,0.00,2,91,66255
+19700101-012144,0,4904712,,4906178,SLOT_DONE,,1/160,,0.00,2,91,66255
+19700101-012144,2,4906712,4906714,,FIRE,,1/160,,0.00,0,91,66255
+19700101-012144,2,4906712,4907271,,FIRE,,1/160,,0.00,1,91,66255
+19700101-012144,2,4906712,4907500,,FIRE,,1/160,,0.00,2,91,66255
+19700101-012144,3,4907712,,,SKIP,BUSY,,,,,91,66255
+19700101-012144,2,4906712,,4908002,SLOT_DONE,,1/160,,0.00,2,91,66255
+19700101-012144,4,4908712,4908729,,FIRE,,1/160,,0.00,0,91,66255
+19700101-012144,4,4908712,4909037,,FIRE,,1/160,,0.00,1,91,66255
+19700101-012144,4,4908712,4909456,,FIRE,,1/160,,0.00,2,91,66255
+19700101-012144,5,4909712,,,SKIP,BUSY,,,,,91,66255
+19700101-012144,4,4908712,,,SKIP,INTERRUPTED,,,,2,91,66255

@@ -1,0 +1,20 @@
+[INFO] CapsDump: wrote /storage/sdcard0/TIMELPS/CAPS.TXT (2104 lines)
+[INFO] 01:21:43.314 onCreate
+[INFO] 01:21:43.421 onResume
+[INFO] Capabilities: model ILCE-6500, profile ILCE-6500
+[INFO] Capabilities: methods 45/45 present
+[INFO] Capabilities: features on: SILENT_SHUTTER, AE_LOCK, BRACKET_3, BURST, HOLY_GRAIL, TOGGLE_FOCUS, SET_LENR, FOCUS_MODE_MANUAL; off: -
+[INFO] Capabilities: values: SILENT_SHUTTER_SUPPORTED=[true], TOGGLE_FOCUS_SUPPORTED=[true], LONG_EXPOSURE_NR_SUPPORTED=[true], LONG_EXPOSURE_NR=[true], DRIVE_MODES=[single, burst, bracket], BURST_DRIVE_SPEEDS=[low, middle, high], AE_LOCKS=[locked, unlocked], BRACKET_MODES=[exposure, white-balance, dro], EXPOSURE_BRACKET_MODES=[single, continue], BRACKET_PICTURE_COUNTS=[3, 5], DRIVE_MODE=[burst], BRACKET_MODE=[exposure], EXPOSURE_BRACKET_MODE=[single], EXPOSURE_BRACKET_PERIOD=[3], NUM_OF_BRACKET_PICTURE=[3], EXPOSURE_BRACKET_PERIODS=[3, 5, 7, 10, 20, 30], ISO_SENSITIVITIES=[0, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000, 40000, 51200], FOCUS_MODES=[manual, auto, dmf]
+[INFO] 01:21:44.422 LENR on
+[INFO] SafeCamera: bracket: 3 frames per interval, step 0.3 EV
+[INFO] SafeCamera: focus already manual; toggle focus left as set
+[INFO] 01:21:44.707 warning: Interval 1.0 s < bracket ~1.8 s
+[INFO] 01:21:44.931 HG: ISO 0 not in table, ramping shutter only
+[INFO] 01:21:46.178 warning: Interval 1.0 s < bracket 1.4 s
+[INFO] 01:21:48.002 warning: Interval 1.0 s < bracket 1.3 s
+[INFO] 01:21:49.849 Stopped: 2/10 shots, 3 skipped
+[INFO] SafeCamera: restored drive state burst|exposure|single|3|3 from this run
+[INFO] 01:21:50.702 on pause
+[INFO] Hello World
+[INFO] CapsDump: wrote /storage/sdcard0/TIMELPS/CAPS.TXT (2104 lines)
+[INFO] CapsDump: wrote /storage/sdcard0/TIMELPS/CAPS.TXT (2104 lines)
