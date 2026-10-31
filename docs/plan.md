@@ -36,7 +36,7 @@ Upstream bugs this plan targets (links go to the upstream tracker):
 
 ## Platform facts
 
-- Both target bodies run **Android 2.3.7 (API 10, Dalvik)**. Their PMCA API levels differ a lot: NEX-5T is 1.1, a6500 is 2.17. Methods present on the a6500 may be missing on the NEX-5T, so everything is capability-probed (T07).
+- Both target bodies run **Dalvik**, but not the same Android: the NEX-5T is **Android 2.3.7 (API 10)**, the a6500 **Android 4.1.2 (API 16)** (from their CAPS files). The app stays at minSdk/targetSdk 10 and must be API-10-safe. Their PMCA API levels differ a lot: NEX-5T is 1.1, a6500 is 2.17. Methods present on the a6500 may be missing on the NEX-5T, so everything is capability-probed (T07).
 - Upstream builds with `compileSdk 10`, Java 1.6, AGP 3.5.0 and jcenter, plus `OpenMemories-Framework` `-SNAPSHOT` from jitpack. Modern JDKs can't run that toolchain (T01).
 - Input arrives as Sony `ScalarInput` key codes. Dial codes differ per body (T08 → T10).
 - Upstream's capture loop schedules each shot from the *previous* shot's time with a −150 ms fudge, so drift accumulates and the loop can fire bursts (T06).
@@ -68,6 +68,7 @@ Each wave is a GitHub milestone, and each ticket is an issue with a spec in `doc
 | 4 | [T17](tickets/T17-assemble-docs.md) | Desktop assembly + docs | S | | T16 |
 | 4 | [T18](tickets/T18-release.md) | Release 2.0.0 | S | ✔ | T15, T17 |
 | 4 | [T19](tickets/T19-bulb-spike.md) | Stretch: bulb > 30 s | M | ✔ | T08 |
+| 4 | [T20](tickets/T20-camera-session-fixes.md) | Camera-session fixes (a6500 and NEX-5T findings) | M | ✔ | camera sessions 2026-10-31 |
 
 Critical path: T00 → T01 → T03 + T08 → T07 / T05 → T06 → wave 3 → T15 → T18.
 

@@ -6,10 +6,10 @@ What each supported body's Sony API actually offers, from its CAPS file (T08), a
 
 1. Install the current build and launch TimeLapse+.
 2. On the settings screen, select **Camera info** in the bottom bar (between Close and Start).
-3. The app opens the camera, reads everything without changing any setting, releases the camera and writes `TIMELPS/CAPS-<model>.txt` to the card as it goes, showing the current section and the path on screen. If the card rejects the long name, the file is `TIMELPS/CAPS.TXT`. Each run overwrites the file.
+3. The app opens the camera, reads everything without changing any setting, releases the camera and writes `TIMELPS/CAPS-<MODEL>.TXT` (upper case, only `A-Z`, `0-9` and `-`) to the card as it goes, showing the current section and the path on screen. If the card rejects that name, the file is `TIMELPS/CAPS.TXT` and the reason is in `LOG.TXT` (`CapsDump: could not open ...`). Both bodies in the first sessions fell back to `CAPS.TXT` with the old name `CAPS-<model>.txt`; the exception was not logged then, so the cause is unconfirmed. Each run overwrites the file.
 4. When the screen reads *Turn every dial and press every button (DELETE last)*: turn the control wheel and every dial one notch each way, step the mode dial through every position, and press every button (half and full shutter included; nothing is acted on). Each event is appended to the file and the last 15 show on screen.
 5. To exit, hold MENU for 2 s and release it, or press DELETE (Back on a body without one). A short MENU press is only logged. If the screen says *Key log NOT being saved*, the file couldn't be written: check the card.
-6. Copy `TIMELPS/CAPS-*.txt` off the card and attach it to the T08 issue.
+6. Copy `TIMELPS/CAPS-*.TXT` (or `CAPS.TXT`) off the card and attach it to the T08 issue.
 
 If the camera crashes or reboots during the probe, still copy the file. The name of each call is written before the call is made, so the last line, a call name with no ` = ` or ` !! `, is the call that crashed it. Groups that finished are synced to the card.
 
@@ -37,7 +37,7 @@ An option the body lacks is hidden on the settings screen, but its saved value i
 |---|---|---|---|
 | SS | `SILENT_SHUTTER` | `setSilentShutterMode`, `isSupportedSilentShutterMode` | `isSupportedSilentShutterMode()` is `true` |
 | AEL | `AE_LOCK` | `setAutoExposureLock` | `getSupportedAutoExposureLocks` has `locked` |
-| BRC3 | `BRACKET_3` | `setDriveMode`, `setBracketMode`, `setExposureBracketMode`, `setExposureBracketPeriod`, `setNumOfBracketPicture` | drive modes have `bracket`, bracket modes `exposure`, exposure-bracket modes `single`, bracket counts `3`. Read at open, before the run changes anything: `getDriveMode`, `getNumOfBracketPicture`, `getExposureBracketPeriod` (tenths of EV), `getSupportedExposureBracketPeriods`. The run brackets when the box is on or the body is already in 3-picture bracket drive; the EV step is the body's own (0.7 EV only if unreadable); a count other than 3 runs single frames |
+| BRC3 | `BRACKET_3` | `setDriveMode`, `setBracketMode`, `setExposureBracketMode`, `setExposureBracketPeriod`, `setNumOfBracketPicture` | drive modes have `bracket`, bracket modes `exposure`, exposure-bracket modes `single` or `continue` (`single` preferred; `continue` alone is the NEX-5T case, where one press shoots all three frames), bracket counts `3`. Read at open, before the run changes anything: `getDriveMode`, `getNumOfBracketPicture`, `getExposureBracketPeriod` (tenths of EV), `getSupportedExposureBracketPeriods`. The run brackets when the box is on or the body is already in 3-picture bracket drive; the EV step is the body's own (0.7 EV only if unreadable); a count other than 3 runs single frames |
 | Holy grail | `HOLY_GRAIL` | `setProgramLineRangeOverListener`, `getShutterSpeed`, `getISOSensitivity`, `setISOSensitivity`, `incrementShutterSpeed`, `decrementShutterSpeed`, `createEmptyParameters` | — |
 | MF | `TOGGLE_FOCUS`, else `FOCUS_MODE_MANUAL` | `setToggleFocusMode`, `isSupportedToggleFocusMode`; the fallback needs none (Android `setFocusMode`) | `isSupportedToggleFocusMode()` is `true`; for the fallback, `getSupportedFocusModes` has `manual` |
 | Burst (interval 0) | `BURST` | `setDriveMode`, `getSupportedBurstDriveSpeeds`, `setBurstDriveSpeed`, `setBurstDriveButtonReleaseBehave` | drive modes have `burst`, burst speeds not empty; otherwise the settings screen shows the burst position as *n/a* and the run uses the shortest interval (1 s) |
@@ -48,36 +48,57 @@ MF prefers the AF/MF toggle. The stubs have no getter for the toggle state, so t
 
 `SettingsActivity` maps every `ScalarInput` dial or wheel event (`ISV_DIAL_1/2/3_*` and `ISV_DIAL_KURU_*`, the control wheel) to the same action: clockwise is the next table value, counter-clockwise the previous one, for the focused setting (seek bar, spinner or checkbox). Up/down move the focus and left/right step a focused bar, on every body, so input never depends on a dial. Holding left/right repeats one table entry about 6 times a second (T04 hold handling). The interval, shots and delay bars are indices into the tables in `core/StepTables`.
 
-Which dials a body reports is **unverified** until its CAPS file's key log shows it:
+Direction comes from the scan code, never from the sign of the dial status: `core` `DialDirection` maps `*_CLOCKWISE` to +1 and `*_COUNTERCW` to -1 and uses the status only for the size of a multi-notch event (`|status| > 22`). The two bodies report opposite signs for the same turn (NEX-5T: `ISV_DIAL_1_CLOCKWISE` status -22, a6500 +22), which stepped the NEX-5T top dial backwards when routed by sign. Key codes seen in the sessions (`docs/camera-sessions/`):
 
-| Body | Expected input | Status |
+| Body | Input | Scan codes (dial status) |
 |---|---|---|
-| ILCE-6500 | control wheel (KURU), front dial, rear dial, plus the arrow keys | unverified |
-| NEX-5T | control wheel only (`DIAL_UNRELIABLE`, see `up#5`), plus the arrow keys | unverified |
+| ILCE-6500 | front dial `ISV_DIAL_1` | 525 clockwise (+22), 526 counter-clockwise (-22) |
+| ILCE-6500 | rear dial `ISV_DIAL_2` | 528 clockwise (+22), 529 counter-clockwise (-22) |
+| NEX-5T | top dial `ISV_DIAL_1` | 525 clockwise (-22), 526 counter-clockwise (+22) |
+| NEX-5T | control wheel `ISV_DIAL_KURU` | 522 clockwise (+22), 523 counter-clockwise (-22) |
+
+The NEX-5T wheel does report, so the `DIAL_UNRELIABLE` quirk is no longer set by any profile (the enum value is kept). Using the wheel in the app on a body is still to be confirmed in a session.
+
+## Camera sessions
+
+Evidence from real bodies, committed as they came off the card (CAPS has the serial number omitted; nothing personal in any file):
+
+| Session | Body | Files | Notes |
+|---|---|---|---|
+| [a6500-2026-10-31](camera-sessions/a6500-2026-10-31/) | ILCE-6500 fw 1.04 | `CAPS.TXT`, `LOG.CSV`, `LOG.TXT` | 1 s interval, BRC3 + silent shutter + holy grail, stopped with MENU. 5 ARW files for 9 FIRE rows, all 1/160 ISO 640 bias 0 (no EV spread). Clock read 1970. First slot +112 ms. |
+| [nex5t-2026-10-31](camera-sessions/nex5t-2026-10-31/) | NEX-5T fw 1.01 | `CAPS.TXT`, `LOG.CSV`, `LOG.TXT` | 10/10 @ 1 s and 40/40 @ 10 s, 0 skips; masking of SS and BRC3 worked, nothing crashed. First slot +128 ms. Clock read 1970. |
+
+Findings from both are tracked in `tickets/T20-camera-session-fixes.md`: the camera clock (the system clock is time since boot, so run ids, `uptime_to_wall_ms` and CAPS timestamps came out as 1970), `model`/`firmware` from `DeviceInfo` instead of `Build.*` (`ScalarA`), the CAPS file name fallback, bracket diagnostics, a 500 ms settle before slot 0, EXIF-based frame matching, dial direction by scan code and continuous bracketing.
 
 ## ILCE-6500
 
-PMCA API 2.17. **CAPS file: pending** (T08); replace the expectations below with its *Used methods* and *Values* results.
+Source: `camera-sessions/a6500-2026-10-31/CAPS.TXT` (TimeLapse+ 2.0.0).
 
-Expected (unverified):
-
-- Profile: none.
-- Every method in the *Used methods* list present.
-- SS, AEL, BRC3, holy grail and MF shown; MF through the toggle.
-
-CAPS results: pending.
+- **Device:** `DeviceInfo` model `ILCE-6500`, firmware `1.04`, hardware version 2, PMCA API **2.17**, category E_MOUNT_CAMERA, **Android 4.1.2 / SDK 16** (incremental `59`). `android.os.Build` says `ScalarA` / `dslr-diadem`, so identity comes from `DeviceInfo`.
+- **Used methods:** **45 of 45 present.** Profile `ILCE-6500` (no overrides). Features on: SS, AEL, BRC3, burst, holy grail, toggle focus, set LENR, manual focus mode. Nothing masked.
+- **Values:**
+  - Drive modes `single, burst, bracket`; burst speeds `low, middle, high`; AE locks `locked, unlocked`.
+  - Bracket modes `exposure, white-balance, dro`; exposure-bracket modes `single, continue`; bracket counts `3, 5`; supported exposure-bracket periods `3, 5, 7, 10, 20, 30` (tenths of EV).
+  - Current state at probe time: drive `burst`, bracket mode `exposure`, exposure-bracket mode `single`, count 3, period 3.
+  - `isSupportedSilentShutterMode` true, `isSupportedToggleFocusMode` true, `isSupportedLongExposureNR` true (LENR was on).
+  - ISO: `0` (auto), 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000, 40000, 51200. Focus modes `manual, auto, dmf`.
+- **Key codes** (key log): front dial `ISV_DIAL_1_CLOCKWISE` 525 (+22) / `COUNTERCW` 526 (-22); rear dial `ISV_DIAL_2_CLOCKWISE` 528 (+22) / `COUNTERCW` 529 (-22); `ISV_KEY_PLAY` 207, `ISV_KEY_FN` 520, `ISV_KEY_ENTER` 232 (keyCode 23), `ISV_KEY_AEL_AFMF` 638, `ISV_KEY_SLI_AF_MF_AEL` 589 (AF/MF slider), `ISV_KEY_CUSTOM1` 622, `ISV_KEY_CUSTOM2` 623, `ISV_KEY_DELETE` 595. MENU stopped the run in the session.
+- **Run observations (from `LOG.CSV`/`LOG.TXT` plus the five ARW files):**
+  - BRC3 + SS: 9 FIRE rows gave 5 files, all 1/160, bias 0, ISO 640, so no bracket happened. Whether the body refuses bracket drive while silent shutter is on is exactly what the new drive read-back in `LOG.TXT` (`drive after configure: ...`) will show. The run is marked unbracketed with a status-line warning if the body keeps another drive mode. BRC3 is not masked statically until the hardware confirms the combination.
+  - The first slot fired +112 ms late (above the 100 ms analyzer gate), later slots +2 to +17 ms; a 500 ms settle after `configure()` was added for NOW starts.
+  - The EXIF times were one per second; the file mtimes Linux saw on the exFAT card were 7 h off (see the README troubleshooting entry and `tools/frames_for_run.py`).
+  - LENR was on at start and the app turned it off for the run.
 
 ## NEX-5T
 
-PMCA API 1.1. **CAPS file: pending** (T08); replace the expectations below with its *Used methods* and *Values* results.
+Source: `camera-sessions/nex5t-2026-10-31/CAPS.TXT` (TimeLapse+ 2.0.0).
 
-Expected (unverified):
-
-- Profile `NEX`, which applies to every model starting with `NEX-`. It turns SS off: no NEX body has a silent shutter, and upstream reports it missing on the NEX-5R/5T ([`up#5`](https://github.com/jonasjuffinger/TimeLapse/issues/5)). It also sets the quirk `DIAL_UNRELIABLE` for T10. The quirk only means input must also work with the arrow keys, so it's safe for the whole family.
-- SS hidden even if the probe finds the methods.
-- AEL, BRC3, holy grail, toggle focus and burst: the probe decides. Any of them may be missing on API 1.1. If they are, the option is hidden, and MF falls back to the focus mode.
-
-CAPS results: pending.
+- **Device:** `DeviceInfo` model `NEX-5T`, firmware `1.01`, hardware version 1, PMCA API **1.1**, **Android 2.3.7 / SDK 10** (incremental `204`). `Build` says `ScalarA`.
+- **Used methods:** **40 of 45 present.** Absent: `isSupportedSilentShutterMode`, `setSilentShutterMode` (silent shutter, 2) and `isSupportedLongExposureNR`, `getLongExposureNR`, `setLongExposureNR` (LENR, 3). Profile `NEX` switches SS off (it is also absent). Features on: AEL, burst, holy grail, manual focus mode. Off: SS, toggle focus (`isSupportedToggleFocusMode` false), set LENR, and BRC3 until this ticket (BRC3 needed `single`; see below). Masking worked and nothing crashed.
+- **Values:** drive modes `single, burst, bracket, speed-prior-burst` (current: `speed-prior-burst`); burst speeds `low`; AE locks `locked, unlocked`; bracket modes `exposure`; **exposure-bracket modes `continue` only**; bracket counts `3`; periods `3, 7, 10, 20, 30`; ISO `0, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600`; focus modes `manual, auto, dmf`.
+- **Key codes:** top dial `ISV_DIAL_1_CLOCKWISE` 525 (-22) / `COUNTERCW` 526 (+22); control wheel `ISV_DIAL_KURU_CLOCKWISE` 522 (+22) / `COUNTERCW` 523 (-22); `ISV_KEY_ENTER` 232 (keyCode 23), `ISV_KEY_PLAY` 207, `ISV_KEY_FN` 520, shutter `ISV_KEY_S1_1` 516, `S1_2` 517, `S2` 518; **MENU is `ISV_KEY_SK1`** (keyCode 82, scan 229) and **`ISV_KEY_SK2` 513** acts as the back/delete key. `BaseActivity` already maps SK1 to MENU and SK2 to DELETE.
+- **Run observations:** two runs passed, 10/10 at 1 s and 40/40 at 10 s, with 0 skips (a 1/4 s shutter at ISO 200 was logged); first slot +128 ms; LENR state unknown (no LENR API); the same 1970 clock, `model=ScalarA` and `CAPS.TXT` fallback as the a6500.
+- **Continuous bracketing (hardware-pending):** with `EXPOSURE_BRACKET_MODES=[continue]` only, BRC3 is offered. The app sets exposure-bracket mode `continue`, presses once per slot and counts three `onShutter` callbacks (it cancels only after the last); if the body reports once, the slot closes after a timeout (2 s plus the remaining exposure time). Every callback and its status is logged in `LOG.TXT` (`onShutter status=N callback k of 3`), so the next session shows which case happens.
 
 ## Bulb exposures (T19 finding)
 

@@ -66,7 +66,7 @@ The HUD shows shots done / target, skips, time to the next shot, elapsed and rem
 
 ### Camera info
 
-The **Camera info** button (bottom bar, next to Start) writes `TIMELPS/CAPS-<model>.txt` to the card: the camera's model, firmware, which Sony API calls exist, supported value lists, and a log of the keys, dials and wheel you press. It changes no camera setting. Run it once per body and attach the file to bug reports and compatibility reports; steps are in [docs/cameras.md](docs/cameras.md).
+The **Camera info** button (bottom bar, next to Start) writes `TIMELPS/CAPS-<MODEL>.TXT` to the card: the camera's model, firmware, which Sony API calls exist, supported value lists, and a log of the keys, dials and wheel you press. It changes no camera setting. Run it once per body and attach the file to bug reports and compatibility reports; steps are in [docs/cameras.md](docs/cameras.md).
 
 ## Getting the video
 
@@ -90,21 +90,24 @@ The camera can't encode video (API 10 has no encoder), so assemble the frames on
 - **Silent shutter does nothing or the app errors** — silent shutter doesn't exist on every body (none of the NEX family). Leave SS off; if it is shown and fails, report the body with its CAPS file.
 - **Frames are skipped or late with a short interval** — the card is too slow (write time plus RAW+JPEG is longer than the interval). Use a faster card, JPEG only, a lower picture size, or a longer interval. Burst needs a fast card.
 - **Camera switches off during a long run** — the app disables auto power-off while it runs, but if the camera still powers down, set Auto Power Off to a long time in the camera menu and use a dummy battery or a full charge for long shoots. Report the length of run and the end of `TIMELPS/LOG.TXT`.
+- **`frames_for_run.py --run` / `assemble.sh --run` finds no frames, or the file times are hours off** — the card stores local time (exFAT), and the computer reads it in its own time zone, so file mtimes can be several hours away from the camera's clock. `frames_for_run.py` therefore matches on each frame's EXIF `DateTimeOriginal` (JPEG, and ARW with `--include-raw`) and only falls back to mtime. If a file has no EXIF, shift the log with `--offset-s <seconds>` (for example `25200` for 7 h). Also check `# clock=` in `LOG.CSV`: `system` means the camera clock couldn't be read and the log's wall times are not real.
 - **Anything else** — attach `TIMELPS/LOG.TXT`, `TIMELPS/LOG.CSV` and the CAPS file to an issue.
 
 ## Camera compatibility
 
-Nothing here has been verified on a camera. Expectations come from the Sony API probe in [docs/cameras.md](docs/cameras.md) and are updated after the maintainer's camera session. "Expected" means the app should offer it; options a body lacks are hidden automatically.
+Both bodies run the app on Dalvik: the NEX-5T is Android 2.3.7 (API 10), the a6500 Android 4.1.2 (API 16). The app targets API 10, so it runs on both.
+
+Little here has been verified on a camera: the first sessions (2026-10-31, [docs/camera-sessions](docs/camera-sessions/)) confirmed the probe on both bodies and plain interval shooting. Expectations come from the Sony API probe in [docs/cameras.md](docs/cameras.md) and are updated after the maintainer's camera session. "Expected" means the app should offer it; options a body lacks are hidden automatically.
 
 | Feature | ILCE-6500 (API 2.17) | NEX-5T (API 1.1) | Other PMCA bodies |
 |---|---|---|---|
 | Launch and basic interval shooting | expected, unverified | expected, unverified | unknown |
 | Start delay and at-time start | expected, unverified | expected, unverified | unknown |
-| Dial and wheel input | wheel, front and rear dials: expected, unverified | wheel unreliable; arrow keys expected, unverified | unknown |
+| Dial and wheel input | wheel, front and rear dials: key codes logged, direction by scan code, not yet used in a session | wheel and top dial: key codes logged, direction by scan code, not yet used in a session | unknown |
 | Silent shutter (SS) | expected, unverified | hidden (none on NEX) | decided by the probe |
 | Manual focus (MF) | toggle: expected, unverified | probe decides, falls back to focus mode | decided by the probe |
 | AEL | expected, unverified | probe decides | decided by the probe |
-| BRC3 with EV step and auto-detect | expected, unverified | probe decides | decided by the probe |
+| BRC3 with EV step and auto-detect | offered; first session got no EV spread (silent shutter on), re-test with SS off | offered through continuous bracketing (one press, three frames); hardware-pending | decided by the probe |
 | Holy grail | expected, unverified | probe decides | decided by the probe |
 | LENR turned off for the run | expected, unverified | probe decides | decided by the probe |
 | Burst | expected, unverified | probe decides | decided by the probe |

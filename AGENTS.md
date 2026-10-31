@@ -30,7 +30,7 @@ python3 -I tools/frames_for_run.py <dir> --log LOG.CSV --run <run_id> [--window-
 
 ## Invariants
 
-- **Runtime is Android 2.3.7 Dalvik (API 10) on both cameras.** Keep `minSdk`/`targetSdk` at 10. Don't use any API above 10, and no AndroidX, Kotlin stdlib or core-library desugaring. Java language level is 8 at most.
+- **Runtime is Dalvik on both cameras, but not the same Android:** the NEX-5T runs 2.3.7 (API 10), the a6500 4.1.2 (API 16). Keep `minSdk`/`targetSdk` at 10, so the code must be API-10-safe. Don't use any API above 10, and no AndroidX, Kotlin stdlib or core-library desugaring. Java language level is 8 at most.
 - **Only `camera/` touches `CameraEx`, `ParametersModifier` or `CameraSequence`; everything else goes through `SafeCamera`.** A method missing on an older body throws `NoSuchMethodError` and reboots the camera (upstream issue 4). So a new Sony call needs:
   - a `SonyMethod` entry, which also puts it in the CAPS *Used methods* report;
   - a `caps.has()`/`caps.supports()` guard before the call. For the options `configure()` applies, the guard is `RunOptions.mask`, the single gate, which `ShootActivity` runs against the session's capabilities;
@@ -60,7 +60,8 @@ python3 -I tools/frames_for_run.py <dir> --log LOG.CSV --run <run_id> [--window-
 ## Hardware
 
 - An agent can't operate a camera. A `hw:required` acceptance box is only ticked from evidence the maintainer posts: a LOG/CAPS file from the card, or a photo. Never claim on-device verification.
-- Camera logs land on the card under `TIMELPS/`.
+- Camera logs land on the card under `TIMELPS/`. Session evidence is committed under `docs/camera-sessions/<body>-<date>/`.
+- **`System.currentTimeMillis()` is time since boot on the cameras** (1970 dates). Real wall time comes only from `Clocks.WALL` (the camera RTC through OpenMemories `DateTime`, system clock as the logged fallback); never call `currentTimeMillis()` for a run id, header or file comparison.
 
 ## Review focus
 

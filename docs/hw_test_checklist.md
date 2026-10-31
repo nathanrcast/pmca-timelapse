@@ -13,7 +13,7 @@ One consolidated camera session covers every pending `hw:required` item for issu
 | # | Step | Expect | a6500 | NEX-5T | Issue |
 |---|---|---|---|---|---|
 | 0.1 | Install, launch the app | Settings screen, no reboot | | | #2 |
-| 0.2 | Settings, **Camera info**; let the probe finish | `TIMELPS/CAPS-<model>.txt` written; if the camera crashes, copy the file anyway (last line is the culprit call) | | | #9 |
+| 0.2 | Settings, **Camera info**; let the probe finish | `TIMELPS/CAPS-<MODEL>.TXT` written; if the camera crashes, copy the file anyway (last line is the culprit call) | | | #9 |
 | 0.3 | At *Turn every dial and press every button*: one notch each way on the control wheel and every dial, step the mode dial, press every button incl. half and full shutter; hold MENU 2 s | Events appear in the key log; file kept | | | #9, #11 |
 | 0.4 | Attach `CAPS-ILCE-6500.txt` and `CAPS-NEX-5T.txt` to #9; summarize in `docs/cameras.md` | Both files posted | | | #9, #8 |
 | 0.5 | Read CAPS: does `getSupportedExposureBracketPeriods` report int tenths of EV? Does the NEX-5T key log show wheel events at all (`DIAL_UNRELIABLE`)? | Answers noted on #10 and #11 | | | #10, #11 |
@@ -59,7 +59,7 @@ One consolidated camera session covers every pending `hw:required` item for issu
 
 ## Collect and verify
 
-- Copy `TIMELPS/` (`LOG.TXT`, `LOG.CSV`, `CAPS-*.txt`) and a sample of the JPEGs.
+- Copy `TIMELPS/` (`LOG.TXT`, `LOG.CSV`, `CAPS-*.TXT`) and a sample of the JPEGs.
 - Paste the `Capabilities:` lines and any `SafeCamera:` lines from `LOG.TXT`.
 - Run `python3 -I tools/analyze_log.py TIMELPS/LOG.CSV` and paste the summary. Exit 1 means drift above `--max-drift-ms` (default 100) or a SKIP row with no reason. Rows are grouped by `run_id`.
 - Run `tools/assemble.sh` on one run's frames (`--run <run_id>`) to confirm the frame match and that the MP4 plays.
