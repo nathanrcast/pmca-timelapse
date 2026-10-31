@@ -1,0 +1,37 @@
+[INFO] Hello World
+[INFO] Capabilities: model NEX-5T, profile NEX
+[INFO] Capabilities: methods 40/45 present; absent: CameraEx$ParametersModifier.isSupportedSilentShutterMode(), CameraEx$ParametersModifier.setSilentShutterMode(boolean), CameraEx$ParametersModifier.isSupportedLongExposureNR(), CameraEx$ParametersModifier.getLongExposureNR(), CameraEx$ParametersModifier.setLongExposureNR(boolean)
+[INFO] Capabilities: features on: AE_LOCK, BURST, HOLY_GRAIL, FOCUS_MODE_MANUAL; off: SILENT_SHUTTER (profile), BRACKET_3, TOGGLE_FOCUS, SET_LENR
+[INFO] Capabilities: values: SILENT_SHUTTER_SUPPORTED=?, TOGGLE_FOCUS_SUPPORTED=[false], LONG_EXPOSURE_NR_SUPPORTED=?, LONG_EXPOSURE_NR=?, DRIVE_MODES=[single, burst, bracket, speed-prior-burst], BURST_DRIVE_SPEEDS=[low], AE_LOCKS=[locked, unlocked], BRACKET_MODES=[exposure], EXPOSURE_BRACKET_MODES=[continue], BRACKET_PICTURE_COUNTS=[3], DRIVE_MODE=[speed-prior-burst], BRACKET_MODE=[exposure], EXPOSURE_BRACKET_MODE=[single], EXPOSURE_BRACKET_PERIOD=[3], NUM_OF_BRACKET_PICTURE=[3], EXPOSURE_BRACKET_PERIODS=[3, 7, 10, 20, 30], ISO_SENSITIVITIES=[0, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600], FOCUS_MODES=[manual, auto, dmf]
+[INFO] Capabilities: quirks: [DIAL_UNRELIABLE]
+[INFO] 00:23:47.628 onCreate
+[INFO] 00:23:47.741 onResume
+[INFO] Capabilities: model NEX-5T, profile NEX
+[INFO] Capabilities: methods 40/45 present; absent: CameraEx$ParametersModifier.isSupportedSilentShutterMode(), CameraEx$ParametersModifier.setSilentShutterMode(boolean), CameraEx$ParametersModifier.isSupportedLongExposureNR(), CameraEx$ParametersModifier.getLongExposureNR(), CameraEx$ParametersModifier.setLongExposureNR(boolean)
+[INFO] Capabilities: features on: AE_LOCK, BURST, HOLY_GRAIL, FOCUS_MODE_MANUAL; off: SILENT_SHUTTER (profile), BRACKET_3, TOGGLE_FOCUS, SET_LENR
+[INFO] Capabilities: values: SILENT_SHUTTER_SUPPORTED=?, TOGGLE_FOCUS_SUPPORTED=[false], LONG_EXPOSURE_NR_SUPPORTED=?, LONG_EXPOSURE_NR=?, DRIVE_MODES=[single, burst, bracket, speed-prior-burst], BURST_DRIVE_SPEEDS=[low], AE_LOCKS=[locked, unlocked], BRACKET_MODES=[exposure], EXPOSURE_BRACKET_MODES=[continue], BRACKET_PICTURE_COUNTS=[3], DRIVE_MODE=[speed-prior-burst], BRACKET_MODE=[exposure], EXPOSURE_BRACKET_MODE=[single], EXPOSURE_BRACKET_PERIOD=[3], NUM_OF_BRACKET_PICTURE=[3], EXPOSURE_BRACKET_PERIODS=[3, 7, 10, 20, 30], ISO_SENSITIVITIES=[0, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600], FOCUS_MODES=[manual, auto, dmf]
+[INFO] Capabilities: quirks: [DIAL_UNRELIABLE]
+[INFO] 00:23:48.524 not on this body, off for this run: [SILENT_SHUTTER, BRACKET_3]
+[INFO] 00:23:48.669 LENR unknown
+[INFO] SafeCamera: restored drive state speed-prior-burst|exposure|single|3|3 from this run
+[INFO] 00:24:01.039 on pause
+[INFO] Hello World
+[INFO] 00:27:16.967 onCreate
+[INFO] 00:27:17.062 onResume
+[INFO] Capabilities: model NEX-5T, profile NEX
+[INFO] Capabilities: methods 40/45 present; absent: CameraEx$ParametersModifier.isSupportedSilentShutterMode(), CameraEx$ParametersModifier.setSilentShutterMode(boolean), CameraEx$ParametersModifier.isSupportedLongExposureNR(), CameraEx$ParametersModifier.getLongExposureNR(), CameraEx$ParametersModifier.setLongExposureNR(boolean)
+[INFO] Capabilities: features on: AE_LOCK, BURST, HOLY_GRAIL, FOCUS_MODE_MANUAL; off: SILENT_SHUTTER (profile), BRACKET_3, TOGGLE_FOCUS, SET_LENR
+[INFO] Capabilities: values: SILENT_SHUTTER_SUPPORTED=?, TOGGLE_FOCUS_SUPPORTED=[false], LONG_EXPOSURE_NR_SUPPORTED=?, LONG_EXPOSURE_NR=?, DRIVE_MODES=[single, burst, bracket, speed-prior-burst], BURST_DRIVE_SPEEDS=[low], AE_LOCKS=[locked, unlocked], BRACKET_MODES=[exposure], EXPOSURE_BRACKET_MODES=[continue], BRACKET_PICTURE_COUNTS=[3], DRIVE_MODE=[speed-prior-burst], BRACKET_MODE=[exposure], EXPOSURE_BRACKET_MODE=[single], EXPOSURE_BRACKET_PERIOD=[3], NUM_OF_BRACKET_PICTURE=[3], EXPOSURE_BRACKET_PERIODS=[3, 7, 10, 20, 30], ISO_SENSITIVITIES=[0, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600], FOCUS_MODES=[manual, auto, dmf]
+[INFO] Capabilities: quirks: [DIAL_UNRELIABLE]
+[INFO] 00:27:17.825 not on this body, off for this run: [SILENT_SHUTTER, BRACKET_3]
+[INFO] 00:27:17.933 LENR unknown
+[INFO] SafeCamera: restored drive state speed-prior-burst|exposure|single|3|3 from this run
+[INFO] 00:33:51.271 on pause
+[INFO] Hello World
+[INFO] Capabilities: model NEX-5T, profile NEX
+[INFO] Capabilities: methods 40/45 present; absent: CameraEx$ParametersModifier.isSupportedSilentShutterMode(), CameraEx$ParametersModifier.setSilentShutterMode(boolean), CameraEx$ParametersModifier.isSupportedLongExposureNR(), CameraEx$ParametersModifier.getLongExposureNR(), CameraEx$ParametersModifier.setLongExposureNR(boolean)
+[INFO] Capabilities: features on: AE_LOCK, BURST, HOLY_GRAIL, FOCUS_MODE_MANUAL; off: SILENT_SHUTTER (profile), BRACKET_3, TOGGLE_FOCUS, SET_LENR
+[INFO] Capabilities: values: SILENT_SHUTTER_SUPPORTED=?, TOGGLE_FOCUS_SUPPORTED=[false], LONG_EXPOSURE_NR_SUPPORTED=?, LONG_EXPOSURE_NR=?, DRIVE_MODES=[single, burst, bracket, speed-prior-burst], BURST_DRIVE_SPEEDS=[low], AE_LOCKS=[locked, unlocked], BRACKET_MODES=[exposure], EXPOSURE_BRACKET_MODES=[continue], BRACKET_PICTURE_COUNTS=[3], DRIVE_MODE=[speed-prior-burst], BRACKET_MODE=[exposure], EXPOSURE_BRACKET_MODE=[single], EXPOSURE_BRACKET_PERIOD=[3], NUM_OF_BRACKET_PICTURE=[3], EXPOSURE_BRACKET_PERIODS=[3, 7, 10, 20, 30], ISO_SENSITIVITIES=[0, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600], FOCUS_MODES=[manual, auto, dmf]
+[INFO] Capabilities: quirks: [DIAL_UNRELIABLE]
+[INFO] CapsDump: wrote /mnt/sdcard/TIMELPS/CAPS.TXT (1306 lines)
+[INFO] CapsDump: wrote /mnt/sdcard/TIMELPS/CAPS.TXT (1306 lines)

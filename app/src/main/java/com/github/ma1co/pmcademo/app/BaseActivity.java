@@ -1,5 +1,6 @@
 package com.github.ma1co.pmcademo.app;
 
+import io.github.nathanrcast.timelapse.core.DialDirection;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Build;
@@ -87,17 +88,21 @@ public class BaseActivity extends Activity {
             case ScalarInput.ISV_KEY_LENS_ATTACH:
                 return onLensAttached();
             case ScalarInput.ISV_DIAL_1_CLOCKWISE:
+                return onUpperDialChanged(DialDirection.steps(true, getDialStatus(ScalarInput.ISV_DIAL_1_STATUS)));
             case ScalarInput.ISV_DIAL_1_COUNTERCW:
-                return onUpperDialChanged(getDialStatus(ScalarInput.ISV_DIAL_1_STATUS) / 22);
+                return onUpperDialChanged(DialDirection.steps(false, getDialStatus(ScalarInput.ISV_DIAL_1_STATUS)));
             case ScalarInput.ISV_DIAL_2_CLOCKWISE:
+                return onLowerDialChanged(DialDirection.steps(true, getDialStatus(ScalarInput.ISV_DIAL_2_STATUS)));
             case ScalarInput.ISV_DIAL_2_COUNTERCW:
-                return onLowerDialChanged(getDialStatus(ScalarInput.ISV_DIAL_2_STATUS) / 22);
+                return onLowerDialChanged(DialDirection.steps(false, getDialStatus(ScalarInput.ISV_DIAL_2_STATUS)));
             case ScalarInput.ISV_DIAL_3_CLOCKWISE:
+                return onThirdDialChanged(DialDirection.steps(true, getDialStatus(ScalarInput.ISV_DIAL_3_STATUS)));
             case ScalarInput.ISV_DIAL_3_COUNTERCW:
-                return onThirdDialChanged(getDialStatus(ScalarInput.ISV_DIAL_3_STATUS) / 22);
+                return onThirdDialChanged(DialDirection.steps(false, getDialStatus(ScalarInput.ISV_DIAL_3_STATUS)));
             case ScalarInput.ISV_DIAL_KURU_CLOCKWISE:
+                return onKuruDialChanged(DialDirection.steps(true, getDialStatus(ScalarInput.ISV_DIAL_KURU_STATUS)));
             case ScalarInput.ISV_DIAL_KURU_COUNTERCW:
-                return onKuruDialChanged(getDialStatus(ScalarInput.ISV_DIAL_KURU_STATUS) / 22);
+                return onKuruDialChanged(DialDirection.steps(false, getDialStatus(ScalarInput.ISV_DIAL_KURU_STATUS)));
             case ScalarInput.ISV_KEY_MODE_DIAL:
                 return onModeDialChanged(getDialStatus(ScalarInput.ISV_KEY_MODE_DIAL));
             default:

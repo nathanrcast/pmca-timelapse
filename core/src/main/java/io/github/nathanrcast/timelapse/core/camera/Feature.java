@@ -29,6 +29,7 @@ public enum Feature {
     public static final String AE_LOCK_ON = "locked";
     public static final String BRACKET_MODE_EXPOSURE = "exposure";
     public static final String EXPOSURE_BRACKET_MODE_SINGLE = "single";
+    public static final String EXPOSURE_BRACKET_MODE_CONTINUE = "continue";
     public static final String BRACKET_PICTURES = "3";
     public static final String FOCUS_MODE_MANUAL_VALUE = "manual";
 
@@ -58,7 +59,8 @@ public enum Feature {
             case BRACKET_3:
                 return allows(caps, Query.DRIVE_MODES, DRIVE_MODE_BRACKET)
                         && allows(caps, Query.BRACKET_MODES, BRACKET_MODE_EXPOSURE)
-                        && allows(caps, Query.EXPOSURE_BRACKET_MODES, EXPOSURE_BRACKET_MODE_SINGLE)
+                        && (allows(caps, Query.EXPOSURE_BRACKET_MODES, EXPOSURE_BRACKET_MODE_SINGLE)
+                        || allows(caps, Query.EXPOSURE_BRACKET_MODES, EXPOSURE_BRACKET_MODE_CONTINUE))
                         && allows(caps, Query.BRACKET_PICTURE_COUNTS, BRACKET_PICTURES);
             case BURST:
                 List<String> speeds = caps.values(Query.BURST_DRIVE_SPEEDS);

@@ -342,10 +342,11 @@ final class CapsFormat {
         return lines;
     }
 
-    static String fileSafe(String model) {
-        if (model == null || model.trim().length() == 0)
-            return "unknown";
-        return model.trim().replaceAll("[^A-Za-z0-9._-]", "_");
+    // The CAPS file name: CAPS-<MODEL>.TXT, upper case and only [A-Z0-9-], 8.3-style characters that every
+    // card filesystem accepts.
+    static String capsFileName(String model) {
+        String m = model == null ? "" : model.trim().toUpperCase(Locale.US).replaceAll("[^A-Z0-9-]", "-");
+        return "CAPS-" + (m.length() == 0 ? "UNKNOWN" : m) + ".TXT";
     }
 
     static List<String> sortedLines(String flattened) {

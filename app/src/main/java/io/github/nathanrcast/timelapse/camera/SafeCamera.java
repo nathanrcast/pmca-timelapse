@@ -16,6 +16,7 @@ import io.github.nathanrcast.timelapse.Logger;
 import io.github.nathanrcast.timelapse.core.LenrGuard;
 import io.github.nathanrcast.timelapse.core.camera.BracketPlan;
 import io.github.nathanrcast.timelapse.core.camera.Capabilities;
+import io.github.nathanrcast.timelapse.core.camera.DriveReadback;
 import io.github.nathanrcast.timelapse.core.camera.Feature;
 import io.github.nathanrcast.timelapse.core.camera.OptionVisibility.FocusControl;
 import io.github.nathanrcast.timelapse.core.camera.ProbedCapabilities;
@@ -283,17 +284,34 @@ public final class SafeCamera {
 
     // The EV step and picture count are the camera's own menu choice (run.bracket, resolved from the values read at
     // open()). Every bracketed run sets the whole bracket state, so none of it depends on what the body held before:
-    // the app fires one frame per press, hence the exposure bracket mode is always single.
+    // the app fires one frame per press, hence the exposure bracket mode is single; a body that only offers continue
+    // (NEX-5T) shoots all the frames from one press.
     private void configureBracket(ParametersModifier modifier, BracketPlan bracket) {
         Logger.info("SafeCamera: bracket: " + bracket.describe());
         try {
             modifier.setDriveMode(ParametersModifier.DRIVE_MODE_BRACKET);
             modifier.setBracketMode(ParametersModifier.BRACKET_MODE_EXPOSURE);
-            modifier.setExposureBracketMode(ParametersModifier.EXPOSURE_BRACKET_MODE_SINGLE);
+            modifier.setExposureBracketMode(bracket.continuous() ? ParametersModifier.EXPOSURE_BRACKET_MODE_CONTINUE
+                    : ParametersModifier.EXPOSURE_BRACKET_MODE_SINGLE);
             modifier.setNumOfBracketPicture(BracketPlan.FRAMES);
             modifier.setExposureBracketPeriod(bracket.periodTenths);
         } catch (Throwable t) {
             failed("bracket", t);
+        }
+    }
+
+    // The drive and bracket state the body holds now, read through the probe's getters (call after configure()).
+    // null when it can't be read.
+    public DriveReadback driveReadback() {
+        if (released)
+            return null;
+        try {
+            Camera.Parameters params = normal.getParameters();
+            Object modifier = cameraEx.createParametersModifier(params);
+            return DriveReadback.of(ReflectiveCapabilities.readValues(methods(), modifier, null, DriveReadback.QUERIES));
+        } catch (Throwable t) {
+            failed("getParameters", t);
+            return null;
         }
     }
 

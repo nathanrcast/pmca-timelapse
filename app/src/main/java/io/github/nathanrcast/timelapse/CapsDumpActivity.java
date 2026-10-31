@@ -21,6 +21,7 @@ import com.sony.scalar.sysutil.ScalarInput;
 import com.sony.scalar.sysutil.ScalarProperties;
 
 import io.github.nathanrcast.timelapse.core.camera.SonyMethod;
+import io.github.nathanrcast.timelapse.core.WallTime;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -29,13 +30,10 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Method;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -375,15 +373,9 @@ public class CapsDumpActivity extends BaseActivity {
     // Worker thread from here on.
 
     private void probe() {
-        String model = null;
-        try {
-            model = DeviceInfo.getInstance().getModel();
-        } catch (Throwable ignored) {
-        }
-        if (model == null || model.length() == 0)
-            model = Build.MODEL;
+        String model = DeviceId.read().model;
 
-        String openError = openCaps(CapsFormat.fileSafe(model));
+        String openError = openCaps(CapsFormat.capsFileName(model));
         if (caps == null) {
             Logger.error("CapsDump: " + openError);
             status("Could not write " + openError + "\nKey log NOT being saved.\n" + EXIT);
@@ -414,15 +406,17 @@ public class CapsDumpActivity extends BaseActivity {
         }
     }
 
-    private String openCaps(String model) {
+    private String openCaps(String name) {
         File dir = Logger.getFile().getParentFile();
         dir.mkdirs();
-        File primary = new File(dir, "CAPS-" + model + ".txt");
+        File primary = new File(dir, name);
         try {
             caps = new CapsWriter(primary);
             return null;
         } catch (IOException e) {
             String error = primary.getPath() + ": " + CapsFormat.failure(e);
+            Logger.error("CapsDump: could not open " + error + " (dir exists=" + dir.isDirectory() + ", can write="
+                    + dir.canWrite() + ", file exists=" + primary.exists() + "); falling back to CAPS.TXT");
             // Fall back to an 8.3 name in case the card's filesystem rejects the long one.
             File fallback = new File(dir, "CAPS.TXT");
             try {
@@ -450,7 +444,9 @@ public class CapsDumpActivity extends BaseActivity {
             version = "?";
         }
         out.line("# TimeLapse+ CapsDump " + version);
-        out.line("# written " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
+        WallTime wall = Clocks.wallNow();
+        out.line("# written " + wall.format("yyyy-MM-dd HH:mm:ss") + " (clock=" + wall.source + ", utc_offset_min="
+                + wall.utcOffsetMinutes() + ")");
         out.line("# A line with a call name but no ' = ' or ' !! ' is the call that crashed the probe.");
 
         section(out, "Device (serial number omitted)");

@@ -38,6 +38,33 @@ public class BracketPlanTest {
     }
 
     @Test
+    public void prefersSingleModeAndUsesContinueOnlyWhenItIsAllThereIs() {
+        BracketPlan both = resolve(state("single", null, "3"), true);
+        assertEquals(Feature.EXPOSURE_BRACKET_MODE_SINGLE, both.exposureMode);
+        assertFalse(both.continuous());
+
+        Map<Query, List<String>> nex = with(state("single", null, "3"), Query.EXPOSURE_BRACKET_MODES, list("continue"));
+        assertTrue(Feature.BRACKET_3.allowedBy(caps(all(), nex)));
+        BracketPlan plan = resolve(nex, true);
+        assertTrue(plan.active);
+        assertTrue(plan.continuous());
+        assertEquals(Feature.EXPOSURE_BRACKET_MODE_CONTINUE, plan.exposureMode);
+        assertTrue(plan.describe(), plan.describe().contains("continuous"));
+    }
+
+    @Test
+    public void aBodyWithNeitherExposureBracketModeHasNoBracketing() {
+        Map<Query, List<String>> v = with(state("single", null, "3"), Query.EXPOSURE_BRACKET_MODES, list("other"));
+        assertFalse(Feature.BRACKET_3.allowedBy(caps(all(), v)));
+    }
+
+    @Test
+    public void unreadableModesMeanSingle() {
+        Map<Query, List<String>> v = with(state("single", null, "3"), Query.EXPOSURE_BRACKET_MODES, null);
+        assertEquals(Feature.EXPOSURE_BRACKET_MODE_SINGLE, resolve(v, true).exposureMode);
+    }
+
+    @Test
     public void fallsBackToPointSevenWhenTheStepCantBeRead() {
         assertEquals(7, resolve(state("single", null, null), true).periodTenths);
         assertEquals(7, resolve(state("single", null, "0"), true).periodTenths);

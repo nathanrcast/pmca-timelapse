@@ -1,0 +1,1330 @@
+# TimeLapse+ CapsDump 2.0.0 (8)
+# written 1970-01-01 02:34:40
+# A line with a call name but no ' = ' or ' !! ' is the call that crashed the probe.
+
+## Device (serial number omitted)
+DeviceInfo.getInstance = ok
+DeviceInfo.isCamera = true
+DeviceInfo.getBrand = "sony"
+DeviceInfo.getModel = "NEX-5T"
+DeviceInfo.getCategory = E_MOUNT_CAMERA
+DeviceInfo.getProductCode = "0032825711"
+DeviceInfo.getFirmwareVersion = "1.01"
+DeviceInfo.getHardwareVersion = 1
+DeviceInfo.getApiVersion = 1
+DeviceInfo.getAndroidVersion = "2.3.7"
+DeviceInfo.getAndroidSdkVersion = 10
+DeviceInfo.getAndroidIncrementalVersion = "204"
+ScalarProperties.version.platform = "1.1"
+Build.MODEL = "ScalarA"
+Build.DEVICE = "dslr-diadem"
+Build.PRODUCT = "ScalarA"
+Build.MANUFACTURER = "unknown"
+Build.VERSION.RELEASE = "2.3.7"
+Build.VERSION.SDK_INT = 10
+Build.VERSION.INCREMENTAL = "204"
+Build.FINGERPRINT = "sony/ScalarA/dslr-diadem:2.3.7/GWK74/204:user/test-keys"
+
+## Classes
+present  com.sony.scalar.hardware.CameraEx
+present  com.sony.scalar.hardware.CameraEx$ParametersModifier
+present  com.sony.scalar.hardware.CameraEx$AutoPictureReviewControl
+present  com.sony.scalar.hardware.CameraEx$ShutterListener
+present  com.sony.scalar.hardware.CameraEx$ProgramLineRangeOverListener
+present  com.sony.scalar.hardware.CameraSequence
+present  com.sony.scalar.hardware.avio.DisplayManager
+present  com.sony.scalar.hardware.avio.DisplayManager$DisplayEventListener
+present  com.sony.scalar.sysutil.ScalarInput
+present  com.sony.scalar.sysutil.didep.Gpelibrary
+
+CameraEx nested classes: 49
+class com.sony.scalar.hardware.CameraEx$AnalizedData
+class com.sony.scalar.hardware.CameraEx$ApertureInfo
+class com.sony.scalar.hardware.CameraEx$AutoPictureReviewControl
+class com.sony.scalar.hardware.CameraEx$CustomWhiteBalanceInfo
+class com.sony.scalar.hardware.CameraEx$ExternalFlashInfo
+class com.sony.scalar.hardware.CameraEx$FocusAreaInfos
+class com.sony.scalar.hardware.CameraEx$FocusAreaRectInfo
+class com.sony.scalar.hardware.CameraEx$LensInfo
+class com.sony.scalar.hardware.CameraEx$OpenOptions
+class com.sony.scalar.hardware.CameraEx$ParametersModifier
+class com.sony.scalar.hardware.CameraEx$PrvwMagChange
+class com.sony.scalar.hardware.CameraEx$PrvwMagInfo
+class com.sony.scalar.hardware.CameraEx$ReviewInfo
+class com.sony.scalar.hardware.CameraEx$SelectedColor
+class com.sony.scalar.hardware.CameraEx$ShutterSpeedInfo
+class com.sony.scalar.hardware.CameraEx$SupportFocus
+class com.sony.scalar.hardware.CameraEx$SupportZoom
+class com.sony.scalar.hardware.CameraEx$WideTele
+class com.sony.scalar.hardware.CameraEx$ZoomInfo
+interface com.sony.scalar.hardware.CameraEx$ApertureChangeListener
+interface com.sony.scalar.hardware.CameraEx$AutoApscModeListener
+interface com.sony.scalar.hardware.CameraEx$AutoFocusDoneListener
+interface com.sony.scalar.hardware.CameraEx$AutoFocusStartListener
+interface com.sony.scalar.hardware.CameraEx$AutoISOSensitivityListener
+interface com.sony.scalar.hardware.CameraEx$AutoSceneModeListener
+interface com.sony.scalar.hardware.CameraEx$CustomWhiteBalanceCallback
+interface com.sony.scalar.hardware.CameraEx$DirectShutterStoppedCallback
+interface com.sony.scalar.hardware.CameraEx$EquipmentCallback
+interface com.sony.scalar.hardware.CameraEx$ErrorCallback
+interface com.sony.scalar.hardware.CameraEx$FaceDetectionListener
+interface com.sony.scalar.hardware.CameraEx$FlashChargingStateListener
+interface com.sony.scalar.hardware.CameraEx$FlashEmittingListener
+interface com.sony.scalar.hardware.CameraEx$FocalLengthChangeListener
+interface com.sony.scalar.hardware.CameraEx$FocusAreaListener
+interface com.sony.scalar.hardware.CameraEx$FocusLightStateListener
+interface com.sony.scalar.hardware.CameraEx$JpegListener
+interface com.sony.scalar.hardware.CameraEx$PictureReviewInfoListener
+interface com.sony.scalar.hardware.CameraEx$PictureReviewStartListener
+interface com.sony.scalar.hardware.CameraEx$PowerZoomListener
+interface com.sony.scalar.hardware.CameraEx$PreviewAnalizeListener
+interface com.sony.scalar.hardware.CameraEx$PreviewMagnificationListener
+interface com.sony.scalar.hardware.CameraEx$PreviewStartListener
+interface com.sony.scalar.hardware.CameraEx$ProgramLineListener
+interface com.sony.scalar.hardware.CameraEx$ProgramLineRangeOverListener
+interface com.sony.scalar.hardware.CameraEx$RecordingMediaChangeCallback
+interface com.sony.scalar.hardware.CameraEx$SettingChangedListener
+interface com.sony.scalar.hardware.CameraEx$ShutterListener
+interface com.sony.scalar.hardware.CameraEx$ShutterSpeedChangeListener
+interface com.sony.scalar.hardware.CameraEx$ZoomChangeListener
+
+## Used methods (app calls today) vs this firmware
+present  CameraEx.open(int, CameraEx$OpenOptions)
+present  CameraEx.release()
+present  CameraEx.getNormalCamera()
+present  CameraEx.createParametersModifier(Camera$Parameters)
+present  CameraEx.setShutterListener(CameraEx$ShutterListener)
+present  CameraEx.burstableTakePicture()
+present  CameraEx.cancelTakePicture()
+present  CameraEx.createEmptyParameters()
+present  CameraEx.setAutoPictureReviewControl(CameraEx$AutoPictureReviewControl)
+present  CameraEx.setProgramLineRangeOverListener(CameraEx$ProgramLineRangeOverListener)
+present  CameraEx.incrementShutterSpeed()
+present  CameraEx.decrementShutterSpeed()
+present  CameraEx.setToggleFocusMode(boolean)
+present  CameraEx$ParametersModifier.setDriveMode(String)
+present  CameraEx$ParametersModifier.getDriveMode()
+present  CameraEx$ParametersModifier.getSupportedDriveModes()
+present  CameraEx$ParametersModifier.getSupportedBurstDriveSpeeds()
+present  CameraEx$ParametersModifier.setBurstDriveSpeed(String)
+present  CameraEx$ParametersModifier.setBurstDriveButtonReleaseBehave(String)
+ABSENT   CameraEx$ParametersModifier.isSupportedSilentShutterMode()
+ABSENT   CameraEx$ParametersModifier.setSilentShutterMode(boolean)
+present  CameraEx$ParametersModifier.getSupportedAutoExposureLocks()
+present  CameraEx$ParametersModifier.setAutoExposureLock(String)
+present  CameraEx$ParametersModifier.getBracketMode()
+present  CameraEx$ParametersModifier.getSupportedBracketModes()
+present  CameraEx$ParametersModifier.setBracketMode(String)
+present  CameraEx$ParametersModifier.getExposureBracketMode()
+present  CameraEx$ParametersModifier.getSupportedExposureBracketModes()
+present  CameraEx$ParametersModifier.setExposureBracketMode(String)
+present  CameraEx$ParametersModifier.getExposureBracketPeriod()
+present  CameraEx$ParametersModifier.getSupportedExposureBracketPeriods()
+present  CameraEx$ParametersModifier.setExposureBracketPeriod(int)
+present  CameraEx$ParametersModifier.getSupportedNumsOfBracketPicture()
+present  CameraEx$ParametersModifier.getNumOfBracketPicture()
+present  CameraEx$ParametersModifier.setNumOfBracketPicture(int)
+present  CameraEx$ParametersModifier.getShutterSpeed()
+present  CameraEx$ParametersModifier.getISOSensitivity()
+present  CameraEx$ParametersModifier.setISOSensitivity(int)
+present  CameraEx$ParametersModifier.getSupportedISOSensitivities()
+ABSENT   CameraEx$ParametersModifier.isSupportedLongExposureNR()
+ABSENT   CameraEx$ParametersModifier.getLongExposureNR()
+ABSENT   CameraEx$ParametersModifier.setLongExposureNR(boolean)
+present  CameraEx$ParametersModifier.isSupportedToggleFocusMode()
+present  DisplayManager.switchDisplayOutputTo(String)
+present  DisplayManager.finish()
+present  CameraEx$ShutterListener.onShutter(int, CameraEx)
+present  CameraEx$ProgramLineRangeOverListener.onAERange(boolean, boolean, boolean, CameraEx)
+present  CameraEx$ProgramLineRangeOverListener.onEVRange(int, CameraEx)
+present  CameraEx$ProgramLineRangeOverListener.onMeteringRange(boolean, CameraEx)
+present  DisplayManager.setDisplayStatusListener(DisplayManager$DisplayEventListener)
+present  DisplayManager.releaseDisplayStatusListener()
+present  DisplayManager.getActiveDevice()
+present  DisplayManager.switchDisplayOutputTo(String)
+present  DisplayManager.finish()
+present  DisplayManager$DisplayEventListener.onDeviceStatusChanged(int)
+present  ScalarInput.getKeyStatus(int)
+present  Gpelibrary.changeFrameBufferPixel(Gpelibrary$GS_FRAMEBUFFER_TYPE)
+5 of 57 absent
+
+## ScalarInput ISV_* constants (82)
+103 ISV_KEY_UP
+105 ISV_KEY_LEFT
+106 ISV_KEY_RIGHT
+108 ISV_KEY_DOWN
+207 ISV_KEY_PLAY
+229 ISV_KEY_SK1
+232 ISV_KEY_ENTER
+513 ISV_KEY_SK2
+514 ISV_KEY_MENU
+515 ISV_KEY_STASTOP
+516 ISV_KEY_S1_1
+517 ISV_KEY_S1_2
+518 ISV_KEY_S2
+519 ISV_KEY_FINDER
+520 ISV_KEY_FN
+521 ISV_DIAL_KURU_STATUS
+522 ISV_DIAL_KURU_CLOCKWISE
+523 ISV_DIAL_KURU_COUNTERCW
+524 ISV_DIAL_1_STATUS
+525 ISV_DIAL_1_CLOCKWISE
+526 ISV_DIAL_1_COUNTERCW
+527 ISV_DIAL_2_STATUS
+528 ISV_DIAL_2_CLOCKWISE
+529 ISV_DIAL_2_COUNTERCW
+530 ISV_KEY_LENS_ATTACH
+531 ISV_KEY_HOTSHOE_SAT_STROBE
+532 ISV_KEY_AEL
+533 ISV_KEY_AFMF
+534 ISV_KEY_MODE_INVALID
+535 ISV_KEY_MODE_AUTO
+536 ISV_KEY_MODE_HQAUTO
+537 ISV_KEY_MODE_PROGRAM
+538 ISV_KEY_MODE_AES
+539 ISV_KEY_MODE_AEA
+540 ISV_KEY_MODE_MANUAL
+541 ISV_KEY_MODE_CUSTOM
+542 ISV_KEY_MODE_PANORAMA
+543 ISV_KEY_MODE_3D
+544 ISV_KEY_MODE_MOVIE
+545 ISV_KEY_MODE_SCN
+546 ISV_KEY_MODE_BOKS
+547 ISV_KEY_MODE_CONT_PRIO_AE
+548 ISV_KEY_MODE_FLASH_OFF
+549 ISV_KEY_MODE_PE
+550 ISV_KEY_MODE_CUSTOM2
+551 ISV_KEY_MODE_CUSTOM3
+552 ISV_KEY_IR_SHUTTER
+553 ISV_KEY_IR_SHUTTER_2SEC
+554 ISV_CEC_ENTER
+555 ISV_CEC_UP
+556 ISV_CEC_DOWN
+557 ISV_CEC_RIGHT
+558 ISV_CEC_LEFT
+559 ISV_CEC_EXIT
+560 ISV_CEC_PLAY
+561 ISV_CEC_STOP
+562 ISV_CEC_FASTFORWARD
+563 ISV_CEC_REWIND
+564 ISV_CEC_FORWARD
+565 ISV_CEC_BACKWARD
+566 ISV_CEC_PAUSE
+567 ISV_CEC_ROOT_MENU
+568 ISV_CEC_SETUP_MENU
+569 ISV_CEC_CONTENTS_MENU
+570 ISV_CEC_CLEAR
+571 ISV_CEC_STANDBY
+572 ISV_KEY_MODE_DIAL
+573 ISV_KEY_IR_DISP
+574 ISV_KEY_IR_HISTOGRAM
+575 ISV_KEY_IR_INDEX
+576 ISV_KEY_IR_ROTATE
+577 ISV_KEY_IR_PLAY
+578 ISV_KEY_IR_SLIDE_SHOW
+579 ISV_KEY_IR_ZOOM_TELE
+580 ISV_KEY_IR_ZOOM_WIDE
+581 ISV_KEY_IR_MENU
+582 ISV_KEY_IR_DELETE
+583 ISV_KEY_IR_ENTER
+584 ISV_KEY_IR_UP
+585 ISV_KEY_IR_DOWN
+586 ISV_KEY_IR_RIGHT
+587 ISV_KEY_IR_LEFT
+
+## Values CameraEx
+CameraEx.open(0, null) = ok
+hasSupportedParameters = true
+getInhibitionInfo = 0
+getLensInfo = null
+getNormalCamera().getParameters() = ok
+
+## Values CameraEx$ParametersModifier on getNormalCamera().getParameters()
+createParametersModifier = ok
+getSupportedAntiHandBlurModes = ["off", "onetime"]
+getSupportedAutoExposureLocks = ["locked", "unlocked"]
+getSupportedAutoFocusModes = ["af-s", "af-c"]
+getSupportedBracketModes = ["exposure"]
+getSupportedBracketOrders = ["start-zero"]
+getSupportedBracketStepPeriods = null
+getSupportedBurstDriveButtonReleaseBehaves = null
+getSupportedBurstDriveSpeeds = ["low"]
+getSupportedColorModes = ["standard", "vivid", "portrait", "landscape", "mono", "sunset"]
+getSupportedColorSelectModes = ["off", "extract"]
+getSupportedDROModes = ["off", "auto", "on"]
+getSupportedDigitalZoomTypes = ["smart", "super-resolution", "precision"]
+getSupportedDriveModes = ["single", "burst", "bracket", "speed-prior-burst"]
+getSupportedExposureBracketModes = ["continue"]
+getSupportedExposureBracketPeriods = [3, 7, 10, 20, 30]
+getSupportedFaceDetectionModes = ["off", "auto", "adult", "child"]
+getSupportedFlashTypes = ["front-sync", "slow-sync", "slow-rear-sync", "wireless"]
+getSupportedFocusAreaModes = ["multi", "center", "flex-spot", "local", "spot", "wide"]
+getSupportedHDRModes = ["off", "auto", "on"]
+getSupportedISOSensitivities = [0, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
+getSupportedISOSensitivitiesForMultiShootNR = [0, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
+getSupportedImageAspectRatios = ["3:2", "16:9"]
+getSupportedImageSizes = ["small", "midium", "large"]
+getSupportedLensCorrections = ["shading-w", "shading-wm", "shading-cr", "shading-cb", "shading-cm", "chroma-r", "chroma-b", "distotion", "distotion-m"]
+getSupportedMeteringModes = ["multi", "center-weighted", "center-spot"]
+getSupportedNumsOfBracketPicture = [3]
+getSupportedPictureEffectMiniatureFocusAreas = ["auto", "left", "vcenter", "right", "upper", "hcenter", "lower"]
+getSupportedPictureEffectPartColorEffects = ["red", "green", "blue", "yellow"]
+getSupportedPictureEffectPosterizationEffects = ["posterization-color", "posterization-mono"]
+getSupportedPictureEffectSoftHightKeyEffects = ["blue", "pink", "green"]
+getSupportedPictureEffectToyCameraEffects = ["normal", "cool", "warm", "green", "magenta"]
+getSupportedPictureEffects = ["off", "toy-camera", "pop-color", "posterization", "retro-photo", "soft-high-key", "part-color", "rough-mono", "soft-focus", "hdr-art", "richtone-mono", "miniature", "illust", "watercolor"]
+getSupportedPictureStorageFormats = ["jpeg", "raw", "rawjpeg"]
+getSupportedPreviewMagnification = [100, 200]
+getSupportedQuickAutoFocus = ["afc_woaf"]
+getSupportedRedEyeReductionModes = ["on", "off"]
+getSupportedSelfTimers = [10, 2, 0]
+getSupportedShootingPreviewModes = ["iris", "iris_ss_iso", "off", "iris_ss_iso_aeunlock"]
+getSupportedZoomDriveTypes = ["auto"]
+isSupportedAutoShutterSpeedLowLimit = true
+isSupportedFocalLengthNotify = true
+isSupportedFocusShift = true
+isSupportedLensInfo = true
+isSupportedOVFPreviewMode = true
+isSupportedPreviewAnalize = true
+isSupportedRemoteControlMode = true
+isSupportedToggleFocusMode = false
+getAntiHandBlurMode = "off"
+getAperture = 0
+getApscMode = "off"
+getAutoExposureLock = "unlocked"
+getAutoFocusMode = "af-s"
+getAutoShutterSpeedLowLimit = -1
+getAutoWhiteBalanceLock = false
+getBracketMode = "exposure"
+getBracketOrder = "start-zero"
+getBracketStepPeriod = "low"
+getBurstDriveButtonReleaseBehave = "stop"
+getBurstDriveSpeed = "high"
+getColorCompensationForWhiteBalance = 0
+getColorMode = "standard"
+getColorSelectMode = "off"
+getColorTemperatureForWhiteBalance = 5500
+getContrast = -3
+getCustomWhiteBalance = 1
+getDROLevel = 1
+getDROMode = "auto"
+getDriveMode = "speed-prior-burst"
+getExposureBracketMode = "single"
+getExposureBracketPeriod = 3
+getFaceDetectionMode = "off"
+getFlashCompensation = 0
+getFlashCompensationStep = 0.33333
+getFlashType = "front-sync"
+getFocusAreaMode = "multi"
+getFocusPoint = (2, 2)
+getFocusPointIndex = 0
+getHDRExposureDifferenceLevel = 1
+getHDRExposureDifferenceLevelStep = 1.0
+getHDRMode = "off"
+getISOSensitivity = 200
+getImageAspectRatio = "3:2"
+getImageSize = "large"
+getLensCorrection = false
+getLightBalanceForWhiteBalance = 0
+getMaxColorCompensationForWhiteBalance = 7
+getMaxColorSelectChannels = 2
+getMaxColorTemperatureForWhiteBalance = 9900
+getMaxContrast = 3
+getMaxDROLevel = 5
+getMaxFlashCompensation = 6
+getMaxFocusShift = 16
+getMaxHDRExposureDifferenceLevel = 6
+getMaxLightBalanceForWhiteBalance = 7
+getMaxNumDetectedFaces = 8
+getMaxNumOfBurstPicture = 5
+getMaxPictureEffectHDRArtEffectLevel = 3
+getMaxPictureEffectIllustEffectLevel = 3
+getMaxPictureEffectRoughMonoEffectLevel = 0
+getMaxPictureEffectSoftFocusEffectLevel = 3
+getMaxPictureEffectWaterColorEffectLevel = 3
+getMaxSaturation = 3
+getMaxSharpness = 3
+getMaxToyCameraTuning = 16
+getMaxZoomSpeed = 8
+getMeteringMode = "multi"
+getMinColorCompensationForWhiteBalance = -7
+getMinColorTemperatureForWhiteBalance = 2500
+getMinContrast = -3
+getMinFlashCompensation = -6
+getMinFocusShift = -16
+getMinHDRExposureDifferenceLevel = 1
+getMinLightBalanceForWhiteBalance = -7
+getMinPictureEffectHDRArtEffectLevel = 1
+getMinPictureEffectIllustEffectLevel = 1
+getMinPictureEffectRoughMonoEffectLevel = 0
+getMinPictureEffectSoftFocusEffectLevel = 1
+getMinPictureEffectWaterColorEffectLevel = 1
+getMinSaturation = -3
+getMinSharpness = -3
+getMinToyCameraTuning = -16
+getMultiShootNRMode = false
+getNumOfBracketPicture = 3
+getNumOfBurstPicture = 3
+getNumOfCustomWhiteBalance = 1
+getOVFPreviewMode = true
+getPictureEffect = "off"
+getPictureEffectHDRArtEffectLevel = 2
+getPictureEffectIllustEffectLevel = 2
+getPictureEffectMiniatureFocusArea = "auto"
+getPictureEffectPartColorEffect = "red"
+getPictureEffectPosterizationEffect = "posterization-color"
+getPictureEffectRoughMonoEffectLevel = 2
+getPictureEffectSoftFocusEffectLevel = 2
+getPictureEffectSoftHightKeyEffect = "blue"
+getPictureEffectToyCameraEffect = "normal"
+getPictureEffectWaterColorEffectLevel = 2
+getPictureStorageFormat = "raw"
+getPreviewMagnificationOnManualFocus = true
+getPreviewMagnificationTimeOnManualFocus = 2
+getRedEyeReductionMode = "off"
+getRemoteControlMode = false
+getSaturation = -2
+getSelfTimer = 0
+getSharpness = -2
+getShootingPreviewMode = "off"
+getShutterSpeed = (1, 1)
+getToyCameraTuning = 0
+getZoomDriveType = "auto"
+isApscModeSupported = false
+isAutoWhiteBalanceLockSupported = true
+isDirectShutterSupported = true
+
+## Values Camera$Parameters
+getSupportedAntibanding = null
+getSupportedColorEffects = ["none", "sepia", "mono"]
+getSupportedFlashModes = ["auto", "on", "off"]
+getSupportedFocusModes = ["manual", "auto", "dmf"]
+getSupportedJpegThumbnailSizes = [Camera$Size{height=120, width=160}, Camera$Size{height=0, width=0}]
+getSupportedPictureFormats = [256]
+getSupportedPictureSizes = [Camera$Size{height=3264, width=4912}, Camera$Size{height=2760, width=4912}, Camera$Size{height=2368, width=3568}, Camera$Size{height=2000, width=3568}, Camera$Size{height=1624, width=2448}, Camera$Size{height=1376, width=2448}]
+getSupportedPreviewFormats !! java.lang.NullPointerException
+getSupportedPreviewFpsRange = null
+getSupportedPreviewFrameRates = null
+getSupportedPreviewSizes = null
+getSupportedSceneModes = ["program-auto", "aperture-priority", "shutter-speed", "manual-exposure", "auto", "portrait", "landscape", "night", "night-portrait", "sunset", "sports", "hand-held-twilight", "anti-motion-blur", "macro"]
+getSupportedWhiteBalance = ["auto", "daylight", "shade", "cloudy-daylight", "fluorescent-coolwhite", "fluorescent-daywhite", "fluorescent-daylight", "warm-fluorescent", "incandescent", "flash", "custom", "color-temp"]
+getAntibanding = null
+getColorEffect = "none"
+getExposureCompensation = 0
+getExposureCompensationStep = 0.33333
+getFlashMode = "on"
+getFocalLength !! java.lang.NullPointerException
+getFocusMode = "manual"
+getHorizontalViewAngle = 360.0
+getJpegQuality = 50
+getJpegThumbnailQuality = 25
+getJpegThumbnailSize = Camera$Size{height=120, width=160}
+getMaxExposureCompensation = 9
+getMaxZoom = 0
+getMinExposureCompensation = -9
+getPictureFormat = 256
+getPictureSize = Camera$Size{height=3264, width=4912}
+getPreviewFormat = 0
+getPreviewFrameRate !! java.lang.NumberFormatException: unable to parse 'null' as integer
+getPreviewSize = null
+getSceneMode = "aperture-priority"
+getVerticalViewAngle = 360.0
+getWhiteBalance = "custom"
+getZoom = 0
+getZoomRatios = null
+isSmoothZoomSupported = false
+isZoomSupported = false
+
+## Camera$Parameters.flatten() of getNormalCamera().getParameters()
+flatten = 211 keys
+ae-lock-values=locked,unlocked
+ae-lock=unlocked
+af-mode-values=af-s,af-c
+af-mode=af-s
+anti-blur-values=off,onetime
+anti-blur=off
+aperture=0
+apsc-mode-supported=false
+apsc-mode=off
+auto-shutter-low-limit-supported=true
+auto-shutter-low-limit=-1
+auto-wb-lock-supported=true
+auto-wb-lock=false
+bracket-mode-values=exposure
+bracket-mode=exposure
+bracket-order-values=start-zero
+bracket-order=start-zero
+bracket-step-period=low
+burst-drive-button-release-behave=stop
+burst-drive-speed-values=low
+burst-drive-speed=high
+color-compensation-for-white-balance=0
+color-mode-values=standard,vivid,portrait,landscape,mono,sunset
+color-mode=standard
+color-select-mode-values=off,extract
+color-select-mode=off
+color-temperture-white-balance=5500
+contrast=-3
+custom-white-balance=1
+digital-zoom-type-values=smart,super-resolution,precision
+direct-shutter-supported=true
+drive-mode-values=single,burst,bracket,speed-prior-burst
+drive-mode=speed-prior-burst
+dro-level=1
+dro-mode-values=off,auto,on
+dro-mode=auto
+effect-values=none,sepia,mono
+effect=none
+exposure-bracket-mode-values=continue
+exposure-bracket-mode=single
+exposure-bracket-period-values=3,7,10,20,30
+exposure-bracket-period=3
+exposure-compensation-step=0.33333
+exposure-compensation=0
+face-detection-mode-values=off,auto,adult,child
+face-detection-mode=off
+flash-compensation-step=0.33333
+flash-compensation=0
+flash-mode-values=auto,on,off
+flash-mode=on
+flash-type-values=front-sync,slow-sync,slow-rear-sync,wireless
+flash-type=front-sync
+focal-length-notify-supported=true
+focus-area-type-values=multi,center,flex-spot,local,spot,wide
+focus-area-type=multi
+focus-mode-values=manual,auto,dmf
+focus-mode=manual
+focus-point-index=0
+focus-point-x=2
+focus-point-y=2
+focus-shift-supported=true
+hdr-exposure-difference-level-step=1.0
+hdr-exposure-difference-level=1
+hdr-mode-values=off,auto,on
+hdr-mode=off
+horizontal-view-angle=360
+image-aspect-values=3:2,16:9
+image-aspect=3:2
+image-size-values=small,midium,large
+image-size=large
+iso-sensitivity-values=0,100,200,400,800,1600,3200,6400,12800,25600
+iso-sensitivity=200
+jpeg-quality=50
+jpeg-thumbnail-height=120
+jpeg-thumbnail-quality=25
+jpeg-thumbnail-size-values=160x120,0x0
+jpeg-thumbnail-width=160
+lens-correction-chroma-blue=0
+lens-correction-chroma-red=0
+lens-correction-distotion-middle=0
+lens-correction-distotion=0
+lens-correction-shading-color-blue=0
+lens-correction-shading-color-middle=0
+lens-correction-shading-color-red=0
+lens-correction-shading-whole-middle=0
+lens-correction-shading-whole=0
+lens-correction-values=shading-w,shading-wm,shading-cr,shading-cb,shading-cm,chroma-r,chroma-b,distotion,distotion-m
+lens-info-supported=true
+light-balance-for-white-balance=0
+max-color-compensation-for-white-balance=7
+max-color-temperture-white-balance=9900
+max-contrast=3
+max-dro-level=5
+max-exposure-compensation=9
+max-exposure-difference-level=6
+max-flash-compensation=6
+max-focus-shift=16
+max-lens-correction-chroma-blue=16
+max-lens-correction-chroma-red=16
+max-lens-correction-distotion-middle=16
+max-lens-correction-distotion=16
+max-lens-correction-shading-color-blue=16
+max-lens-correction-shading-color-middle=16
+max-lens-correction-shading-color-red=16
+max-lens-correction-shading-whole-middle=16
+max-lens-correction-shading-whole=16
+max-light-balance-for-white-balance=7
+max-mag-precision-zoom=100
+max-mag-smart-zoom=100
+max-mag-super-resolution-zoom=100
+max-num-of-burst-picture=5
+max-pe-hdr-art-effect-level=3
+max-pe-illust-color-effect-level=3
+max-pe-rough-mono-effect-level=0
+max-pe-soft-focus-effect-level=3
+max-pe-toy-camera-tuning=16
+max-pe-watercolor-effect-level=3
+max-saturation=3
+max-sharpness=3
+max-zoom-speed=8
+metering-mode-values=multi,center-weighted,center-spot
+metering-mode=multi
+min-color-compensation-for-white-balance=-7
+min-color-temperture-white-balance=2500
+min-contrast=-3
+min-exposure-compensation=-9
+min-exposure-difference-level=1
+min-flash-compensation=-6
+min-focus-shift=-16
+min-lens-correction-chroma-blue=-16
+min-lens-correction-chroma-red=-16
+min-lens-correction-distotion-middle=-16
+min-lens-correction-distotion=-16
+min-lens-correction-shading-color-blue=-16
+min-lens-correction-shading-color-middle=-16
+min-lens-correction-shading-color-red=-16
+min-lens-correction-shading-whole-middle=-16
+min-lens-correction-shading-whole=-16
+min-light-balance-for-white-balance=-7
+min-pe-hdr-art-effect-level=1
+min-pe-illust-color-effect-level=1
+min-pe-soft-focus-effect-level=1
+min-pe-soft-mono-effect-level=0
+min-pe-toy-camera-tuning=-16
+min-pe-watercolor-effect-level=1
+min-saturation=-3
+min-sharpness=-3
+mulit-shoot-nr-iso-values=0,100,200,400,800,1600,3200,6400,12800,25600
+multi-shoot-nr=false
+num-of-bracket-picture-values=3
+num-of-bracket-picture=3
+num-of-burst-picture=3
+num-of-color-select-channel=2
+num-of-custom-white-balance=1
+num-of-detected-faces=8
+ovf_preview-values=true
+ovf_preview=true
+pe-hdr-art-effect-level=2
+pe-illust-effect-level=2
+pe-miniature-focus-area-values=auto,left,vcenter,right,upper,hcenter,lower
+pe-miniature-focus-area=auto
+pe-part-color-effect-values=red,green,blue,yellow
+pe-part-color-effect=red
+pe-posterization-effect-values=posterization-color,posterization-mono
+pe-posterization-effect=posterization-color
+pe-rough-mono-effect-level=2
+pe-soft-focus-effect-level=2
+pe-soft-high-key-effect-values=blue,pink,green
+pe-soft-high-key-effect=blue
+pe-toy-camera-effect-values=normal,cool,warm,green,magenta
+pe-toy-camera-effect=normal
+pe-toy-camera-tuning=0
+pe-watercolor-effect-level=2
+picture-effect-values=off,toy-camera,pop-color,posterization,retro-photo,soft-high-key,part-color,rough-mono,soft-focus,hdr-art,richtone-mono,miniature,illust,watercolor
+picture-effect=off
+picture-format-values=jpeg
+picture-format=jpeg
+picture-size-values=4912x3264,4912x2760,3568x2368,3568x2000,2448x1624,2448x1376
+picture-size=4912x3264
+precision-zoom=false
+preview-analize-supported=true
+prv-mag-mode=true
+prv-mag-time=2
+prv-mag-values=100,200
+quick-af-values=afc_woaf
+red-eye-reduction-mode-values=on,off
+red-eye-reduction-mode=off
+remocon-values=true
+remocon=false
+saturation=-2
+scene-mode-values=program-auto,aperture-priority,shutter-speed,manual-exposure,auto,portrait,landscape,night,night-portrait,sunset,sports,hand-held-twilight,anti-motion-blur,macro
+scene-mode=aperture-priority
+self-timer-values=10,2,0
+self-timer=0
+sharpness=-2
+shooting-preview-values=iris,iris_ss_iso,off,iris_ss_iso_aeunlock
+shooting-preview=off
+shutter-speed-deno=1
+shutter-speed-nume=1
+smart-zoom=false
+smooth-zoom-supported=false
+storage-fmt-values=jpeg,raw,rawjpeg
+storage-fmt=raw
+super-resolution-zoom=false
+toggle-focus-supported=false
+vertical-view-angle=360
+whitebalance-values=auto,daylight,shade,cloudy-daylight,fluorescent-coolwhite,fluorescent-daywhite,fluorescent-daylight,warm-fluorescent,incandescent,flash,custom,color-temp
+whitebalance=custom
+zoom-drive-type-values=auto
+zoom-drive-type=auto
+zoom-supported=false
+
+## Camera$Parameters.flatten() of CameraEx.getSupportedParameters()
+getSupportedParameters !! java.lang.NoSuchMethodException: getSupportedParameters
+CameraEx.release() = ok
+
+## Methods com.sony.scalar.hardware.CameraEx (76)
+void adjustAperture(int)
+void adjustProgramLine(int)
+void adjustShutterSpeed(int)
+void burstableTakePicture()
+boolean cancelSelfTimerShutter()
+void cancelTakePicture()
+void captureCustomWhiteBalance(CameraEx$CustomWhiteBalanceCallback)
+Camera$Parameters createEmptyParameters()
+CameraEx$ParametersModifier createParametersModifier(Camera$Parameters)
+void decrementAperture()
+void decrementShutterSpeed()
+void disableSettingChangedTypes(int[])
+void enableSettingChangedTypes(int[])
+CameraEx$SelectedColor getChannelColorSelect(int)
+CameraEx$ExternalFlashInfo getExternalFlashInfo()
+boolean getFlashStatus()
+CameraEx$FocusAreaInfos[] getFocusAreaInfos(int)
+int getInhibitionInfo()
+Camera$Parameters getInitialParameters()
+CameraEx$LensInfo getLensInfo()
+Camera getNormalCamera()
+CameraEx$SelectedColor getPreviewDisplayColor(int, int)
+int getPreviewMagnificationRatio(int)
+boolean hasSupportedParameters()
+void incrementAperture()
+void incrementShutterSpeed()
+static CameraEx open(int, CameraEx$OpenOptions)
+void release()
+void resetDigitalZoom()
+void resetQuickAutoFocus(String)
+void saveCustomWhiteBalance(int)
+void setApertureChangeListener(CameraEx$ApertureChangeListener)
+void setAutoApscModeListener(CameraEx$AutoApscModeListener)
+void setAutoFocusDoneListener(CameraEx$AutoFocusDoneListener)
+void setAutoFocusStartListener(CameraEx$AutoFocusStartListener)
+void setAutoISOSensitivityListener(CameraEx$AutoISOSensitivityListener)
+void setAutoPictureReviewControl(CameraEx$AutoPictureReviewControl)
+void setAutoPreviewMagnification()
+void setAutoSceneModeListener(CameraEx$AutoSceneModeListener)
+void setColorSelectToChannel(int, CameraEx$SelectedColor)
+void setDigitalZoom(int)
+void setEquipmentCallback(CameraEx$EquipmentCallback)
+void setErrorCallback(CameraEx$ErrorCallback)
+void setFaceDetectionListener(CameraEx$FaceDetectionListener)
+void setFlashChargingStateListener(CameraEx$FlashChargingStateListener)
+void setFlashEmittingListener(CameraEx$FlashEmittingListener)
+void setFocalLengthChangeListener(CameraEx$FocalLengthChangeListener)
+void setFocusAreaListener(CameraEx$FocusAreaListener)
+void setFocusLightStateListener(CameraEx$FocusLightStateListener)
+void setJpegListener(CameraEx$JpegListener)
+void setPowerZoomListener(CameraEx$PowerZoomListener)
+void setPreviewAnalizeListener(CameraEx$PreviewAnalizeListener)
+void setPreviewMagnification(int, Pair)
+void setPreviewMagnificationListener(CameraEx$PreviewMagnificationListener)
+void setPreviewStartListener(CameraEx$PreviewStartListener)
+void setProgramLineListener(CameraEx$ProgramLineListener)
+void setProgramLineRangeOverListener(CameraEx$ProgramLineRangeOverListener)
+void setQuickAutoFocus(String)
+void setRecordingMedia(String, CameraEx$RecordingMediaChangeCallback)
+void setSettingChangedListener(CameraEx$SettingChangedListener)
+void setShutterListener(CameraEx$ShutterListener)
+void setShutterSpeedChangeListener(CameraEx$ShutterSpeedChangeListener)
+void setToggleFocusMode(boolean)
+void setZoomChangeListener(CameraEx$ZoomChangeListener)
+boolean shiftFocusPosition(int)
+void startCustomWhiteBalanceCapture()
+void startDirectShutter()
+void startFaceDetection(int)
+void startSelfTimerShutter()
+void startZoom(int, int)
+void stopCustomWhiteBalanceCapture()
+void stopDirectShutter(CameraEx$DirectShutterStoppedCallback)
+void stopFaceDetection()
+void stopPreviewMagnification()
+void stopZoom()
+void withSupportedParameters(boolean)
+
+## Methods com.sony.scalar.hardware.CameraEx$ApertureChangeListener (1)
+void onApertureChange(CameraEx$ApertureInfo, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$AutoApscModeListener (1)
+void onChanged(String, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$AutoFocusDoneListener (1)
+void onDone(int, int[], CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$AutoFocusStartListener (1)
+void onStart(CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$AutoISOSensitivityListener (1)
+void onChanged(int, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$AutoPictureReviewControl (8)
+void cancelAutoPictureReview()
+int[] getPictureReviewSupportedTimes()
+int getPictureReviewTime()
+void handleMessage(Message)
+void setPictureReviewInfoHist(boolean)
+void setPictureReviewInfoListener(CameraEx$PictureReviewInfoListener)
+void setPictureReviewStartListener(CameraEx$PictureReviewStartListener)
+void setPictureReviewTime(int)
+
+## Methods com.sony.scalar.hardware.CameraEx$AutoSceneModeListener (1)
+void onChanged(String, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$CustomWhiteBalanceCallback (1)
+void onCapture(CameraEx$CustomWhiteBalanceInfo, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$DirectShutterStoppedCallback (1)
+void onShutterStopped(CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$EquipmentCallback (1)
+void onEquipmentChange(int, int, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$ErrorCallback (1)
+void onError(int, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$FaceDetectionListener (1)
+void onFaceDetected(FaceInfo[], CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$FlashChargingStateListener (1)
+void onChanged(int, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$FlashEmittingListener (1)
+void onFlash(boolean, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$FocalLengthChangeListener (1)
+void onFocalLengthChanged(int, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$FocusAreaListener (1)
+void onChanged(CameraEx$FocusAreaInfos, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$FocusLightStateListener (1)
+void onChanged(boolean, boolean, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$JpegListener (1)
+void onPictureTaken(byte[], CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$ParametersModifier (221)
+String getAntiHandBlurMode()
+int getAperture()
+String getApscMode()
+String getAutoExposureLock()
+String getAutoFocusMode()
+int getAutoShutterSpeedLowLimit()
+boolean getAutoWhiteBalanceLock()
+String getBracketMode()
+String getBracketOrder()
+String getBracketStepPeriod()
+String getBurstDriveButtonReleaseBehave()
+String getBurstDriveSpeed()
+int getColorCompensationForWhiteBalance()
+String getColorMode()
+String getColorSelectMode()
+int getColorTemperatureForWhiteBalance()
+int getContrast()
+int getCustomWhiteBalance()
+int getDROLevel()
+String getDROMode()
+boolean getDigitalZoomMode(String)
+String getDriveMode()
+String getExposureBracketMode()
+int getExposureBracketPeriod()
+String getFaceDetectionMode()
+int getFlashCompensation()
+float getFlashCompensationStep()
+String getFlashType()
+String getFocusAreaMode()
+Pair getFocusPoint()
+int getFocusPointIndex()
+int getHDRExposureDifferenceLevel()
+float getHDRExposureDifferenceLevelStep()
+String getHDRMode()
+int getISOSensitivity()
+String getImageAspectRatio()
+String getImageSize()
+boolean getLensCorrection()
+int getLensCorrectionLevel(String)
+int getLightBalanceForWhiteBalance()
+int getMaxColorCompensationForWhiteBalance()
+int getMaxColorSelectChannels()
+int getMaxColorTemperatureForWhiteBalance()
+int getMaxContrast()
+int getMaxDROLevel()
+int getMaxDigitalZoomMagnification(String)
+int getMaxFlashCompensation()
+int getMaxFocusShift()
+int getMaxHDRExposureDifferenceLevel()
+int getMaxLensCorrectionLevel(String)
+int getMaxLightBalanceForWhiteBalance()
+int getMaxNumDetectedFaces()
+int getMaxNumOfBurstPicture()
+int getMaxPictureEffectHDRArtEffectLevel()
+int getMaxPictureEffectIllustEffectLevel()
+int getMaxPictureEffectRoughMonoEffectLevel()
+int getMaxPictureEffectSoftFocusEffectLevel()
+int getMaxPictureEffectWaterColorEffectLevel()
+int getMaxSaturation()
+int getMaxSharpness()
+int getMaxToyCameraTuning()
+int getMaxZoomSpeed()
+String getMeteringMode()
+int getMinColorCompensationForWhiteBalance()
+int getMinColorTemperatureForWhiteBalance()
+int getMinContrast()
+int getMinFlashCompensation()
+int getMinFocusShift()
+int getMinHDRExposureDifferenceLevel()
+int getMinLensCorrectionLevel(String)
+int getMinLightBalanceForWhiteBalance()
+int getMinPictureEffectHDRArtEffectLevel()
+int getMinPictureEffectIllustEffectLevel()
+int getMinPictureEffectRoughMonoEffectLevel()
+int getMinPictureEffectSoftFocusEffectLevel()
+int getMinPictureEffectWaterColorEffectLevel()
+int getMinSaturation()
+int getMinSharpness()
+int getMinToyCameraTuning()
+boolean getMultiShootNRMode()
+int getNumOfBracketPicture()
+int getNumOfBurstPicture()
+int getNumOfCustomWhiteBalance()
+boolean getOVFPreviewMode()
+String getPictureEffect()
+int getPictureEffectHDRArtEffectLevel()
+int getPictureEffectIllustEffectLevel()
+String getPictureEffectMiniatureFocusArea()
+String getPictureEffectPartColorEffect()
+String getPictureEffectPosterizationEffect()
+int getPictureEffectRoughMonoEffectLevel()
+int getPictureEffectSoftFocusEffectLevel()
+String getPictureEffectSoftHightKeyEffect()
+String getPictureEffectToyCameraEffect()
+int getPictureEffectWaterColorEffectLevel()
+String getPictureStorageFormat()
+boolean getPreviewMagnificationOnManualFocus()
+int getPreviewMagnificationTimeOnManualFocus()
+String getRedEyeReductionMode()
+boolean getRemoteControlMode()
+int getSaturation()
+int getSelfTimer()
+int getSharpness()
+String getShootingPreviewMode()
+Pair getShutterSpeed()
+List getSupportedAntiHandBlurModes()
+List getSupportedAutoExposureLocks()
+List getSupportedAutoFocusModes()
+List getSupportedBracketModes()
+List getSupportedBracketOrders()
+List getSupportedBracketStepPeriods()
+List getSupportedBurstDriveButtonReleaseBehaves()
+List getSupportedBurstDriveSpeeds()
+List getSupportedColorModes()
+List getSupportedColorSelectModes()
+List getSupportedDROModes()
+List getSupportedDigitalZoomTypes()
+List getSupportedDriveModes()
+List getSupportedExposureBracketModes()
+List getSupportedExposureBracketPeriods()
+List getSupportedFaceDetectionModes()
+List getSupportedFlashTypes()
+List getSupportedFocusAreaModes()
+List getSupportedHDRModes()
+List getSupportedISOSensitivities()
+List getSupportedISOSensitivitiesForMultiShootNR()
+List getSupportedImageAspectRatios()
+List getSupportedImageSizes()
+List getSupportedLensCorrections()
+List getSupportedMeteringModes()
+List getSupportedNumsOfBracketPicture()
+List getSupportedPictureEffectMiniatureFocusAreas()
+List getSupportedPictureEffectPartColorEffects()
+List getSupportedPictureEffectPosterizationEffects()
+List getSupportedPictureEffectSoftHightKeyEffects()
+List getSupportedPictureEffectToyCameraEffects()
+List getSupportedPictureEffects()
+List getSupportedPictureStorageFormats()
+List getSupportedPreviewMagnification()
+List getSupportedQuickAutoFocus()
+List getSupportedRedEyeReductionModes()
+List getSupportedSelfTimers()
+List getSupportedShootingPreviewModes()
+List getSupportedZoomDriveTypes()
+int getToyCameraTuning()
+String getZoomDriveType()
+boolean isApscModeSupported()
+boolean isAutoWhiteBalanceLockSupported()
+boolean isDirectShutterSupported()
+boolean isSupportedAutoShutterSpeedLowLimit()
+boolean isSupportedFocalLengthNotify()
+boolean isSupportedFocusShift()
+boolean isSupportedLensInfo()
+boolean isSupportedOVFPreviewMode()
+boolean isSupportedPreviewAnalize()
+boolean isSupportedRemoteControlMode()
+boolean isSupportedToggleFocusMode()
+void setAntiHandBlurMode(String)
+void setApscMode(String)
+void setAutoExposureLock(String)
+void setAutoFocusMode(String)
+void setAutoShutterSpeedLowLimit(int)
+void setAutoWhiteBalanceLock(boolean)
+void setBracketMode(String)
+void setBracketOrder(String)
+void setBracketStepPeriod(String)
+void setBurstDriveButtonReleaseBehave(String)
+void setBurstDriveSpeed(String)
+void setColorCompensationForWhiteBalance(int)
+void setColorMode(String)
+void setColorSelectMode(String, int[])
+void setColorTemperatureForWhiteBalance(int)
+void setContrast(int)
+void setCustomWhiteBalance(int)
+void setDROLevel(int)
+void setDROMode(String)
+void setDigitalZoomMode(String, boolean)
+void setDriveMode(String)
+void setExposureBracketMode(String)
+void setExposureBracketPeriod(int)
+void setFaceDetectionMode(String)
+void setFaceFrameRendering(boolean)
+void setFlashCompensation(int)
+void setFlashType(String)
+void setFocusAreaMode(String)
+void setFocusPoint(int)
+void setFocusPoint(int, int)
+void setHDRExposureDifferenceLevel(int)
+void setHDRMode(String)
+void setISOSensitivity(int)
+void setImageAspectRatio(String)
+void setImageSize(String)
+void setLensCorrection(boolean)
+void setLensCorrectionLevel(String, int)
+void setLightBalanceForWhiteBalance(int)
+void setMeteringMode(String)
+void setMultiShootNRMode(boolean)
+void setNumOfBracketPicture(int)
+void setNumOfBurstPicture(int)
+void setOVFPreviewMode(boolean)
+void setPictureEffect(String)
+void setPictureEffectHDRArtEffectLevel(int)
+void setPictureEffectIllustEffectLevel(int)
+void setPictureEffectMiniatureFocusArea(String)
+void setPictureEffectPartColorEffect(String)
+void setPictureEffectPosterizationEffect(String)
+void setPictureEffectRoughMonoEffectLevel(int)
+void setPictureEffectSoftFocusEffectLevel(int)
+void setPictureEffectSoftHightKeyEffect(String)
+void setPictureEffectToyCameraEffect(String)
+void setPictureEffectWaterColorEffectLevel(int)
+void setPictureStorageFormat(String)
+void setRedEyeReductionMode(String)
+void setRemoteControlMode(boolean)
+void setSaturation(int)
+void setSelfTimer(int)
+void setSharpness(int)
+void setShootingPreviewMode(String)
+void setToyCameraTuning(int)
+void setZoomDriveType(String)
+void tryIgnoreInhibit()
+
+## Methods com.sony.scalar.hardware.CameraEx$PictureReviewInfoListener (1)
+void onGetInfo(CameraEx$ReviewInfo, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$PictureReviewStartListener (1)
+void onStart(CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$PowerZoomListener (1)
+void onChanged(int, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$PreviewAnalizeListener (1)
+void onAnalizedData(CameraEx$AnalizedData, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$PreviewMagnificationListener (2)
+void onChanged(boolean, int, int, Pair, CameraEx)
+void onInfoUpdated(boolean, Pair, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$PreviewStartListener (1)
+void onStart(CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$ProgramLineListener (1)
+void onChanged(boolean, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$ProgramLineRangeOverListener (3)
+void onAERange(boolean, boolean, boolean, CameraEx)
+void onEVRange(int, CameraEx)
+void onMeteringRange(boolean, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$RecordingMediaChangeCallback (1)
+void onRecordingMediaChange(CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$SettingChangedListener (1)
+void onChanged(int[], Camera$Parameters, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$ShutterListener (1)
+void onShutter(int, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$ShutterSpeedChangeListener (1)
+void onShutterSpeedChange(CameraEx$ShutterSpeedInfo, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraEx$ZoomChangeListener (1)
+void onChanged(CameraEx$ZoomInfo, CameraEx)
+
+## Methods com.sony.scalar.hardware.CameraSequence (18)
+CameraEx getCameraEx()
+CameraSequence$PreviewPluginResult getPreviewPluginResult()
+CameraSequence$PreviewSequenceFrameInfo getPreviewSequenceFrameInfo()
+DeviceMemory[] getPreviewSequenceFrames(int)
+static CameraSequence open(CameraEx)
+void release()
+void setDebugCallback(CameraSequence$DebugCallback)
+void setOneShotPreviewPluginCallback(CameraSequence$PreviewPluginCallback)
+void setPreviewPlugin(DSP)
+void setReleaseLock(boolean)
+void setShutterSequenceCallback(CameraSequence$ShutterSequenceCallback)
+void setShutterSequenceCallback(CameraSequence$ShutterSequenceCallback, CameraSequence$Options)
+void startPreviewSequence(CameraSequence$Options)
+void stopPreviewSequence()
+void storeImage(CameraSequence$RawData, boolean)
+void storeImage(OptimizedImage, boolean)
+Object testCommand(int, int, int, Object)
+void updatePreviewSequence(CameraSequence$Options)
+
+## Methods com.sony.scalar.hardware.avio.DisplayManager (15)
+void controlGraphicsOutputAll(boolean)
+void finish()
+String getActiveDevice()
+DisplayManager$DeviceStatus getActiveDeviceStatus()
+String[] getActiveDevices()
+DisplayManager$DeviceStatus[] getAllDevicesStatus()
+DisplayManager$DeviceInfo getDeviceInfo(String)
+DisplayManager$VideoRect getDisplayedVideoRect()
+void releaseDisplayStatusListener()
+void releaseLayoutStatusListener()
+void releaseOnScreenDisplayListener()
+void setDisplayStatusListener(DisplayManager$DisplayEventListener)
+void setLayoutStatusListener(DisplayManager$VideoLayoutStatusListener)
+void setOnScreenDisplayListener(DisplayManager$OnScreenDisplayListener)
+void switchDisplayOutputTo(String)
+
+## Methods com.sony.scalar.hardware.avio.DisplayManager$DisplayEventListener (1)
+void onDeviceStatusChanged(int)
+
+## Methods com.sony.scalar.sysutil.ScalarInput (1)
+static KeyStatus getKeyStatus(int)
+
+## Methods com.sony.scalar.sysutil.didep.Gpelibrary (4)
+static void changeFrameBufferPixel(Gpelibrary$GS_FRAMEBUFFER_TYPE)
+static void onActivityStateChanged(int, int)
+static void onWindowFocusChanged(boolean, int)
+static void updateEnable(Gpelibrary$GS_SWITCH_TYPE)
+
+## Constants com.sony.scalar.hardware.CameraEx
+PREVIEW_ASPECT_TYPE_16_9 = 1
+PREVIEW_ASPECT_TYPE_3_2 = 0
+PROGRAM_LINE_RESET = 0
+ZOOM_DIRECTION_TELE = 0
+ZOOM_DIRECTION_WIDE = 1
+
+## Constants com.sony.scalar.hardware.CameraEx$ParametersModifier
+AE_LOCK_OFF = "unlocked"
+AE_LOCK_ON = "locked"
+AE_LOCK_SPOT = "spot"
+ANTI_HAND_BLUR_MODE_CONTINUOUS = "keep"
+ANTI_HAND_BLUR_MODE_OFF = "off"
+ANTI_HAND_BLUR_MODE_SHOOT = "onetime"
+APSC_MODE_AUTO = "auto"
+APSC_MODE_OFF = "off"
+APSC_MODE_ON = "on"
+AUTO_FOCUS_MODE_AF_A = "af-a"
+AUTO_FOCUS_MODE_AF_C = "af-c"
+AUTO_FOCUS_MODE_AF_S = "af-s"
+BRACKET_MODE_COLOR = "color"
+BRACKET_MODE_DRO = "dro"
+BRACKET_MODE_EXPOSURE = "exposure"
+BRACKET_MODE_WHITE_BALANCE = "white-balance"
+BRACKET_ORDER_START_MINUS = "start-minus"
+BRACKET_ORDER_START_ZERO = "start-zero"
+BRACKET_STEP_PERIOD_HIGH = "high"
+BRACKET_STEP_PERIOD_LOW = "low"
+BURST_DRIVE_BUTTON_RELEASE_BEHAVE_CONTINUE = "continue"
+BURST_DRIVE_BUTTON_RELEASE_BEHAVE_STOP = "stop"
+BURST_DRIVE_SPEED_HIGH = "high"
+BURST_DRIVE_SPEED_LOW = "low"
+BURST_DRIVE_SPEED_MIDDLE = "middle"
+COLOR_MODE_CLEAR = "clear"
+COLOR_MODE_DEEP = "deep"
+COLOR_MODE_LANDSCAPE = "landscape"
+COLOR_MODE_LIGHT = "light"
+COLOR_MODE_MONO = "mono"
+COLOR_MODE_NEUTRAL = "neutral"
+COLOR_MODE_NIGHT = "night"
+COLOR_MODE_PORTRAIT = "portrait"
+COLOR_MODE_REAL = "real"
+COLOR_MODE_RED_LEAVES = "red-leaves"
+COLOR_MODE_SEPIA = "sepia"
+COLOR_MODE_STANDARD = "standard"
+COLOR_MODE_SUNSET = "sunset"
+COLOR_MODE_VIVID = "vivid"
+COLOR_SELECT_MODE_EXTRACT = "extract"
+COLOR_SELECT_MODE_OFF = "off"
+COLOR_SELECT_MODE_REVISION = "revision"
+DIGITAL_ZOOM_TYPE_PRECISION = "precision"
+DIGITAL_ZOOM_TYPE_SMART = "smart"
+DIGITAL_ZOOM_TYPE_SUPER_RESOLUTION = "super-resolution"
+DRIVE_MODE_BRACKET = "bracket"
+DRIVE_MODE_BURST = "burst"
+DRIVE_MODE_SINGLE = "single"
+DRIVE_MODE_SPEED_PRIOR_BURST = "speed-prior-burst"
+DRO_MODE_AUTO = "auto"
+DRO_MODE_OFF = "off"
+DRO_MODE_ON = "on"
+EXPOSURE_BRACKET_MODE_CONTINUE = "continue"
+EXPOSURE_BRACKET_MODE_SINGLE = "single"
+FACE_DETECTION_MODE_ADULT = "adult"
+FACE_DETECTION_MODE_AUTO = "auto"
+FACE_DETECTION_MODE_CHILD = "child"
+FACE_DETECTION_MODE_OFF = "off"
+FLASH_TYPE_FRONT_SYNC = "front-sync"
+FLASH_TYPE_REAR_SYNC = "rear-sync"
+FLASH_TYPE_SLOW_REAR_SYNC = "slow-rear-sync"
+FLASH_TYPE_SLOW_SYNC = "slow-sync"
+FLASH_TYPE_WIRELESS = "wireless"
+FOCUS_AREA_MODE_CENTER = "center"
+FOCUS_AREA_MODE_CENTER_SPOT = "center-spot"
+FOCUS_AREA_MODE_FLEX_SPOT = "flex-spot"
+FOCUS_AREA_MODE_LOCAL = "local"
+FOCUS_AREA_MODE_MINIATURE = "miniature"
+FOCUS_AREA_MODE_MULTI = "multi"
+FOCUS_AREA_MODE_SEMIWIDE = "semiwide"
+FOCUS_AREA_MODE_SEMI_MULTI = "semi-multi"
+FOCUS_AREA_MODE_SPOT = "spot"
+FOCUS_AREA_MODE_TOUCH = "touch"
+FOCUS_AREA_MODE_TRACKING = "tracking"
+FOCUS_AREA_MODE_WIDE = "wide"
+FOCUS_MODE_DMF = "dmf"
+FOCUS_MODE_MANUAL = "manual"
+FOCUS_MODE_NEIGHBOR = "neighbor"
+HDR_MODE_AUTO = "auto"
+HDR_MODE_OFF = "off"
+HDR_MODE_ON = "on"
+IMAGE_ASPECT_RATIO_16_9 = "16:9"
+IMAGE_ASPECT_RATIO_1_1 = "1:1"
+IMAGE_ASPECT_RATIO_3_2 = "3:2"
+IMAGE_ASPECT_RATIO_4_3 = "4:3"
+IMAGE_SIZE_L = "large"
+IMAGE_SIZE_M = "midium"
+IMAGE_SIZE_S = "small"
+LENS_CORRECTION_CHROMA_BLUE = "chroma-b"
+LENS_CORRECTION_CHROMA_RED = "chroma-r"
+LENS_CORRECTION_DISTOTION = "distotion"
+LENS_CORRECTION_DISTOTION_MIDDLE = "distotion-m"
+LENS_CORRECTION_SHADING_COLOR_BLUE = "shading-cb"
+LENS_CORRECTION_SHADING_COLOR_MIDDLE = "shading-cm"
+LENS_CORRECTION_SHADING_COLOR_RED = "shading-cr"
+LENS_CORRECTION_SHADING_WHOLE = "shading-w"
+LENS_CORRECTION_SHADING_WHOLE_MIDDLE = "shading-wm"
+METERING_MODE_CENTER_SPOT = "center-spot"
+METERING_MODE_CENTER_WEIGHTED = "center-weighted"
+METERING_MODE_CENTER_WEIGHTED_AVERAGE = "center-weighted-average"
+METERING_MODE_MULTI = "multi"
+PICTURE_EFFECT_HDR_ART = "hdr-art"
+PICTURE_EFFECT_ILLUST = "illust"
+PICTURE_EFFECT_MINIATURE = "miniature"
+PICTURE_EFFECT_MINIATURE_FOCUS_AREA_AUTO = "auto"
+PICTURE_EFFECT_MINIATURE_FOCUS_AREA_HCENTER = "hcenter"
+PICTURE_EFFECT_MINIATURE_FOCUS_AREA_LEFT = "left"
+PICTURE_EFFECT_MINIATURE_FOCUS_AREA_LOWER = "lower"
+PICTURE_EFFECT_MINIATURE_FOCUS_AREA_RIGHT = "right"
+PICTURE_EFFECT_MINIATURE_FOCUS_AREA_UPPER = "upper"
+PICTURE_EFFECT_MINIATURE_FOCUS_AREA_VCENTER = "vcenter"
+PICTURE_EFFECT_OFF = "off"
+PICTURE_EFFECT_PART_COLOR = "part-color"
+PICTURE_EFFECT_PART_COLOR_EFFECT_BLUE = "blue"
+PICTURE_EFFECT_PART_COLOR_EFFECT_GREEN = "green"
+PICTURE_EFFECT_PART_COLOR_EFFECT_RED = "red"
+PICTURE_EFFECT_PART_COLOR_EFFECT_YELLOW = "yellow"
+PICTURE_EFFECT_POP_COLOR = "pop-color"
+PICTURE_EFFECT_POSTERIZATION = "posterization"
+PICTURE_EFFECT_POSTERIZATION_EFFECT_COLOR = "posterization-color"
+PICTURE_EFFECT_POSTERIZATION_EFFECT_MONO = "posterization-mono"
+PICTURE_EFFECT_RETRO_PHOTO = "retro-photo"
+PICTURE_EFFECT_RICHTONE_MONO = "richtone-mono"
+PICTURE_EFFECT_ROUGH_MONO = "rough-mono"
+PICTURE_EFFECT_SOFT_FOCUS = "soft-focus"
+PICTURE_EFFECT_SOFT_HIGH_KEY = "soft-high-key"
+PICTURE_EFFECT_SOFT_HIGH_KEY_EFFECT_BLUE = "blue"
+PICTURE_EFFECT_SOFT_HIGH_KEY_EFFECT_GREEN = "green"
+PICTURE_EFFECT_SOFT_HIGH_KEY_EFFECT_PINK = "pink"
+PICTURE_EFFECT_TOY_CAMERA = "toy-camera"
+PICTURE_EFFECT_TOY_CAMERA_EFFECT_COOL = "cool"
+PICTURE_EFFECT_TOY_CAMERA_EFFECT_GREEN = "green"
+PICTURE_EFFECT_TOY_CAMERA_EFFECT_MAGENTA = "magenta"
+PICTURE_EFFECT_TOY_CAMERA_EFFECT_NORMAL = "normal"
+PICTURE_EFFECT_TOY_CAMERA_EFFECT_WARM = "warm"
+PICTURE_EFFECT_WATERCOLOR = "watercolor"
+PICTURE_STORAGE_FMT_JPEG = "jpeg"
+PICTURE_STORAGE_FMT_RAW = "raw"
+PICTURE_STORAGE_FMT_RAWJPEG = "rawjpeg"
+PREVIEW_MAGNIFICATION_OFF = "off"
+PREVIEW_MAGNIFICATION_ON = "on"
+QUICK_AF_C_WO_AEL = "afc_woaf"
+QUICK_AF_WO_AEL = "af_woaf"
+RED_EYE_REDUCTION_MODE_AUTO = "auto"
+RED_EYE_REDUCTION_MODE_OFF = "off"
+RED_EYE_REDUCTION_MODE_ON = "on"
+SCENE_MODE_ADVANCE_SPORTS = "advance-sports"
+SCENE_MODE_ANTI_MOTION_BLUR = "anti-motion-blur"
+SCENE_MODE_APERTURE_PRIORITY = "aperture-priority"
+SCENE_MODE_BACKGROUND_DEFOCUS = "background-defocus"
+SCENE_MODE_BACK_LIGHT = "back-light"
+SCENE_MODE_CONT_PRIORITY_AE = "cont-priority-ae"
+SCENE_MODE_CONT_PRIORITY_AE_CROP = "cont-priority-ae-crop"
+SCENE_MODE_GOURMET = "gourmet"
+SCENE_MODE_HAND_HELD_TWILIGHT = "hand-held-twilight"
+SCENE_MODE_HIGH_SENSITIVITY = "high-sensitivity"
+SCENE_MODE_HIGH_SPEED_SHUTTER = "high-speed-shutter"
+SCENE_MODE_LOW_LIGHT = "low-light"
+SCENE_MODE_MACRO = "macro"
+SCENE_MODE_MAGNIFIER = "magnifier"
+SCENE_MODE_MANUAL_EXPOSURE = "manual-exposure"
+SCENE_MODE_MY_PHOTO_STYLE = "my-photo-style"
+SCENE_MODE_MY_PHOTO_STYLE_IN_PREMIER = "my-photo-style-in-premier"
+SCENE_MODE_NIGHT_SHOT = "night-shot"
+SCENE_MODE_PET = "pet"
+SCENE_MODE_PICTURE_EFFECT = "picture-effect"
+SCENE_MODE_PROGRAM_AUTO = "program-auto"
+SCENE_MODE_SHUTTER_PRIORITY = "shutter-speed"
+SCENE_MODE_SOFT_SKIN = "soft-skin"
+SCENE_MODE_SPOTLIGHT = "spotlight"
+SCENE_MODE_SUNRISE_SUNSET = "sunrise-sunset"
+SCENE_MODE_ULTRA_SENSITIVITY = "ultra-sensitivity"
+SCENE_MODE_UNDERWATER = "underwater"
+SHOOTING_PREVIEW_MODE_IRIS = "iris"
+SHOOTING_PREVIEW_MODE_IRIS_SS_ISO = "iris_ss_iso"
+SHOOTING_PREVIEW_MODE_IRIS_SS_ISO_AEUNLOCK = "iris_ss_iso_aeunlock"
+SHOOTING_PREVIEW_MODE_OFF = "off"
+WHITE_BALANCE_COLOR_TEMP = "color-temp"
+WHITE_BALANCE_CUSTOM = "custom"
+WHITE_BALANCE_FLASH = "flash"
+WHITE_BALANCE_FLUORESCENT_COOLWHITE = "fluorescent-coolwhite"
+WHITE_BALANCE_FLUORESCENT_DAYLIGHT = "fluorescent-daylight"
+WHITE_BALANCE_FLUORESCENT_DAYWHITE = "fluorescent-daywhite"
+WHITE_BALANCE_UNDERWATER_BLUE = "underwater-blue"
+WHITE_BALANCE_UNDERWATER_GREEN = "underwater-green"
+ZOOM_DRIVE_TYPE_AUTO = "auto"
+ZOOM_DRIVE_TYPE_DIGITAL = "digital"
+ZOOM_DRIVE_TYPE_OPTICAL = "optical"
+
+## Key log: seconds since start, action, keyCode, scanCode, ScalarInput name, dial status
+    4.575 down   key=0   scan=525  ISV_DIAL_1_CLOCKWISE status=-22
+    4.576 up     key=0   scan=525  ISV_DIAL_1_CLOCKWISE
+    5.534 down   key=0   scan=526  ISV_DIAL_1_COUNTERCW status=22
+    5.534 up     key=0   scan=526  ISV_DIAL_1_COUNTERCW
+    6.914 down   key=0   scan=522  ISV_DIAL_KURU_CLOCKWISE status=22
+    6.914 up     key=0   scan=522  ISV_DIAL_KURU_CLOCKWISE
+    8.053 down   key=0   scan=523  ISV_DIAL_KURU_COUNTERCW status=-22
+    8.054 up     key=0   scan=523  ISV_DIAL_KURU_COUNTERCW
+    9.265 down   key=23  scan=232  ISV_KEY_ENTER
+    9.475 up     key=23  scan=232  ISV_KEY_ENTER
+   11.584 down   key=0   scan=207  ISV_KEY_PLAY
+   11.834 up     key=0   scan=207  ISV_KEY_PLAY
+   13.415 down   key=0   scan=520  ISV_KEY_FN
+   13.646 up     key=0   scan=520  ISV_KEY_FN
+   14.485 down   key=0   scan=516  ISV_KEY_S1_1
+   14.487 down   key=0   scan=517  ISV_KEY_S1_2
+   14.536 down   key=0   scan=518  ISV_KEY_S2
+   14.693 up     key=0   scan=518  ISV_KEY_S2
+   14.715 up     key=0   scan=516  ISV_KEY_S1_1
+   14.730 up     key=0   scan=517  ISV_KEY_S1_2
+   16.104 down   key=82  scan=229  ISV_KEY_SK1
+   16.237 up     key=82  scan=229  ISV_KEY_SK1
+   22.394 down   key=0   scan=513  ISV_KEY_SK2
+   22.615 up     key=0   scan=513  ISV_KEY_SK2

@@ -33,6 +33,10 @@ public final class ShotPlan {
         return new ShotPlan(intervalMs / 1000.0, shotCount, delayMinutes, framesPerInterval);
     }
 
+    public ShotPlan withFramesPerInterval(int frames) {
+        return new ShotPlan(intervalSeconds, shotCount, delayMinutes, frames);
+    }
+
     public boolean isBurst() {
         return intervalSeconds == 0;
     }

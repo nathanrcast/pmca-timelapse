@@ -123,6 +123,25 @@ public class SchedulerTest {
     }
 
     @Test
+    public void droppingTheBracketGivesOneFramePerSlotFromTheNextSlot() {
+        FakeClock clock = new FakeClock(START);
+        Scheduler s = new Scheduler(new ShotPlan(3, 10, 0, 3), clock, CAPTURED);
+        s.start();
+        assertEquals(FIRE, s.onTimer().action);
+        assertEquals(FIRE, s.onFrameCaptured().action);
+        assertEquals(FIRE, s.onFrameCaptured().action);
+        assertEquals(SLOT_DONE, s.onFrameCaptured().action);
+        s.pause();
+        s.resume();
+        s.setFramesPerInterval(1);
+        assertEquals(1, s.plan().framesPerInterval());
+        clock.set(s.nextSlotDueMs());
+        Decision d = s.onTimer();
+        assertEquals(FIRE, d.action);
+        assertEquals(SLOT_DONE, s.onFrameCaptured().action);
+    }
+
+    @Test
     public void raiseIntervalIgnoresBurstAndUnstartedRuns() {
         Scheduler burst = new Scheduler(new ShotPlan(0, 5, 0, 1), new FakeClock(START), CAPTURED);
         burst.start();

@@ -12,7 +12,7 @@ public final class BracketPlan {
     // 0.7 EV, in tenths.
     public static final int FALLBACK_PERIOD = 7;
 
-    private static final BracketPlan OFF = new BracketPlan(false, 0, null, null);
+    private static final BracketPlan OFF = new BracketPlan(false, 0, null, null, null);
 
     // Frames per interval follow this: FRAMES when true, one otherwise.
     public final boolean active;
@@ -23,7 +23,11 @@ public final class BracketPlan {
     // Why the step isn't the camera's own, or why a bracket drive wasn't auto-detected; null otherwise. For the log.
     public final String note;
 
-    private BracketPlan(boolean active, int periodTenths, String unsupportedReason, String note) {
+    // "single" (one press per frame) or "continue" (one press, the camera shoots all frames); null when not active.
+    public final String exposureMode;
+
+    private BracketPlan(boolean active, int periodTenths, String unsupportedReason, String note, String exposureMode) {
+        this.exposureMode = exposureMode;
         this.active = active;
         this.periodTenths = periodTenths;
         this.unsupportedReason = unsupportedReason;
@@ -42,7 +46,7 @@ public final class BracketPlan {
         Integer count = parse(first(caps.values(Query.NUM_OF_BRACKET_PICTURE)));
         if (inBracket && count != null && count.intValue() != FRAMES)
             return new BracketPlan(false, 0, "camera is set to " + count + " bracket pictures, only "
-                    + FRAMES + " is supported", null);
+                    + FRAMES + " is supported", null, null);
         String note = null;
         boolean detected = false;
         if (inBracket && count != null) {
@@ -54,15 +58,15 @@ public final class BracketPlan {
                         + (mode == null ? "unreadable" : mode) + ", not an exposure bracket: not auto-detected";
         }
         if (!requested && !detected)
-            return new BracketPlan(false, 0, null, note);
-        return period(caps, note);
+            return new BracketPlan(false, 0, null, note, null);
+        return period(caps, note, mode(caps));
     }
 
-    private static BracketPlan period(Capabilities caps, String note) {
+    private static BracketPlan period(Capabilities caps, String note, String mode) {
         Integer current = parse(first(caps.values(Query.EXPOSURE_BRACKET_PERIOD)));
         if (current == null || current.intValue() <= 0)
             return new BracketPlan(true, FALLBACK_PERIOD, null, join(note, "step unreadable, using "
-                    + evText(FALLBACK_PERIOD)));
+                    + evText(FALLBACK_PERIOD)), mode);
         List<String> supported = caps.values(Query.EXPOSURE_BRACKET_PERIODS);
         if (supported != null) {
             boolean parsed = !supported.isEmpty();
@@ -77,9 +81,24 @@ public final class BracketPlan {
             }
             if (parsed && !found)
                 return new BracketPlan(true, FALLBACK_PERIOD, null, join(note, "step " + current
-                        + " is not in the supported list " + supported + ", using " + evText(FALLBACK_PERIOD)));
+                        + " is not in the supported list " + supported + ", using " + evText(FALLBACK_PERIOD)), mode);
         }
-        return new BracketPlan(true, current.intValue(), null, note);
+        return new BracketPlan(true, current.intValue(), null, note, mode);
+    }
+
+    // SINGLE when the body offers it (the app fires each frame itself), else CONTINUE. Unreadable lists mean single:
+    // that is what every body before the NEX-5T reported.
+    private static String mode(Capabilities caps) {
+        List<String> modes = caps.values(Query.EXPOSURE_BRACKET_MODES);
+        if (modes != null && !modes.contains(Feature.EXPOSURE_BRACKET_MODE_SINGLE)
+                && modes.contains(Feature.EXPOSURE_BRACKET_MODE_CONTINUE))
+            return Feature.EXPOSURE_BRACKET_MODE_CONTINUE;
+        return Feature.EXPOSURE_BRACKET_MODE_SINGLE;
+    }
+
+    /** One takePicture shoots every frame of the slot (the body has no single-press bracket mode). */
+    public boolean continuous() {
+        return active && Feature.EXPOSURE_BRACKET_MODE_CONTINUE.equals(exposureMode);
     }
 
     private static String join(String a, String b) {
@@ -97,7 +116,8 @@ public final class BracketPlan {
         if (!active)
             text = unsupportedReason != null ? "single frames: " + unsupportedReason : "off";
         else
-            text = FRAMES + " frames per interval, step " + evText(periodTenths);
+            text = FRAMES + " frames per interval, step " + evText(periodTenths)
+                    + (continuous() ? ", continuous (one press shoots all)" : "");
         return note == null ? text : text + " (" + note + ")";
     }
 

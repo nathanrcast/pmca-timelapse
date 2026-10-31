@@ -50,4 +50,31 @@ public class StartTimeTest {
         assertEquals(StartMode.NOW, StartMode.fromOrdinal(7, StartMode.NOW));
         assertEquals(StartMode.DELAY, StartMode.fromOrdinal(-1, StartMode.DELAY));
     }
+
+    @Test
+    public void nowSettlesBeforeSlotZeroAndTheOtherModesDoNot() {
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.NOW, 0, 0));
+        assertEquals(60000, StartTime.firstSlotOffsetMs(StartMode.DELAY, 60000, 99));
+        assertEquals(90000, StartTime.firstSlotOffsetMs(StartMode.AT, 60000, 90000));
+    }
+
+    @Test
+    public void everyModeSettlesWhenSlotZeroWouldLandTooSoon() {
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.DELAY, 0, 0));
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.AT, 0, 0));
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.AT, 0, 120));
+        assertEquals(500, StartTime.firstSlotOffsetMs(StartMode.AT, 0, 500));
+        assertEquals(501, StartTime.firstSlotOffsetMs(StartMode.AT, 0, 501));
+    }
+
+    @Test
+    public void theSettleMovesSlotZeroNotTheLaterDeadlines() {
+        FakeClock clock = new FakeClock(10000);
+        Settings s = new Settings();
+        Scheduler sched = new Scheduler(ShotPlan.of(s), clock, Scheduler.StopOn.CAPTURED);
+        sched.start(clock.nowMs() + StartTime.firstSlotOffsetMs(StartMode.NOW, 0, 0));
+        assertEquals(10500, sched.nextWakeMs());
+        clock.set(10500);
+        assertEquals(Scheduler.Action.FIRE, sched.onTimer().action);
+    }
 }

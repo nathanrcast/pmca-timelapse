@@ -154,6 +154,7 @@ public class ReflectiveCapabilitiesTest {
         assertEquals(c.get("AE_LOCK_ON"), Feature.AE_LOCK_ON);
         assertEquals(c.get("BRACKET_MODE_EXPOSURE"), Feature.BRACKET_MODE_EXPOSURE);
         assertEquals(c.get("EXPOSURE_BRACKET_MODE_SINGLE"), Feature.EXPOSURE_BRACKET_MODE_SINGLE);
+        assertEquals(c.get("EXPOSURE_BRACKET_MODE_CONTINUE"), Feature.EXPOSURE_BRACKET_MODE_CONTINUE);
         assertEquals(c.get("FOCUS_MODE_MANUAL"), Feature.FOCUS_MODE_MANUAL_VALUE);
     }
 
