@@ -90,6 +90,13 @@ class AnalyzeLogTest(unittest.TestCase):
         self.assertEqual(0, rc)
         self.assertIn("shots: 1 fired", out)
 
+    def test_system_clock_header_is_flagged(self):
+        path = write_temp(self, "# run_id=r\n# clock=system\n" + COLS + "r,0,1000,1001,,FIRE,,,,,0,,\n")
+        self.assertIn("system clock", run_main(path)[1])
+        path = write_temp(self, "# run_id=r\n# clock=camera\n# android=4.1.2/16\n" + COLS
+                          + "r,0,1000,1001,,FIRE,,,,,0,,\n")
+        self.assertNotIn("system clock", run_main(path)[1])
+
     def test_percentile(self):
         self.assertEqual(95, analyze_log.percentile(list(range(1, 101)), 95))
         self.assertIsNone(analyze_log.percentile([], 95))

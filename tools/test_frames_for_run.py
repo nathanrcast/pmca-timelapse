@@ -1,6 +1,7 @@
 import contextlib
 import io
 import os
+import struct
 import shutil
 import subprocess
 import sys
@@ -141,6 +142,95 @@ class FramesForRun(Tree):
             f.write("# run_id=A\n" + HEADER + row("A", 0, "FIRE", 1000))
         self.touch("DSC00001.JPG", 1)
         self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A")[0], 2)
+
+
+def tiff_blob(stamp, endian="<"):
+    """Minimal TIFF: IFD0 with an ExifIFD pointer, whose IFD holds DateTimeOriginal (ASCII, 20 bytes)."""
+    e = endian
+    head = (b"II" if e == "<" else b"MM") + struct.pack(e + "HI", 42, 8)
+    ifd0 = struct.pack(e + "H", 1) + struct.pack(e + "HHI", 0x8769, 4, 1) + struct.pack(e + "I", 26) + struct.pack(e + "I", 0)
+    exif = struct.pack(e + "H", 1) + struct.pack(e + "HHI", 0x9003, 2, 20) + struct.pack(e + "I", 44) + struct.pack(e + "I", 0)
+    return head + ifd0 + exif + stamp.encode("ascii") + b"\x00"
+
+
+def jpeg_blob(stamp, endian="<"):
+    app1 = b"Exif\x00\x00" + tiff_blob(stamp, endian)
+    return (b"\xff\xd8" + b"\xff\xe0" + struct.pack(">H", 4) + b"JF" + b"\xff\xe1" + struct.pack(">H", len(app1) + 2)
+            + app1 + b"\xff\xd9")
+
+
+class ExifParsing(unittest.TestCase):
+    def read(self, data, suffix):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        path = os.path.join(d, "x" + suffix)
+        with open(path, "wb") as f:
+            f.write(data)
+        return frames_for_run.exif_time(path)
+
+    def test_tiff_arw_little_and_big_endian(self):
+        want = frames_for_run.calendar.timegm((2026, 10, 31, 8, 24, 1))
+        self.assertEqual(self.read(tiff_blob("2026:10:31 08:24:01"), ".ARW"), want)
+        self.assertEqual(self.read(tiff_blob("2026:10:31 08:24:01", ">"), ".ARW"), want)
+
+    def test_jpeg_app1_after_another_segment(self):
+        want = frames_for_run.calendar.timegm((2026, 10, 31, 8, 24, 5))
+        self.assertEqual(self.read(jpeg_blob("2026:10:31 08:24:05"), ".JPG"), want)
+        self.assertEqual(self.read(jpeg_blob("2026:10:31 08:24:05", ">"), ".JPG"), want)
+
+    def test_unreadable_files_give_none(self):
+        self.assertIsNone(self.read(b"", ".JPG"))
+        self.assertIsNone(self.read(b"\xff\xd8\xff\xd9", ".JPG"))
+        self.assertIsNone(self.read(b"not an image at all", ".JPG"))
+        self.assertIsNone(self.read(tiff_blob("garbage garbage garb"), ".ARW"))
+        self.assertIsNone(self.read(tiff_blob("2026:10:31 08:24:01")[:30], ".ARW"))
+
+
+class ExifMatching(Tree):
+    # Camera local time is UTC-6; the log header says so. The host sees mtimes 7 h away from the EXIF time.
+    def setUp(self):
+        super().setUp()
+        with open(self.log, "w") as f:
+            f.write("# run_id=A\n# utc_offset_min=-360\n# uptime_to_wall_ms=%d\n" % WALL + HEADER
+                    + row("A", 0, "FIRE", 100000) + row("A", 0, "SLOT_DONE", done=100400)
+                    + row("A", 1, "FIRE", 101000) + row("A", 1, "SLOT_DONE", done=101400))
+
+    def shot(self, name, local_offset_s, mtime_off_s):
+        """A file whose EXIF says local time = run time + local_offset_s, with its own mtime offset."""
+        t = int(WALL / 1000) + 100 + local_offset_s - 6 * 3600
+        stamp = frames_for_run.time.strftime("%Y:%m:%d %H:%M:%S", frames_for_run.time.gmtime(t + 0))
+        path = os.path.join(self.dcim, name)
+        with open(path, "wb") as f:
+            f.write(jpeg_blob(stamp))
+        m = WALL / 1000.0 + mtime_off_s
+        os.utime(path, (m, m))
+        return path
+
+    def test_exif_wins_over_a_wrong_mtime(self):
+        a = self.shot("DSC00001.JPG", 0, 7 * 3600)
+        b = self.shot("DSC00002.JPG", 1, 7 * 3600)
+        self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A"), (0, [a, b]))
+
+    def test_no_exif_flag_uses_mtime(self):
+        self.shot("DSC00001.JPG", 0, 7 * 3600)
+        self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A", "--no-exif")[0], 3)
+
+    def test_files_without_exif_fall_back_to_mtime(self):
+        a = self.touch("DSC00001.JPG", 100.5)
+        self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A")[1], [a])
+
+    def test_exif_outside_the_run_is_left_out(self):
+        self.shot("DSC00001.JPG", 5000, 100)
+        self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A")[0], 3)
+
+    def test_raw_files_only_with_include_raw(self):
+        j = self.shot("DSC00001.JPG", 0, 0)
+        raw = os.path.join(self.dcim, "DSC00001.ARW")
+        t = int(WALL / 1000) + 100 - 6 * 3600
+        with open(raw, "wb") as f:
+            f.write(tiff_blob(frames_for_run.time.strftime("%Y:%m:%d %H:%M:%S", frames_for_run.time.gmtime(t))))
+        self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A")[1], [j])
+        self.assertEqual(self.run_main(self.tmp, "--log", self.log, "--run", "A", "--include-raw")[1], [raw, j])
 
 
 @unittest.skipUnless(shutil.which("bash"), "bash not available")

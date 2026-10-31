@@ -140,6 +140,8 @@ def report(run, stats, max_drift):
         problems.append("%d unexplained skip(s): SKIP rows with no skip_reason" % stats["unexplained"])
     who = ", ".join(v for v in (run.meta.get("model"), run.meta.get("app_version")) if v)
     out = ["run %s%s" % (run.run_id, " (%s)" % who if who else "")]
+    if run.meta.get("clock") == "system":
+        out.append("  note: wall times come from the system clock, not the camera RTC; do not match files by time")
     out.append("  shots: %d fired, %d completed" % (stats["fired"], stats["completed"]))
     out.append("  drift ms: max %s  mean %s  p95 %s" % (fmt(stats["drift_max"]), fmt(stats["drift_mean"]),
                                                        fmt(stats["drift_p95"])))
