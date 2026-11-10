@@ -4,29 +4,27 @@ TimeLapse+: an in-camera intervalometer for Sony PlayMemories (PMCA) cameras, ha
 
 ## Commands
 
-Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17–21 (Gradle 8.7 cannot run on 22+, and a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. CI: `.github/workflows/ci.yml` job `build`. Signing and publishing: `scripts/release.sh <version> [--local] [--dry-run]` (needs a gitignored `keystore.properties`, see `keystore.properties.example`; `scripts/make-keystore.sh` creates both). Maintainer release steps: `docs/release.md`.
+Gradle 8.7 (wrapper) + AGP 8.5.2. Needs a full JDK 17–21 (Gradle 8.7 cannot run on 22+, and a JRE fails in AGP's `androidJdkImage`) and an Android SDK with platform `android-34`, referenced from the untracked `local.properties` as `sdk.dir=<SDK path>`. CI: `.github/workflows/ci.yml` job `build`. Release and signing: `docs/release.md` (`scripts/release.sh`; needs a gitignored `keystore.properties`).
 
 ```
-JAVA_HOME=<JDK 17–21> ./gradlew clean :core:check :app:assembleDebug :app:assembleRelease :app:lint :app:testDebugUnitTest   # full build = pre-push gate
-JAVA_HOME=<JDK 17–21> ./gradlew :core:test                                                                                 # JVM unit tests only
-python3 -I tools/analyze_log.py <LOG.CSV> [--max-drift-ms 100]                                                              # per-run drift/skips/battery; exit 1 on drift or unexplained skips
-python3 -I -m unittest discover -s tools -p 'test_*.py'                                                                    # analyzer tests (stdlib only; CI runs them too, including the assemble.sh dry-run tests)
-tools/assemble.sh <dir> [--fps 24] [--deflicker] [--crop 16:9] [--out f.mp4] [--run <run_id>] [--dry-run]                      # JPEGs -> H.264 MP4 via ffmpeg (needed at run time only); --dry-run prints the command
-python3 -I tools/frames_for_run.py <dir> --log LOG.CSV --run <run_id> [--window-s 2] [--offset-s 0]                              # frame list for one run (FIRE/SLOT_DONE wall times vs file mtime); --list-runs prints ids
+JAVA_HOME=<JDK 17–21> ./gradlew clean :core:check :app:assembleDebug :app:assembleRelease :app:lint :app:testDebugUnitTest  # full build = pre-push gate
+JAVA_HOME=<JDK 17–21> ./gradlew :core:test  # JVM unit tests only
+python3 -I -m unittest discover -s tools -p 'test_*.py'  # desktop-tool tests (stdlib only; CI runs them too)
 ```
 
-- Outputs: `app/build/outputs/apk/debug/app-debug.apk` (debug-signed, v1+v2) and `app/build/outputs/apk/release/app-release-unsigned.apk` (unsigned until T18; T02 names release assets). Lint report: `app/build/reports/lint-results-debug.html`.
-- `:core:check` runs `:core:test` plus `jacocoTestCoverageVerification`, which fails below 90 % line coverage on `ShotPlan`, `Scheduler` (nested classes included), `Progress`, `RampController` or `ExposureRamp` (nested included). Every `:core:test` run writes the JaCoCo report to `core/build/reports/jacoco/test/` (HTML and `jacocoTestReport.xml`).
+- Desktop tools (`tools/analyze_log.py`, `tools/assemble.sh`, `tools/frames_for_run.py`): usage in `docs/architecture.md` § Desktop tools.
+- `:core:check` runs `:core:test` plus a JaCoCo gate: it fails below 90 % line coverage on `ShotPlan`, `Scheduler`, `Progress`, `RampController` or `ExposureRamp`. Report: `core/build/reports/jacoco/test/`.
 - API-10 guard: NewApi and InlinedApi are fatal lint issues. `assembleRelease` enforces them through `lintVitalRelease`; `assembleDebug` runs no lint, which is why the gate includes `:app:lint`.
 - Check an APK: `$ANDROID_HOME/build-tools/34.0.0/aapt dump badging <apk> | head -3` must show package `io.github.nathanrcast.timelapse`, `sdkVersion:'10'` and `targetSdkVersion:'10'`. `unzip -p <apk> classes.dex | head -c 8 | od -c` must read `dex\n035`, the only dex version Dalvik 2.3 loads.
 - OpenMemories-Framework is vendored in `app/libs/` at commit `f8df350` (sha256s in `app/libs/README.md`); there is no jitpack dependency. `stubs` must stay `compileOnly`: the `com.sony.*` classes come from the camera firmware, and packaging the stubs would shadow them.
 
 ## Layout
 
-- `app/src/main/java/io/github/nathanrcast/timelapse/`: app sources; the Java namespace matches `applicationId`. `ShootActivity` runs the capture loop on the core `Scheduler` (one `Handler` timer re-armed with `postAtTime` for each deadline, captures reported from `onShutter` and posted to the main looper) and applies the holy-grail ramp (the decision is `core` `ExposureRamp`, one table step per slot, with its per-run state in `RampController`; run once per slot on frame 0), `SettingsActivity` the setup UI. Android glue for `:core`: `SharedPreferencesSettingsStore` (persists `Settings`), `SettingsIntent` (hands them to `ShootActivity`) and `Clocks` (`UPTIME`, Handler's time base, the capture loop's `Clock`), `CardSpace` (free space and per-frame picture size, sampled on its own thread for the HUD) and `ShotLog` (appends one `TIMELPS/LOG.CSV` row per scheduler decision from a background `HandlerThread`; `core` `ShotRecord`/`ShotLogCsv` format it, and `tools/analyze_log.py` reads it).
-- `app/src/main/java/io/github/nathanrcast/timelapse/camera/`: the capability layer. `SafeCamera` makes every `CameraEx`/`ParametersModifier` call (its listener bridges `ShutterBridge` and `ExposureBridge` sit beside it). `ReflectiveCapabilities` is the probe: it resolves methods once per process, and `SafeCamera` re-reads the values at every `open()`. `ModelProfile` holds the per-body overrides. How the probe decides is in `docs/cameras.md`.
-- `core/src/main/java/io/github/nathanrcast/timelapse/core/`: the `:core` module, a plain `java-library` (`--release 8`) that the app depends on. Its compile classpath has no Android or Sony jar, so any `android.*`/`com.sony.*` reference fails `:core:compileJava`. `Settings` holds the options, defaults, range clamping and persisted keys, behind the `SettingsStore` interface; `load()` derives interval, shot count and delay from table indices (`StepTable`/`StepTables`) and migrates the pre-T10 raw slider keys (`LegacySliderMapping`). `ShotPlan` does duration, clip length and end time (bracketing, burst, infinite). `Scheduler` times the run from absolute deadlines `t0 + n·interval`: a slot is skipped at its deadline (`BUSY`, `LATE`) or fires and ends as `SLOT_DONE`, `LOST` (no onShutter within the capture timeout) or `INTERRUPTED` (paused), with no catch-up; it also handles brackets, burst, pause/resume and stopOn `CAPTURED`/`SLOTS`. All Scheduler calls must come from one thread (the main looper). `Progress` turns scheduler state into the shoot screen's count and remaining time, and `HudModel` formats the whole HUD (skips, next, elapsed, battery, card estimate, run summary). `Clock` is the time source, `Util` the formatters and the shutter/ISO/deadband step tables, and `SliderMapping` the seek-bar labels and HG mappings. `core.camera` holds the capability model for the app's `camera/` layer: `SonyMethod` lists every Sony method used, `Query` the supported-value reads, `Feature` each option's rules, `Capabilities`/`ProbedCapabilities` the probe result, `OptionVisibility` the settings-screen decision, and `RunOptions` the run-time mask. Tests in `core/src/test/` include the `FakeClock` and `MapSettingsStore` fakes and `SchedulerRig`, which drives a `Scheduler` like `ShootActivity` (timer, onShutter, capture times, late or lost callbacks).
-- `app/src/main/java/com/github/ma1co/pmcademo/app/`: `BaseActivity` (Sony `ScalarInput` key handling) and `AppNotificationManager`, vendored from PMCADemo. They keep their own package and `LICENSE.txt`.
+Class-by-class map: `docs/architecture.md`.
+
+- `app/src/main/java/io/github/nathanrcast/timelapse/`: Activities and Android glue; `camera/` under it is the capability layer (`SafeCamera`, `ReflectiveCapabilities`, `ModelProfile`; probe rules in `docs/cameras.md`).
+- `core/`: plain `java-library` (`--release 8`) with no Android or Sony jar on its classpath; holds `Settings`, `ShotPlan`, `Scheduler`, `ExposureRamp` and the `core.camera` capability model. All `Scheduler` calls come from one thread (the main looper).
+- `app/src/main/java/com/github/ma1co/pmcademo/app/`: vendored from PMCADemo; keeps its own package and `LICENSE.txt`.
 
 ## Invariants
 
@@ -40,7 +38,7 @@ python3 -I tools/frames_for_run.py <dir> --log LOG.CSV --run <run_id> [--window-
 - **`DisplayManager` calls outside `BaseActivity` are `Display`'s alone** (DOFF switch and restore). They are `SonyMethod` entries, and `Display` guards each with `ReflectiveCapabilities.has` because `restoreIfLeftOff` runs before any probe. Every restore path targets the panel.
 - `applicationId` and the release signing key are permanent. Installers pin the certificate on first install, so changing either forces every user to uninstall.
 - Pure logic (scheduling, exposure ramp, shot-plan math) belongs in `:core` with JVM unit tests, not in Activities.
-- **Lint's API-10 check does not cover `:core`.** `--release 8` limits it to the Java 8 API, but Android lint runs NewApi only on the app module, not on JVM modules. Keep core code to what API 10 has: no `java.util.function`, streams, `java.time` or `java.nio.file`, and plain anonymous classes rather than lambdas (D8 desugars lambdas, but anonymous classes read clearer against Dalvik). After changing `:core`, check the APK with `dexdump -d` for `invoke-custom`/`invoke-polymorphic` (there must be none).
+- **Lint's API-10 check does not cover `:core`** (Android lint runs NewApi only on the app module). Keep core code to what API 10 has: no `java.util.function`, streams, `java.time` or `java.nio.file`, and anonymous classes rather than lambdas. After changing `:core`, check the APK with `dexdump -d`: there must be no `invoke-custom`/`invoke-polymorphic`.
 
 ## Settled decisions — do not re-litigate
 
@@ -53,7 +51,7 @@ python3 -I tools/frames_for_run.py <dir> --log LOG.CSV --run <run_id> [--window-
 - **Upstream issue numbers ≠ ours.** In issues, PRs and commit messages, write upstream refs as `` `up#41` `` inside backticks. A bare `#41` links to *our* issue 41. A `jonasjuffinger/TimeLapse#41` or upstream issue URL posts a backlink on the dormant upstream repo. Link to upstream issues only from files under `docs/`.
 - Don't `@`-mention upstream authors in issues/PRs. Credits live in README.
 - Long-exposure NR makes the camera shoot a dark frame after each exposure, which shows up as "skipped every other shot" (upstream issues 26/50). Rule it out before blaming the scheduler.
-- The Frosbe fork is merged with its history (T03): `git log --follow` on a moved file runs through `com/frosbe/holygrail/` back to `com/jonasjuffinger/timelapse/`. Holy grail defaults to off, and its Sony calls run only when it is on. The T03 holy-grail bugs are fixed in T14 (target in EV via `ExposureRamp.thirdsToEv`, ramp per slot, ISO/shutter "unknown" handling, slot-aware shutter clamp). Its `com.jjoe64:graphview:3.1.4` dependency (LGPL, never shown) was removed.
+- The Frosbe fork is merged with its history: `git log --follow` on a moved file runs through `com/frosbe/holygrail/` back to `com/jonasjuffinger/timelapse/`. Holy grail defaults to off, and its Sony calls run only when it is on.
 - `local.properties` is machine-specific and untracked.
 - Release minify is off on purpose; re-enabling it (R8) needs an on-camera Dalvik 2.3 test.
 
